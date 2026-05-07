@@ -11,5 +11,9 @@ database_id = "c4f3214b-44dc-455d-9f8a-3a4589254548"
 binding = "MEDIA_BUCKET"
 bucket_name = "portfolio-media"
 
+[[kv_namespaces]]
+binding = "SESSION"
+id = "d5ac5efdcd7544399999b227b19633d6"
+
 [vars]
 ADMIN_USERNAME = "admin"
