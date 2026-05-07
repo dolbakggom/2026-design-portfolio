@@ -1,0 +1,55 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import WorkBlocks from "../../components/WorkBlocks.astro";
+import { getWorkBySlug } from "../../lib/content";
+
+export const prerender = false;
+
+const { slug } = Astro.params;
+const work = slug ? await getWorkBySlug(slug) : null;
+
+if (!work) {
+  Astro.response.status = 404;
+}
+---
+
+<BaseLayout title={work ? `${work.title} | Beyond the Answer.` : "Work not found"}>
+  {
+    work ? (
+      <main class="work-detail">
+        <a class="back-link" href="/#work">Back to work</a>
+        <header class="work-hero">
+          <div class="work-hero-copy">
+            <p class="section-kicker">{work.category}</p>
+            <h1>{work.title}</h1>
+            <p>{work.summary}</p>
+          </div>
+          <dl class="work-meta">
+            <div>
+              <dt>Client</dt>
+              <dd>{work.client || "Selected Project"}</dd>
+            </div>
+            <div>
+              <dt>Year</dt>
+              <dd>{work.year || "2026"}</dd>
+            </div>
+            <div>
+              <dt>Role</dt>
+              <dd>{work.role || "Design"}</dd>
+            </div>
+          </dl>
+        </header>
+        <section class="work-detail-media">
+          {work.hero?.url ? <img src={work.hero.url} alt={work.hero.alt ?? work.title} /> : <div class="work-detail-placeholder" />}
+        </section>
+        <WorkBlocks blocks={work.blocks ?? []} />
+      </main>
+    ) : (
+      <main class="not-found">
+        <p class="section-kicker">404</p>
+        <h1>작업물을 찾을 수 없습니다.</h1>
+        <a href="/">메인으로 돌아가기</a>
+      </main>
+    )
+  }
+</BaseLayout>

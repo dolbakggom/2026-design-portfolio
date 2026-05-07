@@ -1,0 +1,600 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getHomeContent } from "../lib/content";
+
+interface Props {
+  initialSection?: "intro" | "about" | "career" | "work";
+}
+
+const { initialSection = "intro" } = Astro.props;
+const { profile, timeline, featuredWorks, works } = await getHomeContent();
+const categories = ["UI/UX", "BI/BX"];
+const logoSrc = "/assets/figma/hampenta-logo.svg";
+const fallbackPortraitSrc = "/assets/figma/profile-guitar.png";
+const slogan = profile.headline.replace(/\.$/, "");
+const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
+const phoneLink = profile.links.find((link) => link.url.startsWith("tel:") || /010[-\d]+/.test(link.label));
+const locationLink = profile.links.find((link) => link.label.includes("서울") || link.label.toLowerCase() === "location");
+---
+
+<BaseLayout title={`${profile.headline} | ${profile.name}`} description={profile.bio} htmlClass="home-scroll" bodyClass="home-body">
+  <main class="site-shell" data-initial-section={initialSection}>
+    <section class="intro-section snap-panel" aria-label="Intro" data-route="/">
+      <div class="intro-grid">
+        <img class="site-logo intro-logo" src={logoSrc} alt="" />
+        <h1 class="intro-title">
+          <span data-intro-typewriter={slogan}>{slogan}</span><span class="intro-dot" aria-hidden="true">.</span>
+        </h1>
+      </div>
+    </section>
+
+    <section class="identity-section snap-panel" id="about" data-identity data-route="/about" style={`min-height:${timeline.length + 1}00svh;`}>
+      <div class="identity-stage">
+        <div class="identity-copy">
+          <img class="profile-logo" src={logoSrc} alt="" />
+          <div class="identity-copy-stack">
+            <div class="profile-intro identity-copy-panel is-active" data-type-copy="about" set:html={profile.intro} />
+            <div class="timeline-heading identity-copy-panel" data-type-copy="career">
+              <h2>초등학교 방과 후 교실에서 포토샵에 흥미를 가진 이후,<br />2014년부터 계속 활동하고 있습니다.</h2>
+            </div>
+          </div>
+          <div class="profile-contact" data-profile-contact>
+            <strong>{profile.name}</strong>
+            {emailLink ? <a href={emailLink.url}><span aria-hidden="true">E</span>{emailLink.label}</a> : null}
+            {phoneLink ? <a href={phoneLink.url}><span aria-hidden="true">T</span>{phoneLink.label}</a> : null}
+            {locationLink ? <span><span aria-hidden="true">L</span>{locationLink.label}</span> : null}
+          </div>
+        </div>
+
+        <div class="identity-side">
+          <figure class="profile-media" data-profile-media>
+            <img src={profile.portrait?.url ?? fallbackPortraitSrc} alt={profile.portrait?.alt ?? profile.name} />
+            <figcaption>취미로 기타를 치고 있습니다.</figcaption>
+          </figure>
+
+          <div class="timeline-items" data-career-list>
+            {
+              timeline.map((item, index) => (
+                <article class:list={["timeline-card", index === 0 && "is-active"]} data-timeline-card>
+                  <p>{item.period}</p>
+                  <h3>{item.title}</h3>
+                  <span>{item.organization}</span>
+                  <div>{item.description}</div>
+                </article>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="work-intro-section snap-panel" id="work" aria-label="Work intro" data-route="/work">
+      <img class="site-logo" src={logoSrc} alt="" />
+      <h2>WORK</h2>
+    </section>
+
+    <section class="featured-section" id="featured-work" data-route="/work">
+      <div class="section-heading">
+        <p class="section-kicker">Selected Work</p>
+      </div>
+      <div class="featured-list">
+        {
+          featuredWorks.map((work, index) => (
+            <article class="featured-work snap-panel" style={`--work-index:${index};`} data-route="/work">
+              <a href={`/work/${work.slug}`} class="featured-link" aria-label={`${work.title} 자세히 보기`}>
+                <div class="work-visual">
+                  {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} crossorigin="anonymous" loading="lazy" /> : null}
+                </div>
+                <div class="featured-copy">
+                  <span class="featured-category">{work.category}</span>
+                  <h3>{work.title}</h3>
+                  <p class="featured-meta">
+                    <span>{work.year}</span>
+                    <span>{work.client || "개인 프로젝트"}</span>
+                    <span>{work.role || "Figma + Adobe Illustrator"}</span>
+                  </p>
+                  <em>더 알아보기 →</em>
+                </div>
+              </a>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="gallery-section snap-panel" aria-label="Work gallery" data-route="/work">
+      <div class="section-heading gallery-heading">
+        <div class="category-filter" role="tablist" aria-label="Work category">
+          {categories.map((category) => <button type="button" class:list={[category === "UI/UX" && "is-active"]} data-filter={category}>{category}</button>)}
+        </div>
+      </div>
+      <div class="work-grid">
+        {
+          works.map((work) => (
+            <a class="work-tile" href={`/work/${work.slug}`} data-category={work.category} hidden={work.category !== "UI/UX"}>
+              <div class="work-tile-media">
+                {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} loading="lazy" /> : null}
+              </div>
+              <div>
+                <h3>{work.title}</h3>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+
+  <script>
+    import gsap from "gsap";
+    import { ScrollTrigger } from "gsap/ScrollTrigger";
+    import { ScrollToPlugin } from "gsap/ScrollToPlugin";
+
+    gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const shell = document.querySelector<HTMLElement>(".site-shell");
+    const initialSection = shell?.dataset.initialSection ?? "intro";
+    let lockedUntil = 0;
+
+    const replaceRoute = (route: string) => {
+      if (window.location.pathname === route) return;
+      window.history.replaceState(null, "", route);
+    };
+
+    const lockScroll = (duration = 1050) => {
+      lockedUntil = Math.max(lockedUntil, Date.now() + duration);
+    };
+
+    const isScrollLocked = () => Date.now() < lockedUntil;
+
+    const typeText = (target: HTMLElement, value: string, speed = 58, done?: () => void) => {
+      target.textContent = "";
+      const chars = value.split("");
+      chars.forEach((char, index) => {
+        window.setTimeout(() => {
+          target.textContent += char;
+          if (index === chars.length - 1) done?.();
+        }, speed * index);
+      });
+    };
+
+    const textCopies = new Map<HTMLElement, { node: Text; text: string }[]>();
+
+    const prepareTypeElement = (element: HTMLElement) => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      const nodes: { node: Text; text: string }[] = [];
+      let current = walker.nextNode();
+
+      while (current) {
+        if (current.textContent?.trim()) {
+          nodes.push({ node: current as Text, text: current.textContent });
+        }
+        current = walker.nextNode();
+      }
+
+      textCopies.set(element, nodes);
+      nodes.forEach(({ node }) => {
+        node.textContent = "";
+      });
+    };
+
+    const typeElement = (element: HTMLElement, speed = 18) => {
+      const nodes = textCopies.get(element);
+      if (!nodes || element.dataset.typed === "true") return;
+
+      element.dataset.typed = "true";
+      let nodeIndex = 0;
+      let charIndex = 0;
+
+      const step = () => {
+        const current = nodes[nodeIndex];
+        if (!current) return;
+
+        current.node.textContent = current.text.slice(0, charIndex + 1);
+        charIndex += 1;
+
+        if (charIndex >= current.text.length) {
+          nodeIndex += 1;
+          charIndex = 0;
+        }
+
+        if (nodeIndex < nodes.length) {
+          window.setTimeout(step, speed);
+        }
+      };
+
+      step();
+    };
+
+    const introLogo = document.querySelector<HTMLElement>(".intro-logo");
+    const introTypeTarget = document.querySelector<HTMLElement>("[data-intro-typewriter]");
+
+    if (introTypeTarget && !reduceMotion) {
+      const phrase = introTypeTarget.dataset.introTypewriter ?? introTypeTarget.textContent ?? "";
+      introTypeTarget.textContent = "";
+      gsap.set(introLogo, { autoAlpha: 0, filter: "blur(18px)", scale: 0.94 });
+      gsap.to(introLogo, { autoAlpha: 1, filter: "blur(0px)", scale: 1, duration: 1.45, ease: "power3.out" });
+      gsap.delayedCall(1, () => {
+        typeText(introTypeTarget, phrase, 64, () => {
+          document.documentElement.classList.add("intro-complete");
+        });
+      });
+    } else {
+      document.documentElement.classList.add("intro-complete");
+    }
+
+    const aboutCopy = document.querySelector<HTMLElement>('[data-type-copy="about"]');
+    const careerCopy = document.querySelector<HTMLElement>('[data-type-copy="career"]');
+    const identity = document.querySelector<HTMLElement>("[data-identity]");
+    const profileLogo = document.querySelector<HTMLElement>(".profile-logo");
+    const profileContact = document.querySelector<HTMLElement>("[data-profile-contact]");
+    const profileMedia = document.querySelector<HTMLElement>("[data-profile-media]");
+    const careerList = document.querySelector<HTMLElement>("[data-career-list]");
+    const timelineCards = gsap.utils.toArray<HTMLElement>("[data-timeline-card]");
+
+    if (!reduceMotion) {
+      [aboutCopy, careerCopy].forEach((element) => {
+        if (element) prepareTypeElement(element);
+      });
+
+      gsap.set([profileLogo, profileContact, profileMedia], { autoAlpha: 0 });
+      gsap.set(profileLogo, { y: 18, filter: "brightness(0) blur(12px)" });
+      gsap.set(profileContact, { y: 24 });
+      gsap.set(profileMedia, { clipPath: "inset(10% 0% 10% 100%)", scale: 1.08, filter: "blur(10px)" });
+      gsap.set(careerList, { autoAlpha: 0, x: 64, filter: "blur(12px)" });
+    }
+
+    const playAboutIntro = () => {
+      if (!identity || !profileLogo || !profileContact || !profileMedia || !aboutCopy) return;
+      if (identity.dataset.aboutPlayed === "true") return;
+      if (reduceMotion) return;
+
+      identity.dataset.aboutPlayed = "true";
+      lockScroll(3000);
+      const timeline = gsap.timeline();
+      timeline
+        .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.72, ease: "power3.out" })
+        .add(() => typeElement(aboutCopy, 16), "-=0.06")
+        .to(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)", duration: 1.12, ease: "power4.out" }, "<")
+        .to(profileContact, { autoAlpha: 1, y: 0, duration: 0.62, ease: "power3.out" }, "+=0.24");
+    };
+
+    const setIdentityMode = (mode: "about" | "career", progress = 0) => {
+      if (!identity) return;
+      const isCareer = mode === "career";
+      identity.classList.toggle("is-career", isCareer);
+      replaceRoute(isCareer ? "/career" : "/about");
+
+      if (isCareer && careerCopy) {
+        typeElement(careerCopy, 15);
+      }
+
+      if (timelineCards.length) {
+        const activeIndex = Math.min(timelineCards.length - 1, Math.max(0, Math.floor(progress * timelineCards.length)));
+        timelineCards.forEach((card, index) => card.classList.toggle("is-active", index === activeIndex));
+      }
+    };
+
+    if (identity && !reduceMotion) {
+      const careerStartProgress = 1 / Math.max(1, timelineCards.length);
+      ScrollTrigger.create({
+        trigger: identity,
+        start: "top top",
+        end: "bottom bottom",
+        scrub: true,
+        onEnter: playAboutIntro,
+        onEnterBack: playAboutIntro,
+        onUpdate: (self) => {
+          const careerProgress = gsap.utils.clamp(0, 1, (self.progress - careerStartProgress) / (1 - careerStartProgress));
+          setIdentityMode(self.progress >= careerStartProgress * 0.72 ? "career" : "about", careerProgress);
+          gsap.to(careerList, {
+            autoAlpha: self.progress >= careerStartProgress * 0.58 ? 1 : 0,
+            x: self.progress >= careerStartProgress * 0.58 ? 0 : 64,
+            filter: self.progress >= careerStartProgress * 0.58 ? "blur(0px)" : "blur(12px)",
+            duration: 0.26,
+            overwrite: true
+          });
+        }
+      });
+    }
+
+    if (!reduceMotion) {
+      gsap.utils.toArray<HTMLElement>(".snap-panel").forEach((panel) => {
+        if (!panel.matches(".intro-section, .identity-section")) {
+          gsap.fromTo(
+            panel,
+            { y: 120 },
+            {
+              y: 0,
+              ease: "none",
+              scrollTrigger: {
+                trigger: panel,
+                start: "top bottom",
+                end: "top top",
+                scrub: 0.65
+              }
+            }
+          );
+        }
+
+        ScrollTrigger.create({
+          trigger: panel,
+          start: "top center",
+          end: "bottom center",
+          onEnter: () => panel.dataset.route && !panel.matches(".identity-section") && replaceRoute(panel.dataset.route),
+          onEnterBack: () => panel.dataset.route && !panel.matches(".identity-section") && replaceRoute(panel.dataset.route)
+        });
+      });
+
+      gsap.utils.toArray<HTMLElement>(".featured-work").forEach((item) => {
+        const visual = item.querySelector(".work-visual img");
+        const copyChildren = item.querySelectorAll(".featured-copy > *");
+
+        if (visual) {
+          gsap.fromTo(
+            visual,
+            { scale: 1.12, yPercent: 4 },
+            {
+              scale: 1,
+              yPercent: 0,
+              ease: "none",
+              scrollTrigger: {
+                trigger: item,
+                start: "top bottom",
+                end: "bottom top",
+                scrub: true
+              }
+            }
+          );
+        }
+
+        gsap.fromTo(
+          copyChildren,
+          { autoAlpha: 0, y: 48, filter: "blur(10px)" },
+          {
+            autoAlpha: 1,
+            y: 0,
+            filter: "blur(0px)",
+            duration: 0.85,
+            stagger: 0.08,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: item,
+              start: "top 68%"
+            }
+          }
+        );
+      });
+    }
+
+    type SnapTarget = {
+      y: number;
+      route: string;
+      kind: "intro" | "about" | "career" | "work" | "featured" | "gallery";
+      careerIndex?: number;
+    };
+
+    const getSnapTargets = () => {
+      const intro = document.querySelector<HTMLElement>(".intro-section");
+      const identitySection = document.querySelector<HTMLElement>("[data-identity]");
+      const workSection = document.querySelector<HTMLElement>("#work");
+      const featuredPanels = gsap.utils.toArray<HTMLElement>(".featured-work");
+      const gallery = document.querySelector<HTMLElement>(".gallery-section");
+      const targets: SnapTarget[] = [];
+
+      if (intro) targets.push({ y: intro.offsetTop, route: "/", kind: "intro" });
+      if (identitySection) {
+        targets.push({ y: identitySection.offsetTop, route: "/about", kind: "about" });
+        timelineCards.forEach((_, index) => {
+          targets.push({
+            y: identitySection.offsetTop + window.innerHeight * (index + 1),
+            route: "/career",
+            kind: "career",
+            careerIndex: index
+          });
+        });
+      }
+      if (workSection) targets.push({ y: workSection.offsetTop, route: "/work", kind: "work" });
+      featuredPanels.forEach((panel) => targets.push({ y: panel.offsetTop, route: "/work", kind: "featured" }));
+      if (gallery) targets.push({ y: gallery.offsetTop, route: "/work", kind: "gallery" });
+
+      return targets.sort((a, b) => a.y - b.y);
+    };
+
+    const getCurrentSnapIndex = (targets: SnapTarget[]) => {
+      const currentY = window.scrollY;
+      let closestIndex = 0;
+      let closestDistance = Number.POSITIVE_INFINITY;
+
+      targets.forEach((target, index) => {
+        const distance = Math.abs(target.y - currentY);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+
+      return closestIndex;
+    };
+
+    const applySnapState = (target: SnapTarget) => {
+      replaceRoute(target.route);
+
+      if (target.kind === "about") {
+        setIdentityMode("about", 0);
+        if (identity?.dataset.aboutPlayed === "true") {
+          if (profileLogo) {
+            gsap.set(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)" });
+          }
+          if (profileContact) {
+            gsap.set(profileContact, { autoAlpha: 1, y: 0, filter: "blur(0px)" });
+          }
+          if (profileMedia) {
+            gsap.set(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
+          }
+          if (careerList) {
+            gsap.to(careerList, { autoAlpha: 0, x: 64, filter: "blur(12px)", duration: 0.25, overwrite: true });
+          }
+        } else {
+          playAboutIntro();
+        }
+      }
+
+      if (target.kind === "career") {
+        if (identity) {
+          identity.dataset.aboutPlayed = "true";
+        }
+        if (profileLogo) {
+          gsap.set(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)" });
+        }
+        if (profileContact) {
+          gsap.set(profileContact, { autoAlpha: 0, y: 24 });
+        }
+        if (profileMedia) {
+          gsap.set(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
+        }
+        if (careerList) {
+          gsap.to(careerList, { autoAlpha: 1, x: 0, filter: "blur(0px)", duration: 0.35, overwrite: true });
+        }
+        const progress = timelineCards.length > 1 ? (target.careerIndex ?? 0) / (timelineCards.length - 1) : 0;
+        setIdentityMode("career", progress);
+      }
+    };
+
+    const goToSnap = (direction: 1 | -1) => {
+      const targets = getSnapTargets();
+      if (!targets.length || isScrollLocked()) return;
+
+      const currentIndex = getCurrentSnapIndex(targets);
+      const nextIndex = currentIndex + direction;
+      const target = targets[nextIndex];
+      if (!target) return;
+
+      lockScroll(target.kind === "about" ? 3000 : 1050);
+      gsap.to(window, {
+        scrollTo: { y: target.y, autoKill: false },
+        duration: 0.92,
+        ease: "power3.inOut",
+        overwrite: true,
+        onStart: () => applySnapState(target),
+        onComplete: () => {
+          ScrollTrigger.refresh();
+        }
+      });
+    };
+
+    if (!reduceMotion) {
+      ScrollTrigger.observe({
+        target: window,
+        type: "wheel,touch",
+        wheelSpeed: -1,
+        tolerance: 64,
+        preventDefault: true,
+        onUp: () => goToSnap(1),
+        onDown: () => goToSnap(-1)
+      });
+
+      window.addEventListener("keydown", (event) => {
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (["ArrowDown", "PageDown", " "].includes(event.key)) {
+          event.preventDefault();
+          goToSnap(1);
+        }
+        if (["ArrowUp", "PageUp"].includes(event.key)) {
+          event.preventDefault();
+          goToSnap(-1);
+        }
+      });
+    }
+
+    const scrollToInitialSection = () => {
+      if (initialSection === "intro") return;
+
+      const identitySection = document.querySelector<HTMLElement>("[data-identity]");
+      const workSection = document.querySelector<HTMLElement>("#work");
+      const targetTop =
+        initialSection === "work"
+          ? workSection?.offsetTop
+          : identitySection
+            ? identitySection.offsetTop + (initialSection === "career" ? window.innerHeight : 0)
+            : 0;
+
+      window.scrollTo({ top: targetTop ?? 0, behavior: "instant" as ScrollBehavior });
+      if (initialSection === "about") {
+        playAboutIntro();
+      }
+      if (initialSection === "career") {
+        applySnapState({ y: targetTop ?? 0, route: "/career", kind: "career", careerIndex: 0 });
+      }
+      ScrollTrigger.refresh();
+    };
+
+    window.requestAnimationFrame(() => window.setTimeout(scrollToInitialSection, 120));
+
+    const updateFeaturedContrast = () => {
+      document.querySelectorAll<HTMLElement>(".featured-work").forEach((card) => {
+        const img = card.querySelector<HTMLImageElement>(".work-visual img");
+        if (!img) {
+          card.dataset.textTone = "light";
+          return;
+        }
+
+        const sampleImage = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const size = 32;
+            canvas.width = size;
+            canvas.height = size;
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+            if (!context) return;
+
+            context.drawImage(img, 0, 0, size, size);
+            const pixels = context.getImageData(0, 0, size, size).data;
+            let total = 0;
+            let count = 0;
+
+            for (let index = 0; index < pixels.length; index += 4) {
+              const alpha = pixels[index + 3] / 255;
+              if (alpha < 0.2) continue;
+              const red = pixels[index];
+              const green = pixels[index + 1];
+              const blue = pixels[index + 2];
+              total += (0.2126 * red + 0.7152 * green + 0.0722 * blue) * alpha;
+              count += alpha;
+            }
+
+            const luminance = count ? total / count : 0;
+            card.dataset.textTone = luminance > 148 ? "dark" : "light";
+          } catch {
+            card.dataset.textTone = "light";
+          }
+        };
+
+        if (img.complete && img.naturalWidth) {
+          sampleImage();
+        } else {
+          img.addEventListener("load", sampleImage, { once: true });
+          img.addEventListener("error", () => {
+            card.dataset.textTone = "light";
+          }, { once: true });
+        }
+      });
+    };
+
+    updateFeaturedContrast();
+
+    const filterButtons = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
+    const tiles = document.querySelectorAll<HTMLElement>("[data-category]");
+
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const filter = button.dataset.filter ?? "UI/UX";
+        filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+        tiles.forEach((tile) => {
+          tile.toggleAttribute("hidden", tile.dataset.category !== filter);
+        });
+      });
+    });
+  </script>
+</BaseLayout>

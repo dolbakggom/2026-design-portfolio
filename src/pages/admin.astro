@@ -1,0 +1,10 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import AdminApp from "../components/admin/AdminApp";
+
+export const prerender = false;
+---
+
+<BaseLayout title="Admin | Beyond the Answer." bodyClass="admin-body">
+  <AdminApp client:load />
+</BaseLayout>
