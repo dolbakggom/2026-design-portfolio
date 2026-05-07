@@ -22,12 +22,15 @@ npm run db:migrate:local
 npm run dev
 ```
 
-## Cloudflare
+## Cloudflare Workers
 
 - D1 binding: `DB`
 - R2 binding: `MEDIA_BUCKET`
+- KV binding: `SESSION`
 - Required secrets: `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`
-- Update `database_id` in `wrangler.toml` after creating the Cloudflare D1 database.
+- Deploy with Cloudflare Workers, not Cloudflare Pages. Astro 6 + `@astrojs/cloudflare` v13 targets Workers.
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
 
 ## Routes
 
