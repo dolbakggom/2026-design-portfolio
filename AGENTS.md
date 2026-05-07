@@ -30,6 +30,12 @@
 - Validate all admin API payloads with Zod.
 - Keep public routes resilient: if D1 is unavailable locally, render starter content instead of crashing.
 
+## History Workflow
+- Keep `HISTORY.md` updated so work can continue across separate Codex projects on different Macs.
+- Before committing or pushing, add a concise entry to `HISTORY.md` when the work changes behavior, deployment configuration, schema, scroll mechanics, visual structure, or future-agent assumptions.
+- Each history entry should include the user request, implementation summary, important files, verification commands/results, and any remaining follow-up or caution.
+- If the user asks to commit/push, include the relevant `HISTORY.md` update in the same commit unless they explicitly ask not to.
+
 ## Cloudflare Bindings
 - D1 binding: `DB`
 - R2 binding: `MEDIA_BUCKET`
