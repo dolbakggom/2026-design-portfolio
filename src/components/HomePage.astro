@@ -15,6 +15,7 @@ const slogan = profile.headline.replace(/\.$/, "");
 const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
 const phoneLink = profile.links.find((link) => link.url.startsWith("tel:") || /010[-\d]+/.test(link.label));
 const locationLink = profile.links.find((link) => link.label.includes("서울") || link.label.toLowerCase() === "location");
+const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
 ---
 
 <BaseLayout title={`${profile.headline} | ${profile.name}`} description={profile.bio} htmlClass="home-scroll" bodyClass="home-body">
@@ -28,7 +29,7 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
       </div>
     </section>
 
-    <section class="identity-section snap-panel" id="about" data-identity data-route="/about" style={`min-height:${timeline.length + 1}00svh;`}>
+    <section class="identity-section snap-panel" id="about" data-identity data-route="/about" style={`min-height:${identityTravelSvh}svh;`}>
       <div class="identity-stage">
         <div class="identity-copy">
           <img class="profile-logo" src={logoSrc} alt="" />
@@ -136,17 +137,24 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
     const shell = document.querySelector<HTMLElement>(".site-shell");
     const initialSection = shell?.dataset.initialSection ?? "intro";
     let lockedUntil = 0;
+    let snapTween: gsap.core.Tween | null = null;
 
     const replaceRoute = (route: string) => {
       if (window.location.pathname === route) return;
       window.history.replaceState(null, "", route);
     };
 
+    const clearHomeRoute = () => {
+      if (["/about", "/career", "/work"].includes(window.location.pathname)) {
+        replaceRoute("/");
+      }
+    };
+
     const lockScroll = (duration = 1050) => {
       lockedUntil = Math.max(lockedUntil, Date.now() + duration);
     };
 
-    const isScrollLocked = () => Date.now() < lockedUntil;
+    const isScrollLocked = () => Date.now() < lockedUntil || Boolean(snapTween);
 
     const typeText = (target: HTMLElement, value: string, speed = 58, done?: () => void) => {
       target.textContent = "";
@@ -251,11 +259,10 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
       if (reduceMotion) return;
 
       identity.dataset.aboutPlayed = "true";
-      lockScroll(3000);
       const timeline = gsap.timeline();
       timeline
         .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.72, ease: "power3.out" })
-        .add(() => typeElement(aboutCopy, 16), "-=0.06")
+        .add(() => typeElement(aboutCopy, 24), "-=0.06")
         .to(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)", duration: 1.12, ease: "power4.out" }, "<")
         .to(profileContact, { autoAlpha: 1, y: 0, duration: 0.62, ease: "power3.out" }, "+=0.24");
     };
@@ -264,10 +271,9 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
       if (!identity) return;
       const isCareer = mode === "career";
       identity.classList.toggle("is-career", isCareer);
-      replaceRoute(isCareer ? "/career" : "/about");
 
       if (isCareer && careerCopy) {
-        typeElement(careerCopy, 15);
+        typeElement(careerCopy, 24);
       }
 
       if (timelineCards.length) {
@@ -276,8 +282,10 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
       }
     };
 
+    const careerStartProgress = 0.22;
+    const careerEndProgress = 0.9;
+
     if (identity && !reduceMotion) {
-      const careerStartProgress = 1 / Math.max(1, timelineCards.length);
       ScrollTrigger.create({
         trigger: identity,
         start: "top top",
@@ -286,12 +294,13 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
         onEnter: playAboutIntro,
         onEnterBack: playAboutIntro,
         onUpdate: (self) => {
-          const careerProgress = gsap.utils.clamp(0, 1, (self.progress - careerStartProgress) / (1 - careerStartProgress));
-          setIdentityMode(self.progress >= careerStartProgress * 0.72 ? "career" : "about", careerProgress);
+          const showCareer = self.progress >= careerStartProgress * 0.82;
+          const careerProgress = gsap.utils.clamp(0, 1, (self.progress - careerStartProgress) / (careerEndProgress - careerStartProgress));
+          setIdentityMode(showCareer ? "career" : "about", careerProgress);
           gsap.to(careerList, {
-            autoAlpha: self.progress >= careerStartProgress * 0.58 ? 1 : 0,
-            x: self.progress >= careerStartProgress * 0.58 ? 0 : 64,
-            filter: self.progress >= careerStartProgress * 0.58 ? "blur(0px)" : "blur(12px)",
+            autoAlpha: showCareer ? 1 : 0,
+            x: showCareer ? 0 : 64,
+            filter: showCareer ? "blur(0px)" : "blur(12px)",
             duration: 0.26,
             overwrite: true
           });
@@ -301,70 +310,13 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
 
     if (!reduceMotion) {
       gsap.utils.toArray<HTMLElement>(".snap-panel").forEach((panel) => {
-        if (!panel.matches(".intro-section, .identity-section")) {
-          gsap.fromTo(
-            panel,
-            { y: 120 },
-            {
-              y: 0,
-              ease: "none",
-              scrollTrigger: {
-                trigger: panel,
-                start: "top bottom",
-                end: "top top",
-                scrub: 0.65
-              }
-            }
-          );
-        }
-
         ScrollTrigger.create({
           trigger: panel,
           start: "top center",
           end: "bottom center",
-          onEnter: () => panel.dataset.route && !panel.matches(".identity-section") && replaceRoute(panel.dataset.route),
-          onEnterBack: () => panel.dataset.route && !panel.matches(".identity-section") && replaceRoute(panel.dataset.route)
+          onEnter: () => panel.matches(".gallery-section") ? replaceRoute("/work") : clearHomeRoute(),
+          onEnterBack: () => panel.matches(".gallery-section") ? replaceRoute("/work") : clearHomeRoute()
         });
-      });
-
-      gsap.utils.toArray<HTMLElement>(".featured-work").forEach((item) => {
-        const visual = item.querySelector(".work-visual img");
-        const copyChildren = item.querySelectorAll(".featured-copy > *");
-
-        if (visual) {
-          gsap.fromTo(
-            visual,
-            { scale: 1.12, yPercent: 4 },
-            {
-              scale: 1,
-              yPercent: 0,
-              ease: "none",
-              scrollTrigger: {
-                trigger: item,
-                start: "top bottom",
-                end: "bottom top",
-                scrub: true
-              }
-            }
-          );
-        }
-
-        gsap.fromTo(
-          copyChildren,
-          { autoAlpha: 0, y: 48, filter: "blur(10px)" },
-          {
-            autoAlpha: 1,
-            y: 0,
-            filter: "blur(0px)",
-            duration: 0.85,
-            stagger: 0.08,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: item,
-              start: "top 68%"
-            }
-          }
-        );
       });
     }
 
@@ -372,8 +324,20 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
       y: number;
       route: string;
       kind: "intro" | "about" | "career" | "work" | "featured" | "gallery";
-      careerIndex?: number;
     };
+
+    const snapTolerance = 10;
+    const snapLockDuration = 680;
+    const aboutLockDuration = 760;
+
+    const getIdentityTop = () => document.querySelector<HTMLElement>("[data-identity]")?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getWorkTop = () => document.querySelector<HTMLElement>("#work")?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getGalleryTop = () => document.querySelector<HTMLElement>(".gallery-section")?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getIdentityScrollDistance = () => Math.max(0, getWorkTop() - getIdentityTop());
+    const getCareerEntryTop = () => getIdentityTop() + getIdentityScrollDistance() * careerStartProgress;
+    const getCareerExitTop = () => getIdentityTop() + getIdentityScrollDistance() * careerEndProgress;
+    const isFreeScrollRange = () => window.scrollY >= getGalleryTop() - snapTolerance;
+    const isNativeCareerRange = () => window.scrollY >= getIdentityTop() - snapTolerance && window.scrollY <= getCareerExitTop() + snapTolerance;
 
     const getSnapTargets = () => {
       const intro = document.querySelector<HTMLElement>(".intro-section");
@@ -386,14 +350,7 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
       if (intro) targets.push({ y: intro.offsetTop, route: "/", kind: "intro" });
       if (identitySection) {
         targets.push({ y: identitySection.offsetTop, route: "/about", kind: "about" });
-        timelineCards.forEach((_, index) => {
-          targets.push({
-            y: identitySection.offsetTop + window.innerHeight * (index + 1),
-            route: "/career",
-            kind: "career",
-            careerIndex: index
-          });
-        });
+        targets.push({ y: getCareerExitTop(), route: "/career", kind: "career" });
       }
       if (workSection) targets.push({ y: workSection.offsetTop, route: "/work", kind: "work" });
       featuredPanels.forEach((panel) => targets.push({ y: panel.offsetTop, route: "/work", kind: "featured" }));
@@ -402,24 +359,20 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
       return targets.sort((a, b) => a.y - b.y);
     };
 
-    const getCurrentSnapIndex = (targets: SnapTarget[]) => {
+    const getNextSnapTarget = (targets: SnapTarget[], direction: 1 | -1) => {
       const currentY = window.scrollY;
-      let closestIndex = 0;
-      let closestDistance = Number.POSITIVE_INFINITY;
-
-      targets.forEach((target, index) => {
-        const distance = Math.abs(target.y - currentY);
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
-        }
-      });
-
-      return closestIndex;
+      if (direction > 0) {
+        return targets.find((target) => target.y > currentY + snapTolerance) ?? null;
+      }
+      return [...targets].reverse().find((target) => target.y < currentY - snapTolerance) ?? null;
     };
 
     const applySnapState = (target: SnapTarget) => {
-      replaceRoute(target.route);
+      if (target.kind === "gallery") {
+        replaceRoute(target.route);
+      } else {
+        clearHomeRoute();
+      }
 
       if (target.kind === "about") {
         setIdentityMode("about", 0);
@@ -455,48 +408,101 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
           gsap.set(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
         }
         if (careerList) {
-          gsap.to(careerList, { autoAlpha: 1, x: 0, filter: "blur(0px)", duration: 0.35, overwrite: true });
+          gsap.set(careerList, { autoAlpha: 1, x: 0, filter: "blur(0px)" });
         }
-        const progress = timelineCards.length > 1 ? (target.careerIndex ?? 0) / (timelineCards.length - 1) : 0;
-        setIdentityMode("career", progress);
+        setIdentityMode("career", 0.999);
       }
     };
 
-    const goToSnap = (direction: 1 | -1) => {
-      const targets = getSnapTargets();
-      if (!targets.length || isScrollLocked()) return;
+    const shouldSnapInput = () => !isFreeScrollRange() && !isNativeCareerRange();
+    let requestSnapObserverSync = () => {};
 
-      const currentIndex = getCurrentSnapIndex(targets);
-      const nextIndex = currentIndex + direction;
-      const target = targets[nextIndex];
-      if (!target) return;
+    const snapToTarget = (target: SnapTarget) => {
+      if (isScrollLocked()) return;
 
-      lockScroll(target.kind === "about" ? 3000 : 1050);
-      gsap.to(window, {
-        scrollTo: { y: target.y, autoKill: false },
-        duration: 0.92,
+      lockScroll(target.kind === "about" ? aboutLockDuration : snapLockDuration);
+      snapTween = gsap.to(window, {
+        scrollTo: { y: Math.round(target.y), autoKill: false },
+        duration: target.kind === "about" ? 0.74 : 0.62,
         ease: "power3.inOut",
         overwrite: true,
-        onStart: () => applySnapState(target),
         onComplete: () => {
+          snapTween = null;
+          applySnapState(target);
           ScrollTrigger.refresh();
+          requestSnapObserverSync();
+        },
+        onInterrupt: () => {
+          snapTween = null;
+          requestSnapObserverSync();
         }
       });
     };
 
+    const goToSnap = (direction: 1 | -1) => {
+      const targets = getSnapTargets();
+      if (!targets.length || isScrollLocked() || !shouldSnapInput()) return;
+
+      const target = getNextSnapTarget(targets, direction);
+      if (!target) return;
+
+      snapToTarget(target);
+    };
+
     if (!reduceMotion) {
-      ScrollTrigger.observe({
+      let snapObserver = ScrollTrigger.observe({
         target: window,
         type: "wheel,touch",
         wheelSpeed: -1,
-        tolerance: 64,
+        tolerance: 28,
         preventDefault: true,
         onUp: () => goToSnap(1),
         onDown: () => goToSnap(-1)
       });
 
+      let previousScrollY = window.scrollY;
+      const syncSnapObserver = () => {
+        const currentY = window.scrollY;
+        const movedDown = currentY > previousScrollY;
+        const freeScroll = isFreeScrollRange();
+        const shouldAutoSnapToWork =
+          !snapTween &&
+          Date.now() >= lockedUntil &&
+          movedDown &&
+          currentY >= getCareerExitTop() - snapTolerance &&
+          currentY < getWorkTop() - snapTolerance;
+
+        document.documentElement.classList.toggle("is-free-scroll", freeScroll);
+
+        if (snapTween || shouldSnapInput()) {
+          if (!snapObserver.isEnabled) snapObserver.enable();
+        } else if (snapObserver.isEnabled) {
+          snapObserver.disable();
+        }
+
+        previousScrollY = currentY;
+
+        if (shouldAutoSnapToWork) {
+          const workTarget = getSnapTargets().find((target) => target.kind === "work");
+          if (workTarget) {
+            window.requestAnimationFrame(() => snapToTarget(workTarget));
+          }
+        }
+      };
+
+      let snapSyncFrame = 0;
+      requestSnapObserverSync = () => {
+        window.cancelAnimationFrame(snapSyncFrame);
+        snapSyncFrame = window.requestAnimationFrame(syncSnapObserver);
+      };
+
+      window.addEventListener("scroll", requestSnapObserverSync, { passive: true });
+      window.addEventListener("resize", requestSnapObserverSync);
+      requestSnapObserverSync();
+
       window.addEventListener("keydown", (event) => {
         if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (!shouldSnapInput()) return;
         if (["ArrowDown", "PageDown", " "].includes(event.key)) {
           event.preventDefault();
           goToSnap(1);
@@ -513,11 +519,14 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
 
       const identitySection = document.querySelector<HTMLElement>("[data-identity]");
       const workSection = document.querySelector<HTMLElement>("#work");
+      const gallerySection = document.querySelector<HTMLElement>(".gallery-section");
       const targetTop =
         initialSection === "work"
-          ? workSection?.offsetTop
+          ? gallerySection?.offsetTop ?? workSection?.offsetTop
           : identitySection
-            ? identitySection.offsetTop + (initialSection === "career" ? window.innerHeight : 0)
+            ? initialSection === "career"
+              ? getCareerEntryTop()
+              : identitySection.offsetTop
             : 0;
 
       window.scrollTo({ top: targetTop ?? 0, behavior: "instant" as ScrollBehavior });
@@ -525,7 +534,19 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
         playAboutIntro();
       }
       if (initialSection === "career") {
-        applySnapState({ y: targetTop ?? 0, route: "/career", kind: "career", careerIndex: 0 });
+        if (identity) {
+          identity.dataset.aboutPlayed = "true";
+        }
+        if (profileLogo) {
+          gsap.set(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)" });
+        }
+        if (profileMedia) {
+          gsap.set(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
+        }
+        if (careerList) {
+          gsap.set(careerList, { autoAlpha: 1, x: 0, filter: "blur(0px)" });
+        }
+        setIdentityMode("career", 0);
       }
       ScrollTrigger.refresh();
     };
