@@ -2,6 +2,9 @@ name = "2026-design-portfolio"
 main = "@astrojs/cloudflare/entrypoints/server"
 compatibility_date = "2026-05-04"
 compatibility_flags = ["nodejs_compat"]
+routes = [
+  { pattern = "dolbakggom.com", custom_domain = true }
+]
 
 [[d1_databases]]
 binding = "DB"
