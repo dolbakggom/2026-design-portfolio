@@ -75,31 +75,36 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
     </section>
 
     <section class="featured-section" id="featured-work" data-route="/work">
-      <div class="section-heading">
-        <p class="section-kicker">Selected Work</p>
+      <div class="featured-stage">
+        <div class="section-heading">
+          <p class="section-kicker">Selected Work</p>
+        </div>
+        <div class="featured-list">
+          {
+            featuredWorks.map((work, index) => (
+              <article class:list={["featured-work", index === 0 && "is-active"]} style={`--work-index:${index};`} data-featured-panel data-route="/work">
+                <a href={`/work/${work.slug}`} class="featured-link" aria-label={`${work.title} 자세히 보기`}>
+                  <div class="work-visual">
+                    {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} crossorigin="anonymous" loading="lazy" /> : null}
+                  </div>
+                  <div class="featured-copy">
+                    <span class="featured-category">{work.category}</span>
+                    <h3>{work.title}</h3>
+                    <p class="featured-meta">
+                      <span>{work.year}</span>
+                      <span>{work.client || "개인 프로젝트"}</span>
+                      <span>{work.role || "Figma + Adobe Illustrator"}</span>
+                    </p>
+                    <em>더 알아보기 →</em>
+                  </div>
+                </a>
+              </article>
+            ))
+          }
+        </div>
       </div>
-      <div class="featured-list">
-        {
-          featuredWorks.map((work, index) => (
-            <article class="featured-work snap-panel" style={`--work-index:${index};`} data-route="/work">
-              <a href={`/work/${work.slug}`} class="featured-link" aria-label={`${work.title} 자세히 보기`}>
-                <div class="work-visual">
-                  {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} crossorigin="anonymous" loading="lazy" /> : null}
-                </div>
-                <div class="featured-copy">
-                  <span class="featured-category">{work.category}</span>
-                  <h3>{work.title}</h3>
-                  <p class="featured-meta">
-                    <span>{work.year}</span>
-                    <span>{work.client || "개인 프로젝트"}</span>
-                    <span>{work.role || "Figma + Adobe Illustrator"}</span>
-                  </p>
-                  <em>더 알아보기 →</em>
-                </div>
-              </a>
-            </article>
-          ))
-        }
+      <div class="featured-steps" aria-hidden="true">
+        {featuredWorks.map((_, index) => <div class="featured-step snap-panel" data-featured-step data-featured-index={index} data-route="/work" />)}
       </div>
     </section>
 
@@ -240,6 +245,7 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
     const profileMedia = document.querySelector<HTMLElement>("[data-profile-media]");
     const careerList = document.querySelector<HTMLElement>("[data-career-list]");
     const timelineCards = gsap.utils.toArray<HTMLElement>("[data-timeline-card]");
+    const featuredPanels = gsap.utils.toArray<HTMLElement>("[data-featured-panel]");
 
     if (!reduceMotion) {
       [aboutCopy, careerCopy].forEach((element) => {
@@ -282,8 +288,14 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
       }
     };
 
-    const careerStartProgress = 0.3;
-    const careerEndProgress = 0.84;
+    const careerStartProgress = 0.38;
+    const careerEndProgress = 0.92;
+
+    const setActiveFeatured = (activeIndex: number) => {
+      featuredPanels.forEach((panel, index) => {
+        panel.classList.toggle("is-active", index === activeIndex);
+      });
+    };
 
     if (identity && !reduceMotion) {
       ScrollTrigger.create({
@@ -294,7 +306,7 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
         onEnter: playAboutIntro,
         onEnterBack: playAboutIntro,
         onUpdate: (self) => {
-          const showCareer = self.progress >= careerStartProgress * 0.82;
+          const showCareer = self.progress >= careerStartProgress * 0.92;
           const careerProgress = gsap.utils.clamp(0, 1, (self.progress - careerStartProgress) / (careerEndProgress - careerStartProgress));
           setIdentityMode(showCareer ? "career" : "about", careerProgress);
           gsap.to(careerList, {
@@ -318,21 +330,34 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
           onEnterBack: () => panel.matches(".gallery-section") ? replaceRoute("/work") : clearHomeRoute()
         });
       });
+
+      gsap.utils.toArray<HTMLElement>("[data-featured-step]").forEach((step, index) => {
+        ScrollTrigger.create({
+          trigger: step,
+          start: "top center",
+          end: "bottom center",
+          onEnter: () => setActiveFeatured(index),
+          onEnterBack: () => setActiveFeatured(index)
+        });
+      });
     }
 
     type SnapTarget = {
       y: number;
       route: string;
       kind: "intro" | "about" | "career" | "work" | "featured" | "gallery";
+      featuredIndex?: number;
     };
 
     const snapTolerance = 10;
-    const snapLockDuration = 680;
+    const snapLockDuration = 760;
     const aboutLockDuration = 760;
+    const snapDuration = 0.74;
 
     const getIdentityTop = () => document.querySelector<HTMLElement>("[data-identity]")?.offsetTop ?? Number.POSITIVE_INFINITY;
     const getWorkTop = () => document.querySelector<HTMLElement>("#work")?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getFirstFeaturedTop = () => document.querySelector<HTMLElement>(".featured-work")?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getFeaturedTop = () => document.querySelector<HTMLElement>("#featured-work")?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getFirstFeaturedTop = getFeaturedTop;
     const getGalleryTop = () => document.querySelector<HTMLElement>(".gallery-section")?.offsetTop ?? Number.POSITIVE_INFINITY;
     const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - window.innerHeight);
     const getCareerEntryTop = () => getIdentityTop() + getIdentityProgressRange() * careerStartProgress;
@@ -344,7 +369,7 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
       const intro = document.querySelector<HTMLElement>(".intro-section");
       const identitySection = document.querySelector<HTMLElement>("[data-identity]");
       const workSection = document.querySelector<HTMLElement>("#work");
-      const featuredPanels = gsap.utils.toArray<HTMLElement>(".featured-work");
+      const featuredSection = document.querySelector<HTMLElement>("#featured-work");
       const gallery = document.querySelector<HTMLElement>(".gallery-section");
       const targets: SnapTarget[] = [];
 
@@ -354,7 +379,16 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
         targets.push({ y: getCareerExitTop(), route: "/career", kind: "career" });
       }
       if (workSection) targets.push({ y: workSection.offsetTop, route: "/work", kind: "work" });
-      featuredPanels.forEach((panel) => targets.push({ y: panel.offsetTop, route: "/work", kind: "featured" }));
+      if (featuredSection) {
+        featuredPanels.forEach((_, index) => {
+          targets.push({
+            y: featuredSection.offsetTop + window.innerHeight * index,
+            route: "/work",
+            kind: "featured",
+            featuredIndex: index
+          });
+        });
+      }
       if (gallery) targets.push({ y: gallery.offsetTop, route: "/work", kind: "gallery" });
 
       return targets.sort((a, b) => a.y - b.y);
@@ -384,6 +418,10 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
         replaceRoute(target.route);
       } else {
         clearHomeRoute();
+      }
+
+      if (target.kind === "featured") {
+        setActiveFeatured(target.featuredIndex ?? 0);
       }
 
       if (target.kind === "about") {
@@ -437,9 +475,14 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
       lockScroll(target.kind === "about" ? aboutLockDuration : snapLockDuration);
       snapTween = gsap.to(window, {
         scrollTo: { y: Math.round(target.y), autoKill: false },
-        duration: target.kind === "about" ? 0.74 : 0.62,
+        duration: snapDuration,
         ease: "power3.inOut",
         overwrite: true,
+        onStart: () => {
+          if (target.kind === "featured") {
+            applySnapState(target);
+          }
+        },
         onComplete: () => {
           snapTween = null;
           applySnapState(target);
@@ -484,7 +527,7 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
           Date.now() >= lockedUntil &&
           movedDown &&
           currentY >= getCareerExitTop() - snapTolerance &&
-          previousScrollY < getFirstFeaturedTop() - snapTolerance;
+          previousScrollY < getWorkTop() - snapTolerance;
         const shouldAutoSnapToCareer =
           !snapTween &&
           Date.now() >= lockedUntil &&
