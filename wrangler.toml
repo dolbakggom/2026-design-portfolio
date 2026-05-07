@@ -1,6 +1,7 @@
 name = "answer-beyond-portfolio"
 compatibility_date = "2026-05-04"
 compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
 
 [[d1_databases]]
 binding = "DB"
