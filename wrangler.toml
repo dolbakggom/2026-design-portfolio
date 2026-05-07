@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "portfolio-db"
-database_id = "replace-with-cloudflare-d1-id"
+database_id = "c4f3214b-44dc-455d-9f8a-3a4589254548"
 
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"
