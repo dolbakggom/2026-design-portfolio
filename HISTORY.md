@@ -13,6 +13,11 @@
 - Featured work blur 전환 중 배경색이 비치는 현상을 줄입니다.
 - Work detail 상단 back link는 `←`만 남기고, 헤드라인 위에 기존 hero/thumbnail 기반 cover 이미지를 추가합니다.
 - Work detail cover는 게시글 폭이 아니라 viewport 좌우를 꽉 채우고, 스크롤 중 fixed 배경처럼 유지되다가 본문이 올라오면 흰색으로 점차 페이드되어야 합니다.
+- Detail cover 높이가 과하게 늘어난 문제를 줄이고, cover 이미지는 우선 placeholder 상태로 유지합니다.
+- Detail cover의 흰색 fade/gradient가 페이지 회색 배경과 분리되어 보이지 않게 맞춥니다.
+- Detail cover에는 이미지가 있으면 다시 표시하고, 이미지가 없을 때만 회색 배경 placeholder로 둡니다.
+- Detail category(`section-kicker`) 크기를 키우고, fixed back button 뒤에 blur topbar를 추가해 본문과 겹칠 때도 가독성을 유지합니다.
+- 로컬 `/admin` 접속 실패 여부를 확인합니다.
 
 ### 구현
 - `src/components/HomePage.astro`
@@ -26,18 +31,30 @@
   - Featured panel의 parent `filter: blur()`를 제거하고, `pointer-events: none`인 overlay pseudo-layer에 `backdrop-filter`를 적용했습니다.
   - Work detail cover/back arrow 스타일을 추가했습니다.
   - Detail cover를 `100vw` full-bleed spacer와 fixed image layer로 분리했습니다.
-  - Fixed cover에는 아래로 갈수록 흰색이 강해지는 linear gradient와 masked `backdrop-filter` blur layer를 올렸습니다.
-  - Scroll progress를 받는 흰색 fade overlay를 추가해 본문이 cover 위로 올라올 때 이미지가 점차 흰색으로 사라지게 했습니다.
+  - Fixed cover에는 아래로 갈수록 `var(--color-paper)`가 강해지는 linear gradient와 masked `backdrop-filter` blur layer를 올렸습니다.
+  - Scroll progress를 받는 paper-color fade overlay를 추가해 본문이 cover 위로 올라올 때 이미지가 페이지 배경색으로 자연스럽게 사라지게 했습니다.
+  - Cover 높이를 `clamp(260px, 34svh, 360px)`로 낮추고, detail hero의 기존 `min-height: 70svh`를 제거해 상단 영역이 과도하게 길어지지 않도록 했습니다.
+  - Cover media는 `work.hero ?? work.thumbnail` 이미지를 다시 렌더링하고, 이미지가 없으면 장식 gradient 없이 `var(--color-paper)`만 표시합니다.
+  - Back arrow 영역에 fixed `.work-detail-topbar`를 추가하고 `backdrop-filter`를 적용했습니다.
+  - Detail `.work-hero .section-kicker` 크기를 키웠습니다.
 - `src/pages/work/[slug].astro`
   - Back link visible text를 `←`로 줄이고 `aria-label="Back to work"`를 유지했습니다.
   - Detail hero 위에 `work.hero ?? work.thumbnail` 기반 cover 영역을 추가했습니다.
   - Cover 이미지 luminance를 canvas로 샘플링해 back arrow 색상을 검정/흰색으로 자동 전환합니다.
   - Cover scroll progress를 requestAnimationFrame 기반으로 CSS variable `--cover-fade`에 반영합니다.
+  - 최신 수정에서는 cover image 렌더링을 복구하고, back arrow를 blur topbar 내부로 옮겼습니다.
+- Admin 확인
+  - `/admin` 라우트 파일은 `src/pages/admin.astro`에 존재합니다.
+  - dev 서버가 꺼져 있으면 접속이 실패합니다. 서버 재시작 후 `/admin`은 GET 기준 `200 OK`입니다.
+  - Admin CMS는 `client:only="react"`로 전환해 React hooks가 서버 렌더링 중 실행되지 않도록 했습니다.
+  - `astro.config.mjs`에서 `drizzle-orm`, `drizzle-orm/d1`, `drizzle-orm/sqlite-core`, `zod`를 Vite optimizeDeps 제외 목록에 추가했습니다. Cloudflare/Vite dev 서버가 SSR dependency cache 파일을 잃으면서 `/admin`이 500으로 흔들리는 현상을 줄이기 위한 조치입니다.
+  - `curl -I` HEAD 요청이나 빌드 직후 HMR 중에는 Cloudflare Vite/Miniflare dev 서버가 일시적으로 `500`을 낼 수 있어, 실제 브라우저 확인은 GET 기준으로 보세요.
 
 ### 검증
 - `npm run build` 통과
 - `git diff --check` 통과
-- 로컬 dev 서버 `http://127.0.0.1:4322` 기준 `/`, `/work`, `/work/rush-hour-app` 응답 `200 OK`
+- 로컬 dev 서버 `http://127.0.0.1:4321` 기준 `/admin`, `/work/rush-hour-app` 응답 `200 OK`
+- 로그인 전 `/api/admin/profile` 응답 `401 Unauthorized` 확인
 
 ## 2026-05-07 회사 맥북 작업 요약
 

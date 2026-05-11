@@ -20,12 +20,14 @@ if (!work) {
     work ? (
       <main class="work-detail">
         <section class="work-detail-cover" data-detail-cover data-cover-tone="light">
-          <a class="back-link work-back-link" href="/work" aria-label="Back to work">←</a>
+          <div class="work-detail-topbar">
+            <a class="back-link work-back-link" href="/work" aria-label="Back to work">←</a>
+          </div>
           <div class="work-detail-cover-fixed">
             {coverImage?.url ? (
               <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" data-cover-image />
             ) : (
-              <div class="work-detail-cover-placeholder" />
+              <div class="work-detail-cover-placeholder" aria-hidden="true" />
             )}
             <span class="work-detail-cover-fade" aria-hidden="true" />
           </div>

@@ -10,5 +10,15 @@ export default defineConfig({
       enabled: true
     }
   }),
-  integrations: [react()]
+  integrations: [react()],
+  vite: {
+    optimizeDeps: {
+      exclude: ["drizzle-orm", "drizzle-orm/d1", "drizzle-orm/sqlite-core", "zod"]
+    },
+    ssr: {
+      optimizeDeps: {
+        exclude: ["drizzle-orm", "drizzle-orm/d1", "drizzle-orm/sqlite-core", "zod"]
+      }
+    }
+  }
 });

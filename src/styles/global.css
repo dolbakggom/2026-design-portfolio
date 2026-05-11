@@ -799,8 +799,12 @@ button:disabled {
   padding: 40px 0 120px;
 }
 
+.work-detail {
+  padding-top: 0;
+}
+
 .work-detail-cover {
-  --cover-height: clamp(380px, 64svh, 720px);
+  --cover-height: clamp(260px, 34svh, 360px);
   --cover-fade: 0;
   position: relative;
   width: 100vw;
@@ -834,9 +838,10 @@ button:disabled {
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.24) 48%,
-      rgba(255, 255, 255, 0.96) 100%
+      rgba(244, 244, 244, 0) 0%,
+      rgba(244, 244, 244, 0.12) 38%,
+      rgba(244, 244, 244, 0.72) 74%,
+      var(--color-paper) 100%
     );
 }
 
@@ -859,25 +864,36 @@ button:disabled {
 
 .work-detail-cover-placeholder {
   height: 100%;
-  background:
-    linear-gradient(180deg, rgba(244, 244, 244, 0), rgba(255, 255, 255, 0.96)),
-    var(--color-paper);
+  background: var(--color-paper);
 }
 
 .work-detail-cover-fade {
   position: absolute;
   inset: 0;
   z-index: 4;
-  background: var(--color-white);
+  background: var(--color-paper);
   opacity: var(--cover-fade);
   pointer-events: none;
 }
 
-.work-back-link {
+.work-detail-topbar {
   position: fixed;
-  left: 28px;
-  top: 24px;
-  z-index: 6;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 10;
+  height: 92px;
+  display: flex;
+  align-items: center;
+  padding-inline: max(24px, calc((100vw - min(1180px, calc(100vw - 48px))) / 2));
+  background: rgba(244, 244, 244, 0.72);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  pointer-events: none;
+}
+
+.work-back-link {
   min-width: 44px;
   min-height: 44px;
   justify-content: center;
@@ -889,8 +905,8 @@ button:disabled {
 }
 
 .work-detail-cover[data-cover-tone="dark"] .work-back-link {
-  color: var(--color-white);
-  text-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  color: var(--color-ink);
+  text-shadow: 0 12px 32px rgba(255, 255, 255, 0.34);
 }
 
 .work-detail-cover[data-cover-scrolled="true"] .work-back-link {
@@ -901,12 +917,16 @@ button:disabled {
 .work-hero {
   position: relative;
   z-index: 2;
-  min-height: 70svh;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 40px;
   align-items: end;
-  padding: 92px 0 54px;
+  padding: clamp(52px, 7svh, 86px) 0 54px;
+}
+
+.work-hero .section-kicker {
+  font-size: clamp(26px, 1.75vw, 34px);
+  line-height: 1.2;
 }
 
 .work-detail-media,
