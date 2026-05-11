@@ -2,6 +2,43 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-11 Safari scroll, gallery, detail refinement
+
+### 요구사항
+- Safari에서 홈 snap scroll이 멈추는 문제를 보강합니다.
+- WORK gallery 진입 시 와이드 화면에서 검정 배경이 잠깐 보이는 flash를 제거합니다.
+- Gallery filter에 `ALL` 탭을 추가하고 기본값을 `ALL`로 둡니다.
+- 작업물 연도 표시는 `<time datetime="YYYY">`를 사용합니다.
+- Gallery thumbnail은 background image + `background-size: cover`로 표시합니다.
+- Featured work blur 전환 중 배경색이 비치는 현상을 줄입니다.
+- Work detail 상단 back link는 `←`만 남기고, 헤드라인 위에 기존 hero/thumbnail 기반 cover 이미지를 추가합니다.
+- Work detail cover는 게시글 폭이 아니라 viewport 좌우를 꽉 채우고, 스크롤 중 fixed 배경처럼 유지되다가 본문이 올라오면 흰색으로 점차 페이드되어야 합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 기존 GSAP Observer를 유지하면서 native `wheel`/`touch` fallback dispatcher를 추가했습니다. Safari에서 Observer가 입력을 놓쳐도 같은 snap 함수로 들어갑니다.
+  - Gallery filter를 `ALL`, `UI/UX`, `BI/BX` 순서로 바꾸고 `ALL` 선택 시 모든 work tile을 표시합니다.
+  - Featured work 연도는 `<time>`으로 변경했습니다.
+  - Gallery thumbnail은 `<img>` 대신 `.work-tile-media`의 CSS background image로 표시합니다.
+- `src/styles/global.css`
+  - Gallery section은 full-width paper background, 내부 `.gallery-canvas`는 1920px max-width로 분리했습니다.
+  - `.work-tile-media`에 cover background sizing을 적용했습니다.
+  - Featured panel의 parent `filter: blur()`를 제거하고, `pointer-events: none`인 overlay pseudo-layer에 `backdrop-filter`를 적용했습니다.
+  - Work detail cover/back arrow 스타일을 추가했습니다.
+  - Detail cover를 `100vw` full-bleed spacer와 fixed image layer로 분리했습니다.
+  - Fixed cover에는 아래로 갈수록 흰색이 강해지는 linear gradient와 masked `backdrop-filter` blur layer를 올렸습니다.
+  - Scroll progress를 받는 흰색 fade overlay를 추가해 본문이 cover 위로 올라올 때 이미지가 점차 흰색으로 사라지게 했습니다.
+- `src/pages/work/[slug].astro`
+  - Back link visible text를 `←`로 줄이고 `aria-label="Back to work"`를 유지했습니다.
+  - Detail hero 위에 `work.hero ?? work.thumbnail` 기반 cover 영역을 추가했습니다.
+  - Cover 이미지 luminance를 canvas로 샘플링해 back arrow 색상을 검정/흰색으로 자동 전환합니다.
+  - Cover scroll progress를 requestAnimationFrame 기반으로 CSS variable `--cover-fade`에 반영합니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- 로컬 dev 서버 `http://127.0.0.1:4322` 기준 `/`, `/work`, `/work/rush-hour-app` 응답 `200 OK`
+
 ## 2026-05-07 회사 맥북 작업 요약
 
 ### 배포와 저장소 정리

@@ -8,7 +8,7 @@ interface Props {
 
 const { initialSection = "intro" } = Astro.props;
 const { profile, timeline, featuredWorks, works } = await getHomeContent();
-const categories = ["UI/UX", "BI/BX"];
+const categories = ["ALL", "UI/UX", "BI/BX"];
 const logoSrc = "/assets/figma/hampenta-logo.svg";
 const fallbackPortraitSrc = "/assets/figma/profile-guitar.png";
 const slogan = profile.headline.replace(/\.$/, "");
@@ -16,6 +16,7 @@ const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
 const phoneLink = profile.links.find((link) => link.url.startsWith("tel:") || /010[-\d]+/.test(link.label));
 const locationLink = profile.links.find((link) => link.label.includes("서울") || link.label.toLowerCase() === "location");
 const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
+const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.[0] ?? "2026";
 ---
 
 <BaseLayout title={`${profile.headline} | ${profile.name}`} description={profile.bio} htmlClass="home-scroll" bodyClass="home-body">
@@ -91,7 +92,7 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
                     <span class="featured-category">{work.category}</span>
                     <h3>{work.title}</h3>
                     <p class="featured-meta">
-                      <span>{work.year}</span>
+                      <time datetime={yearDateTime(work.year)}>{work.year}</time>
                       <span>{work.client || "개인 프로젝트"}</span>
                       <span>{work.role || "Figma + Adobe Illustrator"}</span>
                     </p>
@@ -109,24 +110,29 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
     </section>
 
     <section class="gallery-section snap-panel" aria-label="Work gallery" data-route="/work">
-      <div class="section-heading gallery-heading">
-        <div class="category-filter" role="tablist" aria-label="Work category">
-          {categories.map((category) => <button type="button" class:list={[category === "UI/UX" && "is-active"]} data-filter={category}>{category}</button>)}
+      <div class="gallery-canvas">
+        <div class="section-heading gallery-heading">
+          <div class="category-filter" role="tablist" aria-label="Work category">
+            {categories.map((category) => <button type="button" class:list={[category === "ALL" && "is-active"]} data-filter={category}>{category}</button>)}
+          </div>
         </div>
-      </div>
-      <div class="work-grid">
-        {
-          works.map((work) => (
-            <a class="work-tile" href={`/work/${work.slug}`} data-category={work.category} hidden={work.category !== "UI/UX"}>
-              <div class="work-tile-media">
-                {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} loading="lazy" /> : null}
-              </div>
-              <div>
-                <h3>{work.title}</h3>
-              </div>
-            </a>
-          ))
-        }
+        <div class="work-grid">
+          {
+            works.map((work) => (
+              <a class="work-tile" href={`/work/${work.slug}`} data-category={work.category} aria-label={`${work.title} 자세히 보기`}>
+                <div
+                  class:list={["work-tile-media", work.thumbnail?.url && "has-image"]}
+                  style={work.thumbnail?.url ? `--tile-image: url("${work.thumbnail.url}")` : undefined}
+                  aria-label={work.thumbnail?.alt ?? work.title}
+                  role="img"
+                />
+                <div>
+                  <h3>{work.title}</h3>
+                </div>
+              </a>
+            ))
+          }
+        </div>
       </div>
     </section>
   </main>
@@ -506,6 +512,46 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
       snapToTarget(target);
     };
 
+    const snapAcrossWorkBoundary = (direction: 1 | -1, event?: Event) => {
+      if (isScrollLocked()) return false;
+
+      const currentY = window.scrollY;
+      const careerTarget = findSnapTarget("career");
+      const workTarget = findSnapTarget("work");
+
+      if (
+        direction > 0 &&
+        workTarget &&
+        currentY >= getCareerExitTop() - snapTolerance * 2 &&
+        currentY < getWorkTop() - snapTolerance
+      ) {
+        event?.preventDefault();
+        snapToTarget(workTarget);
+        return true;
+      }
+
+      if (
+        direction < 0 &&
+        careerTarget &&
+        currentY >= getWorkTop() - snapTolerance &&
+        currentY < getFirstFeaturedTop() - snapTolerance
+      ) {
+        event?.preventDefault();
+        snapToTarget(careerTarget);
+        return true;
+      }
+
+      return false;
+    };
+
+    const dispatchNativeSnapInput = (direction: 1 | -1, event?: Event) => {
+      if (snapAcrossWorkBoundary(direction, event)) return;
+      if (!shouldSnapInput() || isScrollLocked()) return;
+
+      event?.preventDefault();
+      goToSnap(direction);
+    };
+
     if (!reduceMotion) {
       let snapObserver = ScrollTrigger.observe({
         target: window,
@@ -574,32 +620,32 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
       window.addEventListener(
         "wheel",
         (event) => {
-          if (isScrollLocked()) return;
+          if (Math.abs(event.deltaY) < 4) return;
+          dispatchNativeSnapInput(event.deltaY > 0 ? 1 : -1, event);
+        },
+        { passive: false, capture: true }
+      );
 
-          const currentY = window.scrollY;
-          const careerTarget = findSnapTarget("career");
-          const workTarget = findSnapTarget("work");
+      let touchStartY = 0;
+      let touchHandled = false;
+      window.addEventListener(
+        "touchstart",
+        (event) => {
+          touchStartY = event.touches[0]?.clientY ?? 0;
+          touchHandled = false;
+        },
+        { passive: true, capture: true }
+      );
+      window.addEventListener(
+        "touchmove",
+        (event) => {
+          if (touchHandled) return;
+          const currentTouchY = event.touches[0]?.clientY ?? touchStartY;
+          const deltaY = touchStartY - currentTouchY;
+          if (Math.abs(deltaY) < 24) return;
 
-          if (
-            event.deltaY > 0 &&
-            workTarget &&
-            currentY >= getCareerExitTop() - snapTolerance * 2 &&
-            currentY < getWorkTop() - snapTolerance
-          ) {
-            event.preventDefault();
-            snapToTarget(workTarget);
-            return;
-          }
-
-          if (
-            event.deltaY < 0 &&
-            careerTarget &&
-            currentY >= getWorkTop() - snapTolerance &&
-            currentY < getFirstFeaturedTop() - snapTolerance
-          ) {
-            event.preventDefault();
-            snapToTarget(careerTarget);
-          }
+          touchHandled = true;
+          dispatchNativeSnapInput(deltaY > 0 ? 1 : -1, event);
         },
         { passive: false, capture: true }
       );
@@ -714,10 +760,10 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
 
     filterButtons.forEach((button) => {
       button.addEventListener("click", () => {
-        const filter = button.dataset.filter ?? "UI/UX";
+        const filter = button.dataset.filter ?? "ALL";
         filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
         tiles.forEach((tile) => {
-          tile.toggleAttribute("hidden", tile.dataset.category !== filter);
+          tile.toggleAttribute("hidden", filter !== "ALL" && tile.dataset.category !== filter);
         });
       });
     });

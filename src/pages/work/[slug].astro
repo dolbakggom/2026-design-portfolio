@@ -7,6 +7,8 @@ export const prerender = false;
 
 const { slug } = Astro.params;
 const work = slug ? await getWorkBySlug(slug) : null;
+const coverImage = work?.hero?.url ? work.hero : work?.thumbnail?.url ? work.thumbnail : null;
+const yearDateTime = work?.year?.match(/\d{4}/)?.[0] ?? "2026";
 
 if (!work) {
   Astro.response.status = 404;
@@ -17,7 +19,17 @@ if (!work) {
   {
     work ? (
       <main class="work-detail">
-        <a class="back-link" href="/#work">Back to work</a>
+        <section class="work-detail-cover" data-detail-cover data-cover-tone="light">
+          <a class="back-link work-back-link" href="/work" aria-label="Back to work">←</a>
+          <div class="work-detail-cover-fixed">
+            {coverImage?.url ? (
+              <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" data-cover-image />
+            ) : (
+              <div class="work-detail-cover-placeholder" />
+            )}
+            <span class="work-detail-cover-fade" aria-hidden="true" />
+          </div>
+        </section>
         <header class="work-hero">
           <div class="work-hero-copy">
             <p class="section-kicker">{work.category}</p>
@@ -31,7 +43,7 @@ if (!work) {
             </div>
             <div>
               <dt>Year</dt>
-              <dd>{work.year || "2026"}</dd>
+              <dd><time datetime={yearDateTime}>{work.year || "2026"}</time></dd>
             </div>
             <div>
               <dt>Role</dt>
@@ -52,4 +64,71 @@ if (!work) {
       </main>
     )
   }
+  <script>
+    const detailCover = document.querySelector<HTMLElement>("[data-detail-cover]");
+    const coverImage = document.querySelector<HTMLImageElement>("[data-cover-image]");
+    let coverFrame = 0;
+
+    const updateCoverTone = () => {
+      if (!detailCover || !coverImage || !coverImage.naturalWidth) {
+        detailCover?.setAttribute("data-cover-tone", "light");
+        return;
+      }
+
+      try {
+        const canvas = document.createElement("canvas");
+        const size = 36;
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) return;
+
+        context.drawImage(coverImage, 0, 0, size, size);
+        const pixels = context.getImageData(0, 0, size, size).data;
+        let total = 0;
+        let count = 0;
+
+        for (let index = 0; index < pixels.length; index += 4) {
+          const alpha = pixels[index + 3] / 255;
+          if (alpha < 0.2) continue;
+          const red = pixels[index];
+          const green = pixels[index + 1];
+          const blue = pixels[index + 2];
+          total += (0.2126 * red + 0.7152 * green + 0.0722 * blue) * alpha;
+          count += alpha;
+        }
+
+        const luminance = count ? total / count : 255;
+        detailCover.setAttribute("data-cover-tone", luminance > 148 ? "light" : "dark");
+      } catch {
+        detailCover.setAttribute("data-cover-tone", "light");
+      }
+    };
+
+    const updateCoverFade = () => {
+      if (!detailCover) return;
+
+      const coverTop = detailCover.offsetTop;
+      const coverHeight = Math.max(1, detailCover.offsetHeight);
+      const progress = Math.min(1, Math.max(0, (window.scrollY - coverTop) / (coverHeight * 0.76)));
+      detailCover.style.setProperty("--cover-fade", progress.toFixed(3));
+      detailCover.dataset.coverScrolled = progress > 0.48 ? "true" : "false";
+    };
+
+    const requestCoverFade = () => {
+      window.cancelAnimationFrame(coverFrame);
+      coverFrame = window.requestAnimationFrame(updateCoverFade);
+    };
+
+    if (coverImage?.complete) {
+      updateCoverTone();
+    } else {
+      coverImage?.addEventListener("load", updateCoverTone, { once: true });
+      coverImage?.addEventListener("error", updateCoverTone, { once: true });
+    }
+
+    updateCoverFade();
+    window.addEventListener("scroll", requestCoverFade, { passive: true });
+    window.addEventListener("resize", requestCoverFade);
+  </script>
 </BaseLayout>
