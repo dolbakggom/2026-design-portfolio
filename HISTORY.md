@@ -17,6 +17,8 @@
 - Detail cover의 흰색 fade/gradient가 페이지 회색 배경과 분리되어 보이지 않게 맞춥니다.
 - Detail cover에는 이미지가 있으면 다시 표시하고, 이미지가 없을 때만 회색 배경 placeholder로 둡니다.
 - Detail category(`section-kicker`) 크기를 키우고, fixed back button 뒤에 blur topbar를 추가해 본문과 겹칠 때도 가독성을 유지합니다.
+- Detail title이 스크롤로 가려지면 blur topbar에 같은 title을 표시합니다.
+- Detail category(`section-kicker`) opacity를 50%로 낮춥니다.
 - 로컬 `/admin` 접속 실패 여부를 확인합니다.
 
 ### 구현
@@ -37,17 +39,21 @@
   - Cover media는 `work.hero ?? work.thumbnail` 이미지를 다시 렌더링하고, 이미지가 없으면 장식 gradient 없이 `var(--color-paper)`만 표시합니다.
   - Back arrow 영역에 fixed `.work-detail-topbar`를 추가하고 `backdrop-filter`를 적용했습니다.
   - Detail `.work-hero .section-kicker` 크기를 키웠습니다.
+  - `.work-topbar-title`을 추가하고 `data-title-hidden="true"`일 때만 opacity가 올라오도록 했습니다.
+  - Detail `.work-hero .section-kicker` opacity를 `0.5`로 낮췄습니다.
 - `src/pages/work/[slug].astro`
   - Back link visible text를 `←`로 줄이고 `aria-label="Back to work"`를 유지했습니다.
   - Detail hero 위에 `work.hero ?? work.thumbnail` 기반 cover 영역을 추가했습니다.
   - Cover 이미지 luminance를 canvas로 샘플링해 back arrow 색상을 검정/흰색으로 자동 전환합니다.
   - Cover scroll progress를 requestAnimationFrame 기반으로 CSS variable `--cover-fade`에 반영합니다.
   - 최신 수정에서는 cover image 렌더링을 복구하고, back arrow를 blur topbar 내부로 옮겼습니다.
+  - Topbar title을 렌더링하고, scroll 시 heading bottom이 topbar 높이 아래로 들어오면 `data-title-hidden`을 켭니다.
 - Admin 확인
   - `/admin` 라우트 파일은 `src/pages/admin.astro`에 존재합니다.
   - dev 서버가 꺼져 있으면 접속이 실패합니다. 서버 재시작 후 `/admin`은 GET 기준 `200 OK`입니다.
   - Admin CMS는 `client:only="react"`로 전환해 React hooks가 서버 렌더링 중 실행되지 않도록 했습니다.
-  - `astro.config.mjs`에서 `drizzle-orm`, `drizzle-orm/d1`, `drizzle-orm/sqlite-core`, `zod`를 Vite optimizeDeps 제외 목록에 추가했습니다. Cloudflare/Vite dev 서버가 SSR dependency cache 파일을 잃으면서 `/admin`이 500으로 흔들리는 현상을 줄이기 위한 조치입니다.
+  - `astro.config.mjs`에서 `drizzle-orm`, `drizzle-orm/d1`, `drizzle-orm/sqlite-core`, `zod`, Tiptap editor 패키지를 Vite optimizeDeps 제외 목록에 추가했습니다. Cloudflare/Vite dev 서버가 dependency cache 파일을 잃으면서 `/admin`이 500 또는 흰 화면으로 흔들리는 현상을 줄이기 위한 조치입니다.
+  - `client:only` 상태에서도 빈 화면만 보이지 않도록 `Loading admin...` fallback을 추가했습니다.
   - `curl -I` HEAD 요청이나 빌드 직후 HMR 중에는 Cloudflare Vite/Miniflare dev 서버가 일시적으로 `500`을 낼 수 있어, 실제 브라우저 확인은 GET 기준으로 보세요.
 
 ### 검증
