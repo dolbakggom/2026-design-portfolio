@@ -39,10 +39,14 @@ type WorkRow = {
   published: number;
   sort_order: number;
   thumbnail_asset_id: string | null;
+  featured_thumbnail_asset_id: string | null;
   hero_asset_id: string | null;
   thumbnail_key: string | null;
   thumbnail_alt: string | null;
   thumbnail_mime: string | null;
+  featured_thumbnail_key: string | null;
+  featured_thumbnail_alt: string | null;
+  featured_thumbnail_mime: string | null;
   hero_key: string | null;
   hero_alt: string | null;
   hero_mime: string | null;
@@ -120,6 +124,7 @@ const toWork = (row: WorkRow): WorkItem => ({
   published: Boolean(row.published),
   sortOrder: row.sort_order,
   thumbnailAssetId: row.thumbnail_asset_id,
+  featuredThumbnailAssetId: row.featured_thumbnail_asset_id,
   heroAssetId: row.hero_asset_id,
   thumbnail: row.thumbnail_key
     ? {
@@ -127,6 +132,14 @@ const toWork = (row: WorkRow): WorkItem => ({
         url: mediaUrl(row.thumbnail_key),
         alt: row.thumbnail_alt,
         mime: row.thumbnail_mime
+    }
+    : null,
+  featuredThumbnail: row.featured_thumbnail_key
+    ? {
+        id: row.featured_thumbnail_asset_id,
+        url: mediaUrl(row.featured_thumbnail_key),
+        alt: row.featured_thumbnail_alt,
+        mime: row.featured_thumbnail_mime
       }
     : null,
   hero: row.hero_key
@@ -166,9 +179,12 @@ export const getHomeContent = async (): Promise<HomeContent> => {
     const worksResult = await db
       .prepare(
         `SELECT w.*, thumb.r2_key AS thumbnail_key, thumb.alt AS thumbnail_alt, thumb.mime AS thumbnail_mime,
+          featured_thumb.r2_key AS featured_thumbnail_key, featured_thumb.alt AS featured_thumbnail_alt,
+          featured_thumb.mime AS featured_thumbnail_mime,
           hero.r2_key AS hero_key, hero.alt AS hero_alt, hero.mime AS hero_mime
         FROM works w
         LEFT JOIN assets thumb ON thumb.id = w.thumbnail_asset_id
+        LEFT JOIN assets featured_thumb ON featured_thumb.id = w.featured_thumbnail_asset_id
         LEFT JOIN assets hero ON hero.id = w.hero_asset_id
         WHERE w.published = 1
         ORDER BY w.sort_order ASC, w.created_at ASC`
@@ -194,9 +210,12 @@ export const getWorkBySlug = async (slug: string): Promise<WorkItem | null> => {
     const row = await db
       .prepare(
         `SELECT w.*, thumb.r2_key AS thumbnail_key, thumb.alt AS thumbnail_alt, thumb.mime AS thumbnail_mime,
+          featured_thumb.r2_key AS featured_thumbnail_key, featured_thumb.alt AS featured_thumbnail_alt,
+          featured_thumb.mime AS featured_thumbnail_mime,
           hero.r2_key AS hero_key, hero.alt AS hero_alt, hero.mime AS hero_mime
         FROM works w
         LEFT JOIN assets thumb ON thumb.id = w.thumbnail_asset_id
+        LEFT JOIN assets featured_thumb ON featured_thumb.id = w.featured_thumbnail_asset_id
         LEFT JOIN assets hero ON hero.id = w.hero_asset_id
         WHERE w.slug = ? AND w.published = 1`
       )

@@ -39,6 +39,7 @@ export const workSchema = z.object({
   year: z.string().max(40).default(""),
   role: z.string().max(180).default(""),
   thumbnailAssetId: z.string().nullable().optional(),
+  featuredThumbnailAssetId: z.string().nullable().optional(),
   heroAssetId: z.string().nullable().optional(),
   featured: z.boolean().default(false),
   published: z.boolean().default(true),

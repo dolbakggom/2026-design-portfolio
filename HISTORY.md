@@ -2,6 +2,58 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-11 Detail, featured, admin media refinement
+
+### 요구사항
+- Work detail 초기 화면에서는 상단바 blur/border가 보이지 않고, 제목이 가려진 뒤에만 blur topbar와 title이 표시되어야 합니다.
+- Work detail meta 첫 항목 위의 불필요한 top border를 제거합니다.
+- Admin work 이미지 업로드 영역의 preview가 너무 커져 레이아웃을 자르지 않게 하고, 이미지 삭제 버튼을 추가합니다.
+- Admin 저장/오류 피드백을 팝업 toast로 표시합니다.
+- Featured work 우측에 전체 개수와 현재 위치를 dot indicator로 보여줍니다.
+- 메인 intro에 scroll 유도 SVG 애니메이션을 추가합니다.
+- Career item 전환 스크롤 거리를 현재보다 약 3배 길게 둡니다.
+- Featured work 전환에서 이미지만 blur 처리하고 텍스트는 fade만 적용합니다.
+- Featured work image blur edge에 흰색이 보이면 마지막 커밋 버전의 backdrop-filter overlay 방식으로 되돌리되, 텍스트는 fade만 유지합니다.
+- Featured work 전용 thumbnail을 gallery thumbnail과 별도로 관리할 수 있게 합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Intro 하단에 SVG scroll cue를 추가했습니다.
+  - Career section travel 값을 `126 + timeline.length * 54` 기준으로 늘려 item focus 전환을 느리게 했습니다.
+  - Featured work는 `featuredThumbnail ?? thumbnail` 이미지를 사용하고, 우측 dot indicator를 active panel과 동기화합니다.
+- `src/styles/global.css`
+  - Work detail topbar는 기본 transparent 상태이고 `data-title-hidden="true"`일 때만 paper blur/background/border가 켜집니다.
+  - Work detail meta 첫 번째 item의 top border를 제거했습니다.
+  - Featured 전환 blur는 `.work-visual` 직접 filter 대신 `.featured-link::before`의 `backdrop-filter` overlay 방식으로 되돌렸고, `.featured-copy`는 opacity fade만 사용합니다.
+  - Intro scroll cue와 featured dots 스타일/애니메이션을 추가했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - Tiptap `BlockEditor`를 top-level import에서 `React.lazy`로 바꿔 Cloudflare dev SSR에서 Tiptap이 바로 평가되지 않게 했습니다.
+  - `EditorBoundary`를 추가해 editor chunk 오류가 works 탭 전체 흰 화면으로 번지지 않게 했습니다.
+  - Work media editor를 `Gallery thumbnail`, `Featured thumbnail`, `Hero` 3개 필드로 분리했습니다.
+  - 각 이미지 필드에 권장 비율 hint, compact preview, `Remove` 버튼을 추가했습니다.
+  - 저장/오류 메시지는 fixed toast로 표시합니다.
+- `astro.config.mjs`
+  - `client:only` admin 환경에서 Tiptap editor가 브라우저에서 정상 로드되도록 Tiptap 패키지와 `use-sync-external-store` shim을 Vite optimizeDeps include로 명시했습니다.
+  - `drizzle-orm`, `drizzle-orm/d1`, `drizzle-orm/sqlite-core`, `zod`는 Cloudflare/server dependency로 optimizeDeps exclude를 유지했습니다.
+- 데이터 모델
+  - `works.featured_thumbnail_asset_id` 컬럼을 추가하는 `migrations/0003_featured_thumbnail.sql`을 만들었습니다.
+  - `src/types.ts`, `src/lib/validation.ts`, `src/db/schema.ts`, `src/lib/admin-data.ts`, `src/lib/content.ts`에 `featuredThumbnailAssetId`/`featuredThumbnail`을 연결했습니다.
+- `src/layouts/BaseLayout.astro`
+  - 로컬 dev admin 화면에만 React Refresh preamble을 명시적으로 주입합니다. 로컬 `/admin`이 `Loading admin...`에서 멈추는 원인이 AdminApp client module의 `window.$RefreshReg$` preamble check 실패였기 때문입니다.
+
+### 검증
+- `npm run db:migrate:local` 통과
+- `npm run build` 통과
+- `git diff --check` 통과
+- 로컬 dev 서버 `http://127.0.0.1:4323` 기준 `/admin`, `/work`, `/work/rush-hour-app` 응답 `200 OK`
+- 로그인 전 `/api/admin/profile` 응답 `401 Unauthorized` 확인
+- Chrome headless + 로컬 admin 세션 쿠키로 `/admin` 진입 후 `works` 탭 클릭 확인: `.works-admin-grid` 1개, `.block-editor` 1개, `.admin-editor-loading.error` 0개 렌더링.
+- Work detail `/work/rush-hour-app` 렌더링 확인: 첫 meta item의 computed `border-top-width`/`padding-top`은 `0px`.
+
+### 참고
+- 원격 D1에도 배포 전 `npm run db:migrate:remote` 또는 동일한 Wrangler remote migration 적용이 필요합니다.
+- 기존 작업물은 `featured_thumbnail_asset_id`가 비어 있으면 자동으로 기존 gallery `thumbnail`을 featured image로 fallback합니다.
+
 ## 2026-05-11 Safari scroll, gallery, detail refinement
 
 ### 요구사항

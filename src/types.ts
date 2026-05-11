@@ -55,8 +55,10 @@ export interface WorkItem {
   published: boolean;
   sortOrder: number;
   thumbnailAssetId?: string | null;
+  featuredThumbnailAssetId?: string | null;
   heroAssetId?: string | null;
   thumbnail?: AssetRef | null;
+  featuredThumbnail?: AssetRef | null;
   hero?: AssetRef | null;
   blocks?: WorkBlock[];
 }

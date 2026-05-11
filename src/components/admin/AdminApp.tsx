@@ -1,8 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties, PointerEvent, SyntheticEvent } from "react";
+import { Component, Suspense, lazy, useEffect, useMemo, useState } from "react";
+import type { CSSProperties, PointerEvent, ReactNode, SyntheticEvent } from "react";
 import type { Profile, TimelineItem, WorkBlock, WorkCategory, WorkItem } from "../../types";
-import BlockEditor from "./BlockEditor";
 import "../../styles/admin.css";
+
+const BlockEditor = lazy(() => import("./BlockEditor"));
+
+class EditorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="admin-editor-loading error">
+          에디터를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 type AssetResponse = {
   asset: {
@@ -15,6 +36,33 @@ type AssetResponse = {
 };
 
 type Tab = "profile" | "timeline" | "works";
+type WorkAssetKind = "thumbnail" | "featuredThumbnail" | "hero";
+
+const workMediaFields: Array<{
+  kind: WorkAssetKind;
+  label: string;
+  hint: string;
+  aspect: string;
+}> = [
+  {
+    kind: "thumbnail",
+    label: "Gallery thumbnail",
+    hint: "WORK gallery card에 사용됩니다. 세로형 3:4 비율 권장.",
+    aspect: "3 / 4"
+  },
+  {
+    kind: "featuredThumbnail",
+    label: "Featured thumbnail",
+    hint: "Featured work full-screen 배경에 사용됩니다. 16:9 이상 와이드 이미지 권장.",
+    aspect: "16 / 9"
+  },
+  {
+    kind: "hero",
+    label: "Hero",
+    hint: "작업물 상세 본문 대표 이미지에 사용됩니다. 16:9 또는 와이드 이미지 권장.",
+    aspect: "16 / 9"
+  }
+];
 
 const emptyProfile: Profile = {
   headline: "Beyond the Answer.",
@@ -445,18 +493,35 @@ export default function AdminApp() {
       .catch(() => fail("작업물 순서 저장에 실패했습니다."));
   };
 
-  const uploadWorkAsset = async (kind: "thumbnail" | "hero", file: File | undefined) => {
+  const workAssetPatch = (kind: WorkAssetKind, asset: AssetResponse["asset"] | null): Partial<WorkItem> => {
+    const assetRef = asset ? { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime } : null;
+
+    if (kind === "thumbnail") {
+      return { thumbnailAssetId: asset?.id ?? null, thumbnail: assetRef };
+    }
+
+    if (kind === "featuredThumbnail") {
+      return { featuredThumbnailAssetId: asset?.id ?? null, featuredThumbnail: assetRef };
+    }
+
+    return { heroAssetId: asset?.id ?? null, hero: assetRef };
+  };
+
+  const uploadWorkAsset = async (kind: WorkAssetKind, file: File | undefined) => {
     if (!selectedWork || !file) return;
     try {
       const asset = await uploadAsset(file, selectedWork.title);
-      updateWorkLocal(selectedWork.id, {
-        [kind === "thumbnail" ? "thumbnailAssetId" : "heroAssetId"]: asset.id,
-        [kind]: { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime }
-      });
+      updateWorkLocal(selectedWork.id, workAssetPatch(kind, asset));
       flash("이미지가 업로드되었습니다. 저장을 눌러 반영하세요.");
     } catch (uploadError) {
       fail(uploadError instanceof Error ? uploadError.message : "업로드에 실패했습니다.");
     }
+  };
+
+  const clearWorkAsset = (kind: WorkAssetKind) => {
+    if (!selectedWork) return;
+    updateWorkLocal(selectedWork.id, workAssetPatch(kind, null));
+    flash("이미지가 제거되었습니다. 저장을 눌러 반영하세요.");
   };
 
   if (loading) {
@@ -489,7 +554,13 @@ export default function AdminApp() {
   }
 
   return (
-    <main className="admin-shell">
+    <>
+      {message || error ? (
+        <div className={`admin-toast ${error ? "error" : ""}`} role={error ? "alert" : "status"}>
+          {error || message}
+        </div>
+      ) : null}
+      <main className="admin-shell">
       <aside className="admin-sidebar">
         <div>
           <p>Beyond CMS</p>
@@ -517,9 +588,6 @@ export default function AdminApp() {
             View site
           </a>
         </header>
-
-        {message ? <div className="admin-alert">{message}</div> : null}
-        {error ? <div className="admin-alert error">{error}</div> : null}
 
         {activeTab === "profile" ? (
           <section className="admin-panel profile-panel">
@@ -749,23 +817,47 @@ export default function AdminApp() {
                   </div>
 
                   <div className="media-grid">
-                    <label>
-                      Thumbnail
-                      {selectedWork.thumbnail?.url ? <img src={selectedWork.thumbnail.url} alt={selectedWork.thumbnail.alt ?? selectedWork.title} /> : null}
-                      <input type="file" accept="image/*" onChange={(event) => uploadWorkAsset("thumbnail", event.target.files?.[0])} />
-                    </label>
-                    <label>
-                      Hero
-                      {selectedWork.hero?.url ? <img src={selectedWork.hero.url} alt={selectedWork.hero.alt ?? selectedWork.title} /> : null}
-                      <input type="file" accept="image/*" onChange={(event) => uploadWorkAsset("hero", event.target.files?.[0])} />
-                    </label>
+                    {workMediaFields.map((field) => {
+                      const media = selectedWork[field.kind];
+
+                      return (
+                        <section className="media-field" key={field.kind} style={{ "--media-aspect": field.aspect } as CSSProperties}>
+                          <header>
+                            <div>
+                              <strong>{field.label}</strong>
+                              <p>{field.hint}</p>
+                            </div>
+                            <button type="button" className="danger" disabled={!media?.url} onClick={() => clearWorkAsset(field.kind)}>
+                              Remove
+                            </button>
+                          </header>
+                          <div className="media-preview">
+                            {media?.url ? <img src={media.url} alt={media.alt ?? selectedWork.title} /> : <span>No image</span>}
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) => {
+                              const input = event.currentTarget;
+                              void uploadWorkAsset(field.kind, input.files?.[0]).finally(() => {
+                                input.value = "";
+                              });
+                            }}
+                          />
+                        </section>
+                      );
+                    })}
                   </div>
 
-                  <BlockEditor
-                    blocks={selectedWork.blocks ?? []}
-                    onUpload={uploadAsset}
-                    onChange={(blocks: WorkBlock[]) => updateWorkLocal(selectedWork.id, { blocks })}
-                  />
+                  <EditorBoundary>
+                    <Suspense fallback={<div className="admin-editor-loading">Loading editor...</div>}>
+                      <BlockEditor
+                        blocks={selectedWork.blocks ?? []}
+                        onUpload={uploadAsset}
+                        onChange={(blocks: WorkBlock[]) => updateWorkLocal(selectedWork.id, { blocks })}
+                      />
+                    </Suspense>
+                  </EditorBoundary>
 
                   <div className="action-row sticky-actions">
                     <button type="button" className="primary-action" onClick={() => saveWork(selectedWork)}>
@@ -805,6 +897,7 @@ export default function AdminApp() {
           </section>
         ) : null}
       </section>
-    </main>
+      </main>
+    </>
   );
 }

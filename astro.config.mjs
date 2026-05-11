@@ -6,11 +6,16 @@ const optimizerExcludes = [
   "drizzle-orm",
   "drizzle-orm/d1",
   "drizzle-orm/sqlite-core",
-  "zod",
+  "zod"
+];
+
+const optimizerIncludes = [
   "@tiptap/react",
   "@tiptap/starter-kit",
   "@tiptap/extension-image",
-  "@tiptap/extension-placeholder"
+  "@tiptap/extension-placeholder",
+  "use-sync-external-store/shim/index.js",
+  "use-sync-external-store/shim/with-selector.js"
 ];
 
 export default defineConfig({
@@ -24,6 +29,7 @@ export default defineConfig({
   integrations: [react()],
   vite: {
     optimizeDeps: {
+      include: optimizerIncludes,
       exclude: optimizerExcludes
     },
     ssr: {

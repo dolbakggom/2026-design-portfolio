@@ -45,6 +45,7 @@ export const works = sqliteTable("works", {
   year: text("year").notNull().default(""),
   role: text("role").notNull().default(""),
   thumbnailAssetId: text("thumbnail_asset_id"),
+  featuredThumbnailAssetId: text("featured_thumbnail_asset_id"),
   heroAssetId: text("hero_asset_id"),
   featured: integer("featured", { mode: "boolean" }).notNull().default(false),
   published: integer("published", { mode: "boolean" }).notNull().default(true),

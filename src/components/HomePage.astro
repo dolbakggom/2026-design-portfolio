@@ -15,7 +15,7 @@ const slogan = profile.headline.replace(/\.$/, "");
 const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
 const phoneLink = profile.links.find((link) => link.url.startsWith("tel:") || /010[-\d]+/.test(link.label));
 const locationLink = profile.links.find((link) => link.label.includes("서울") || link.label.toLowerCase() === "location");
-const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
+const identityTravelSvh = Math.max(300, 126 + timeline.length * 54);
 const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.[0] ?? "2026";
 ---
 
@@ -27,6 +27,13 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         <h1 class="intro-title">
           <span data-intro-typewriter={slogan}>{slogan}</span><span class="intro-dot" aria-hidden="true">.</span>
         </h1>
+        <div class="intro-scroll-cue" aria-hidden="true">
+          <svg viewBox="0 0 28 58" focusable="false">
+            <path class="intro-scroll-track" d="M14 1.5c6.9 0 12.5 5.6 12.5 12.5v30c0 6.9-5.6 12.5-12.5 12.5S1.5 50.9 1.5 44V14C1.5 7.1 7.1 1.5 14 1.5Z" />
+            <path class="intro-scroll-wheel" d="M14 12v10" />
+            <path class="intro-scroll-arrow" d="M8.5 35.5 14 41l5.5-5.5" />
+          </svg>
+        </div>
       </div>
     </section>
 
@@ -86,7 +93,14 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
               <article class:list={["featured-work", index === 0 && "is-active"]} style={`--work-index:${index};`} data-featured-panel data-route="/work">
                 <a href={`/work/${work.slug}`} class="featured-link" aria-label={`${work.title} 자세히 보기`}>
                   <div class="work-visual">
-                    {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} crossorigin="anonymous" loading="lazy" /> : null}
+                    {work.featuredThumbnail?.url || work.thumbnail?.url ? (
+                      <img
+                        src={work.featuredThumbnail?.url ?? work.thumbnail?.url}
+                        alt={work.featuredThumbnail?.alt ?? work.thumbnail?.alt ?? work.title}
+                        crossorigin="anonymous"
+                        loading="lazy"
+                      />
+                    ) : null}
                   </div>
                   <div class="featured-copy">
                     <span class="featured-category">{work.category}</span>
@@ -103,6 +117,13 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
             ))
           }
         </div>
+        {
+          featuredWorks.length > 1 ? (
+            <div class="featured-dots" aria-hidden="true">
+              {featuredWorks.map((_, index) => <span class:list={[index === 0 && "is-active"]} data-featured-dot />)}
+            </div>
+          ) : null
+        }
       </div>
       <div class="featured-steps" aria-hidden="true">
         {featuredWorks.map((_, index) => <div class="featured-step snap-panel" data-featured-step data-featured-index={index} data-route="/work" />)}
@@ -252,6 +273,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const careerList = document.querySelector<HTMLElement>("[data-career-list]");
     const timelineCards = gsap.utils.toArray<HTMLElement>("[data-timeline-card]");
     const featuredPanels = gsap.utils.toArray<HTMLElement>("[data-featured-panel]");
+    const featuredDots = gsap.utils.toArray<HTMLElement>("[data-featured-dot]");
 
     if (!reduceMotion) {
       [aboutCopy, careerCopy].forEach((element) => {
@@ -300,6 +322,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const setActiveFeatured = (activeIndex: number) => {
       featuredPanels.forEach((panel, index) => {
         panel.classList.toggle("is-active", index === activeIndex);
+      });
+      featuredDots.forEach((dot, index) => {
+        dot.classList.toggle("is-active", index === activeIndex);
       });
     };
 

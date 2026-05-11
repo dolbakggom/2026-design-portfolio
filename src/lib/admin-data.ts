@@ -52,12 +52,15 @@ type WorkRow = {
   year: string;
   role: string;
   thumbnail_asset_id: string | null;
+  featured_thumbnail_asset_id: string | null;
   hero_asset_id: string | null;
   featured: number;
   published: number;
   sort_order: number;
   thumbnail_key: string | null;
   thumbnail_alt: string | null;
+  featured_thumbnail_key: string | null;
+  featured_thumbnail_alt: string | null;
   hero_key: string | null;
   hero_alt: string | null;
 };
@@ -135,12 +138,20 @@ const toWork = (row: WorkRow, blocks: WorkBlock[] = []): WorkItem => ({
   published: Boolean(row.published),
   sortOrder: row.sort_order,
   thumbnailAssetId: row.thumbnail_asset_id,
+  featuredThumbnailAssetId: row.featured_thumbnail_asset_id,
   heroAssetId: row.hero_asset_id,
   thumbnail: row.thumbnail_key
     ? {
         id: row.thumbnail_asset_id,
         url: mediaUrl(row.thumbnail_key),
         alt: row.thumbnail_alt
+    }
+    : null,
+  featuredThumbnail: row.featured_thumbnail_key
+    ? {
+        id: row.featured_thumbnail_asset_id,
+        url: mediaUrl(row.featured_thumbnail_key),
+        alt: row.featured_thumbnail_alt
       }
     : null,
   hero: row.hero_key
@@ -250,9 +261,11 @@ export const listWorks = async () => {
   const worksResult = await getD1()
     .prepare(
       `SELECT w.*, thumb.r2_key AS thumbnail_key, thumb.alt AS thumbnail_alt,
+        featured_thumb.r2_key AS featured_thumbnail_key, featured_thumb.alt AS featured_thumbnail_alt,
         hero.r2_key AS hero_key, hero.alt AS hero_alt
       FROM works w
       LEFT JOIN assets thumb ON thumb.id = w.thumbnail_asset_id
+      LEFT JOIN assets featured_thumb ON featured_thumb.id = w.featured_thumbnail_asset_id
       LEFT JOIN assets hero ON hero.id = w.hero_asset_id
       ORDER BY w.sort_order ASC, w.created_at ASC`
     )
@@ -280,8 +293,8 @@ export const createWork = async (input: WorkInput) => {
     .prepare(
       `INSERT INTO works (
         id, slug, title, category, summary, client, year, role,
-        thumbnail_asset_id, hero_asset_id, featured, published, sort_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        thumbnail_asset_id, featured_thumbnail_asset_id, hero_asset_id, featured, published, sort_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -293,6 +306,7 @@ export const createWork = async (input: WorkInput) => {
       input.year,
       input.role,
       input.thumbnailAssetId ?? null,
+      input.featuredThumbnailAssetId ?? null,
       input.heroAssetId ?? null,
       input.featured ? 1 : 0,
       input.published ? 1 : 0,
@@ -333,7 +347,7 @@ export const updateWork = async (id: string, input: WorkInput) => {
     .prepare(
       `UPDATE works SET
         slug = ?, title = ?, category = ?, summary = ?, client = ?, year = ?, role = ?,
-        thumbnail_asset_id = ?, hero_asset_id = ?, featured = ?, published = ?,
+        thumbnail_asset_id = ?, featured_thumbnail_asset_id = ?, hero_asset_id = ?, featured = ?, published = ?,
         sort_order = COALESCE(?, sort_order), updated_at = CURRENT_TIMESTAMP
       WHERE id = ?`
     )
@@ -346,6 +360,7 @@ export const updateWork = async (id: string, input: WorkInput) => {
       input.year,
       input.role,
       input.thumbnailAssetId ?? null,
+      input.featuredThumbnailAssetId ?? null,
       input.heroAssetId ?? null,
       input.featured ? 1 : 0,
       input.published ? 1 : 0,
