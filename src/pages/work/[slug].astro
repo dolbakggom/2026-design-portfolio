@@ -7,7 +7,7 @@ export const prerender = false;
 
 const { slug } = Astro.params;
 const work = slug ? await getWorkBySlug(slug) : null;
-const coverImage = work?.thumbnail?.url ? work.thumbnail : work?.hero?.url ? work.hero : null;
+const coverImage = work?.thumbnail?.url ? work.thumbnail : null;
 const yearDateTime = work?.year?.match(/\d{4}/)?.[0] ?? "2026";
 
 if (!work) {
@@ -54,9 +54,6 @@ if (!work) {
             </div>
           </dl>
         </header>
-        <section class="work-detail-media">
-          {work.hero?.url ? <img src={work.hero.url} alt={work.hero.alt ?? work.title} /> : <div class="work-detail-placeholder" />}
-        </section>
         <WorkBlocks blocks={work.blocks ?? []} />
       </main>
     ) : (

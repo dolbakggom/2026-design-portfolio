@@ -36,7 +36,7 @@ type AssetResponse = {
 };
 
 type Tab = "profile" | "timeline" | "works";
-type WorkAssetKind = "thumbnail" | "featuredThumbnail" | "hero";
+type WorkAssetKind = "thumbnail" | "featuredThumbnail";
 type AdminIconName = Tab | "logout";
 
 const navItems: Array<{ tab: Tab; label: string; icon: AdminIconName }> = [
@@ -95,19 +95,13 @@ const workMediaFields: Array<{
   {
     kind: "thumbnail",
     label: "Gallery thumbnail",
-    hint: "WORK gallery card와 상세 상단 transition cover에 사용됩니다. 세로형 3:4 비율 권장, 상세 상단에서는 cover로 crop됩니다.",
-    aspect: "3 / 4"
+    hint: "WORK gallery card와 상세 상단 transition cover에 같이 사용됩니다. 16:9 가로 이미지 권장.",
+    aspect: "16 / 9"
   },
   {
     kind: "featuredThumbnail",
     label: "Featured thumbnail",
     hint: "Featured work full-screen 배경에 사용됩니다. 16:9 이상 와이드 이미지 권장.",
-    aspect: "16 / 9"
-  },
-  {
-    kind: "hero",
-    label: "Hero",
-    hint: "작업물 상세 본문 대표 이미지에 사용됩니다. 16:9 또는 와이드 이미지 권장.",
     aspect: "16 / 9"
   }
 ];
@@ -176,7 +170,7 @@ const previewBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", par
   }) as CSSProperties;
 
 function WorkLivePreview({ work }: { work: WorkItem }) {
-  const coverUrl = work.thumbnail?.url || work.hero?.url;
+  const coverUrl = work.thumbnail?.url;
   const blocks = work.blocks ?? [];
 
   return (
@@ -193,7 +187,7 @@ function WorkLivePreview({ work }: { work: WorkItem }) {
 
       <div className="work-preview-scroll">
         <section className="preview-hero">
-          <div className="preview-hero-media">{coverUrl ? <img src={coverUrl} alt={work.thumbnail?.alt ?? work.hero?.alt ?? work.title} /> : null}</div>
+          <div className="preview-hero-media">{coverUrl ? <img src={coverUrl} alt={work.thumbnail?.alt ?? work.title} /> : null}</div>
           <p>{work.category}</p>
           <h4>{work.title || "Untitled work"}</h4>
           <span>{work.summary || "Summary preview will appear here."}</span>
@@ -480,6 +474,8 @@ export default function AdminApp() {
         method: "PUT",
         body: JSON.stringify({
           ...work,
+          heroAssetId: null,
+          hero: null,
           blocks: (work.blocks ?? []).map((block, index) => ({ ...block, sortOrder: index + 1 }))
         })
       });
@@ -553,7 +549,7 @@ export default function AdminApp() {
       return { featuredThumbnailAssetId: asset?.id ?? null, featuredThumbnail: assetRef };
     }
 
-    return { heroAssetId: asset?.id ?? null, hero: assetRef };
+    return {};
   };
 
   const uploadWorkAsset = async (kind: WorkAssetKind, file: File | undefined) => {

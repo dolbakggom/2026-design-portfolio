@@ -106,7 +106,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                       <span>{work.client || "개인 프로젝트"}</span>
                       <span>{work.role || "Figma + Adobe Illustrator"}</span>
                     </p>
-                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기`}>더 알아보기</a>
+                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기`} data-astro-reload>더 알아보기</a>
                   </div>
                 </div>
               </article>

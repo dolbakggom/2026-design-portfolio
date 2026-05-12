@@ -2,6 +2,42 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-12 Work image role simplification
+
+### 요구사항
+- WORK image 역할을 gallery thumbnail / featured thumbnail 두 개로 단순화합니다.
+- Gallery thumbnail은 16:9 가로 비율로 바꾸고, work detail 상단 cover와 동일 asset을 사용합니다.
+- 기존 본문 hero image 영역과 admin hero 업로드 항목은 제거합니다.
+- Detail 상단 cover 영역을 기존보다 약 1.5배 높이고, cover blur가 더 확실히 보이게 조정합니다.
+- Featured work에서 detail로 진입할 때 어색한 shared view transition이 발생하지 않게 합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Featured work의 `더 알아보기` 링크에 `data-astro-reload`를 붙여 gallery shared-element transition과 분리했습니다.
+  - Gallery tile의 `work-media-{slug}` transition은 유지해 gallery thumbnail → detail cover 경로만 shared transition을 사용합니다.
+- `src/pages/work/[slug].astro`
+  - Detail 상단 cover는 `thumbnail`만 사용합니다. Thumbnail이 없으면 placeholder로 처리합니다.
+  - 기존 `work-detail-media` 본문 hero image section을 제거했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - WORK media upload field를 `Gallery thumbnail`, `Featured thumbnail` 두 개만 남겼습니다.
+  - Gallery thumbnail 설명을 16:9 가로 이미지 및 detail top cover 공용 용도로 수정했습니다.
+  - Work 저장 시 legacy `heroAssetId`/`hero`는 `null`로 보내 기존 연결이 다시 저장되지 않게 했습니다.
+  - Admin live preview도 gallery thumbnail 기준으로 표시합니다.
+- `src/styles/global.css`
+  - Gallery thumbnail aspect ratio를 `16 / 9`로 변경했습니다.
+  - Detail cover height를 `clamp(390px, 51svh, 540px)`로 키웠습니다.
+  - Detail cover blur overlay의 opacity/blur/mask를 강화했습니다.
+  - 사용하지 않는 `work-detail-media`/`work-detail-placeholder` 스타일을 제거했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- `/work/rush-hour-app` 브라우저 DOM 확인
+  - `data-cover-image`가 gallery thumbnail asset `/media/uploads/2026/05/00df4d6c...png`를 사용
+  - `work-detail-media` 제거 확인
+  - Work blocks는 계속 렌더링 확인
+- `/work` HTML에서 featured detail link에 `data-astro-reload`가 붙는 것 확인
+
 ## 2026-05-12 Smooth top scroll and gallery-cover transition alignment
 
 ### 요구사항

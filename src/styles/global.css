@@ -705,8 +705,7 @@ button:disabled {
 }
 
 .work-visual::before,
-.work-tile-media::before,
-.work-detail-placeholder::before {
+.work-tile-media::before {
   position: absolute;
   inset: 0;
   content: "";
@@ -726,8 +725,7 @@ button:disabled {
     transparent;
 }
 
-.work-visual img,
-.work-detail-media img {
+.work-visual img {
   position: relative;
   z-index: 1;
   width: 100%;
@@ -940,7 +938,7 @@ button:disabled {
 
 .work-tile-media {
   position: relative;
-  aspect-ratio: 314 / 418;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.14);
   background-color: transparent;
@@ -973,7 +971,7 @@ button:disabled {
 }
 
 .work-detail-cover {
-  --cover-height: clamp(260px, 34svh, 360px);
+  --cover-height: clamp(390px, 51svh, 540px);
   --cover-fade: 0;
   position: relative;
   width: 100vw;
@@ -1016,11 +1014,12 @@ button:disabled {
 
 .work-detail-cover-fixed::after {
   z-index: 3;
-  opacity: calc(0.42 + var(--cover-fade) * 0.48);
-  backdrop-filter: blur(calc(0.25rem + var(--cover-fade) * 0.75rem));
-  -webkit-backdrop-filter: blur(calc(0.25rem + var(--cover-fade) * 0.75rem));
-  mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.12) 38%, rgba(0, 0, 0, 0.72) 74%, #000 100%);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.12) 38%, rgba(0, 0, 0, 0.72) 74%, #000 100%);
+  background: rgba(244, 244, 244, 0.01);
+  opacity: calc(0.56 + var(--cover-fade) * 0.4);
+  backdrop-filter: blur(calc(0.75rem + var(--cover-fade) * 1.15rem));
+  -webkit-backdrop-filter: blur(calc(0.75rem + var(--cover-fade) * 1.15rem));
+  mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.16) 32%, rgba(0, 0, 0, 0.78) 72%, #000 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.16) 32%, rgba(0, 0, 0, 0.78) 72%, #000 100%);
 }
 
 .work-detail-cover img {
@@ -1132,7 +1131,6 @@ button:disabled {
   opacity: 0.5;
 }
 
-.work-detail-media,
 .work-blocks {
   position: relative;
   z-index: 2;
@@ -1187,15 +1185,6 @@ button:disabled {
 .work-meta dd {
   margin: 6px 0 0;
   color: var(--color-ink);
-}
-
-.work-detail-media,
-.work-detail-placeholder {
-  position: relative;
-  min-height: 620px;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: transparent;
 }
 
 .work-blocks {
