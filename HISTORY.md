@@ -2,6 +2,129 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-12 Admin isolation and top-button scroll fix
+
+### 요구사항
+- Gallery 하단에서 floating top button을 누르면 career item scroll lock 구간에서 멈추지 않고 맨 위로 이동해야 합니다.
+- About에서 career로 넘어가는 스크롤 길이가 마지막 커밋/푸시 버전보다 길어진 느낌이 있어 이전 값으로 되돌립니다.
+- View Transition 적용 이후 `/admin`이 흰 화면만 나오는 문제를 분석하고 해결합니다.
+
+### 구현
+- `src/layouts/BaseLayout.astro`
+  - Admin에서도 `ClientRouter` import side effect가 섞이지 않도록 BaseLayout은 다시 순수 공통 layout으로 정리했습니다.
+  - React Refresh preamble은 기존처럼 admin dev에서만 유지합니다.
+- `src/layouts/PublicLayout.astro`
+  - 새 공개 페이지 전용 layout을 만들고, `ClientRouter`, gallery/detail route swap 보정, floating top button script를 이쪽으로 분리했습니다.
+  - Admin은 PublicLayout을 거치지 않으므로 View Transition client router와 floating button script가 로드되지 않습니다.
+- `src/components/HomePage.astro`
+  - BaseLayout 대신 PublicLayout을 사용합니다.
+  - `identityTravelSvh`를 이전 커밋 기준인 `Math.max(210, 126 + timeline.length * 18)`로 되돌려 about→career 진입 스크롤 길이를 줄였습니다.
+  - Floating top button 전용 `portfolio:scroll-top` 이벤트를 받아 career lock을 초기화하고, home snap observer를 잠깐 비활성화한 뒤 즉시 intro 위치로 이동하게 했습니다.
+- `src/pages/work/[slug].astro`
+  - Work detail도 PublicLayout을 사용하도록 변경했습니다.
+- `src/pages/admin.astro`
+  - Admin은 `client:only="react"`를 유지합니다. `client:load`는 dev SSR에서 React duplicate hook 오류가 발생해 사용하지 않습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- 새 dev server `http://127.0.0.1:4324`에서 `/admin` DOM 확인: `Admin Login`, username/password input, login button 렌더링 확인
+- `/admin` HTML에서 `ClientRouter`/route announcer가 빠지고 admin island만 남는 것 확인
+- `/work` 직접 진입 URL이 `/work`로 유지되는 것 확인
+- 검증용 dev server 포트 `4323`, `4324` 프로세스 종료 완료
+
+### 참고
+- 기존 dev server/HMR 캐시가 꼬인 경우 `/admin`이 계속 흰 화면이면 dev server를 재시작하세요. 이번 변경은 fresh dev server 기준 정상 렌더링됩니다.
+
+## 2026-05-12 Gallery-detail view transition and top button
+
+### 요구사항
+- WORK gallery에서 work detail로 들어가고 다시 나올 때 Astro View Transitions API를 사용해 썸네일이 detail cover로 자연스럽게 이어지는 느낌을 만듭니다.
+- Gallery/detail 이동이 정적 이미지처럼 뚝 끊기지 않도록 client-side transition을 적용합니다.
+- 페이지 하단에 도달하면 우측 하단에 원형 top button을 띄우고, 흰색 배경/그림자 기반에서 hover 시 메인 accent color로 바뀌게 합니다.
+- Intro scroll cue의 dot animation duration을 `2.5s`로 변경하고, loop 시작 시 dot이 갑자기 튀어나오지 않도록 fade-in/fade-out 구조로 바꿉니다.
+
+### 구현
+- `src/layouts/BaseLayout.astro`
+  - Astro 공식 View Transitions 문서 방식대로 `ClientRouter`를 공통 layout head에 추가했습니다.
+  - `/work/*`에서 `/work`로 돌아올 때 전환 중 새 문서가 gallery scroll position을 먼저 잡도록 `astro:after-swap`에서 `.gallery-section` 위치로 instant scroll을 보정합니다.
+  - 전역 floating top button과 rerun-safe inline script를 추가했습니다. Admin body에서는 숨깁니다.
+- `src/components/HomePage.astro`
+  - Gallery thumbnail media에 `transition:name="work-media-{slug}"`, tile title에 `transition:name="work-title-{slug}"`를 추가했습니다.
+  - ClientRouter 적용 후에도 홈 스크롤 스크립트가 다시 초기화되도록 기존 GSAP setup을 `astro:page-load` 기반 initializer로 감쌌습니다.
+  - 페이지 전환 전에는 GSAP Observer/ScrollTrigger/window listener를 정리해 detail/admin 페이지 스크롤을 방해하지 않게 했습니다.
+  - `/work` alias 진입 시 gallery route가 `/`로 정리되는 부작용을 줄이도록 gallery 위치에서는 `/work`를 유지합니다.
+- `src/pages/work/[slug].astro`
+  - Detail cover와 h1에 gallery와 같은 transition name을 부여했습니다.
+  - Detail cover/topbar script도 `astro:page-load` 기반으로 재초기화하고, 전환 전 listener를 정리합니다.
+- `src/styles/global.css`
+  - Shared element transition duration/easing을 조정했습니다.
+  - Floating top button 스타일을 추가했습니다.
+  - Intro scroll cue dot animation을 `2.5s`로 바꾸고, 시작/종료 opacity가 0인 keyframe으로 loop 재시작 튐을 줄였습니다.
+
+### 검증
+- Astro 공식 문서의 `ClientRouter`, `transition:name`, `astro:page-load`, `astro:after-swap` 사용 방식 확인
+- `npm run build` 통과
+- `git diff --check` 통과
+- 로컬 dev server `http://127.0.0.1:4322`에서 브라우저 확인
+  - `/work` 직접 진입 시 gallery가 보이고 URL이 `/work`로 유지됨
+  - 첫 gallery tile 클릭 시 `/work/rush-hour-app` 상세로 이동하고 cover/header가 렌더링됨
+  - Detail back arrow 클릭 시 `/work` gallery로 복귀하고 `ALL` filter가 유지됨
+
+### 참고
+- View Transitions는 브라우저 지원에 따라 native shared element transition 또는 Astro fallback으로 동작합니다. `prefers-reduced-motion` 환경에서는 Astro router가 애니메이션을 줄입니다.
+
+## 2026-05-12 Home interaction and detail typography refinement
+
+### 요구사항
+- Intro scroll 유도 요소를 SVG 단독 아이콘에서 CSS mouse + 안내 문구 형태로 변경합니다.
+- 이후 유도 문구는 다시 제거하고 CSS mouse만 남깁니다. Mouse outline/dot 크기와 3초 loop 애니메이션을 참고 코드에 가깝게 조정합니다.
+- Intro headline 뒤 점 blink 속도를 기존보다 2배 느리게 합니다.
+- About 연락처 앞 라벨 문자를 제공된 email/phone/mappin SVG 아이콘으로 교체합니다.
+- Admin 좌측 sidebar를 최소화/복원하는 toggle 버튼을 추가합니다.
+- Career item 전환 애니메이션 중 연속 wheel/touch/key 입력으로 여러 item이 지나치게 넘어가는 현상을 줄입니다.
+- Featured work dot indicator가 흰 배경에서도 보이도록 약한 shadow를 추가합니다.
+- Featured work 상세 링크는 전체 card가 아니라 `더 알아보기` 라벨에만 걸고, hover 시 화살표만 left-right sweep 애니메이션을 줍니다.
+- Featured work 상세 링크 hover/focus 시 underline도 표시합니다.
+- Work detail hero title은 4vw 기준으로 낮추고, summary 본문은 20px로 맞춥니다.
+- Detail cover blur layer가 cover gradient와 같은 방향/강도로 적용되도록 mask를 맞춥니다.
+- 사이트 전반에 `word-break: keep-all`을 적용합니다.
+- Work gallery thumbnail에 약한 회색 border line을 추가합니다.
+- Gallery/featured/detail 등 cover image container에서 검정 background가 비치지 않도록 image cover 배경을 transparent로 정리합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Intro scroll cue 마크업은 빈 `<p>` 기반 CSS mouse만 남겼습니다.
+  - About 연락처에 `/assets/figma/email.svg`, `/assets/figma/phone.svg`, `/assets/figma/mappin.svg`를 렌더링합니다.
+  - Featured work 전체 card anchor를 제거하고, `.featured-more` 링크만 실제 hyperlink로 남겼습니다.
+  - Career active timeline index가 바뀐 직후 `360ms` 동안 추가 wheel/touch/key scroll 입력을 막는 guard를 추가했습니다. 기존 snap 구조와 progress 기반 career 동작은 유지했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - `sidebarCollapsed` state와 sidebar toggle button을 추가했습니다.
+  - Sidebar collapse 상태에서는 navigation/logout 라벨을 시각적으로 줄이고 단축 문자만 노출합니다.
+- `src/styles/admin.css`
+  - `.admin-shell.is-sidebar-collapsed` 레이아웃과 collapsed sidebar button/label 스타일을 추가했습니다.
+- `src/styles/global.css`
+  - Body에 `word-break: keep-all`과 `overflow-wrap: break-word`를 적용했습니다.
+  - Intro scroll cue를 CSS mouse outline + animated wheel dot만 보이도록 스타일링하고, intro dot blink를 `1s`로 늦췄습니다.
+  - Contact icon, featured dot shadow, featured link arrow hover animation/underline, gallery thumbnail border를 추가했습니다.
+  - Work detail h1은 `clamp(42px, 4vw, 76px)`, hero summary는 `20px`로 조정했습니다.
+  - Detail cover blur pseudo-layer의 mask gradient를 visual gradient와 같은 stop 구조로 맞췄습니다.
+  - `.work-visual`, `.work-tile-media`, `.work-detail-media`, `.work-block-image img` 등 cover image container의 검정 background를 transparent로 바꿨습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- 로컬 Chrome headless 확인
+  - Intro cue text가 비어 있고 CSS mouse pseudo-element가 `20px x 30px`로 렌더링되는 것 확인
+  - Intro dot blink computed animation duration `1s` 확인
+  - `body` computed `word-break: keep-all` 확인
+  - Work detail h1/p computed font-size 확인
+  - About 연락처 SVG 3개 렌더링 확인
+  - Work gallery thumbnail border `rgba(0, 0, 0, 0.14) 1px` 확인
+  - Featured active panel의 link가 `.featured-more` 하나만 남은 것 확인
+  - Work gallery thumbnail computed background color가 transparent인 것 확인
+  - Admin sidebar toggle 클릭 전/후 grid column이 `280px`에서 `84px`로 바뀌는 것 확인
+
 ## 2026-05-11 Detail, featured, admin media refinement
 
 ### 요구사항

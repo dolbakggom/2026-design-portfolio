@@ -14,7 +14,8 @@ const {
   htmlClass = "",
   bodyClass = ""
 } = Astro.props;
-const needsReactRefreshPreamble = import.meta.env.DEV && bodyClass.includes("admin-body");
+const isAdminBody = bodyClass.includes("admin-body");
+const needsReactRefreshPreamble = import.meta.env.DEV && isAdminBody;
 ---
 
 <!doctype html>
@@ -25,6 +26,7 @@ const needsReactRefreshPreamble = import.meta.env.DEV && bodyClass.includes("adm
     <meta name="description" content={description} />
     <meta name="theme-color" content="#f7f4ee" />
     <title>{title}</title>
+    <slot name="head" />
     {
       needsReactRefreshPreamble ? (
         <script type="module" is:inline>

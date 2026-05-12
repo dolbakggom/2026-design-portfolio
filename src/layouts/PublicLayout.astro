@@ -1,0 +1,62 @@
+---
+import { ClientRouter } from "astro:transitions";
+import BaseLayout from "./BaseLayout.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+  htmlClass?: string;
+  bodyClass?: string;
+}
+
+const props = Astro.props as Props;
+---
+
+<BaseLayout {...props}>
+  <ClientRouter slot="head" />
+  <slot />
+  <button class="floating-top-button" type="button" data-floating-top aria-label="맨 위로 이동">↑</button>
+  <script is:inline>
+    if (!window.__portfolioTransitionSetup) {
+      window.__portfolioTransitionSetup = true;
+      document.addEventListener("astro:after-swap", () => {
+        if (window.location.pathname !== "/work") return;
+        const gallery = document.querySelector(".gallery-section");
+        if (!gallery) return;
+        window.scrollTo(0, gallery.offsetTop);
+      });
+    }
+  </script>
+  <script is:inline data-astro-rerun>
+    (() => {
+      window.__floatingTopController?.abort?.();
+      const controller = new AbortController();
+      window.__floatingTopController = controller;
+      const button = document.querySelector("[data-floating-top]");
+
+      if (!button) return;
+
+      const syncButton = () => {
+        const root = document.documentElement;
+        const canScroll = root.scrollHeight > window.innerHeight * 1.25;
+        const nearBottom = window.scrollY + window.innerHeight >= root.scrollHeight - Math.max(220, window.innerHeight * 0.18);
+        button.classList.toggle("is-visible", canScroll && nearBottom);
+      };
+
+      button.addEventListener("click", () => {
+        const topEvent = new CustomEvent("portfolio:scroll-top", { cancelable: true });
+        if (window.dispatchEvent(topEvent)) {
+          if (document.querySelector(".site-shell")) {
+            document.documentElement.classList.remove("is-free-scroll");
+            window.history.replaceState(null, "", "/");
+          }
+          window.scrollTo(0, 0);
+        }
+      }, { signal: controller.signal });
+      window.addEventListener("scroll", syncButton, { passive: true, signal: controller.signal });
+      window.addEventListener("resize", syncButton, { signal: controller.signal });
+      document.addEventListener("astro:before-swap", () => controller.abort(), { once: true, signal: controller.signal });
+      syncButton();
+    })();
+  </script>
+</BaseLayout>

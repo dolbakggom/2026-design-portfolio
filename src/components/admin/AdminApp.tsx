@@ -233,6 +233,7 @@ export default function AdminApp() {
   const [works, setWorks] = useState<WorkItem[]>([]);
   const [selectedWorkId, setSelectedWorkId] = useState<string>("");
   const [workPreviewWidth, setWorkPreviewWidth] = useState(460);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -560,21 +561,32 @@ export default function AdminApp() {
           {error || message}
         </div>
       ) : null}
-      <main className="admin-shell">
+      <main className={`admin-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
       <aside className="admin-sidebar">
-        <div>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-pressed={sidebarCollapsed}
+          onClick={() => setSidebarCollapsed((current) => !current)}
+        >
+          {sidebarCollapsed ? "›" : "‹"}
+        </button>
+        <div className="sidebar-brand">
           <p>Beyond CMS</p>
           <h1>Portfolio Admin</h1>
         </div>
         <nav>
           {(["profile", "timeline", "works"] as Tab[]).map((tab) => (
             <button key={tab} type="button" className={activeTab === tab ? "is-active" : ""} onClick={() => setActiveTab(tab)}>
-              {tab}
+              <span className="nav-short" aria-hidden="true">{tab.slice(0, 1)}</span>
+              <span className="nav-label">{tab}</span>
             </button>
           ))}
         </nav>
         <button type="button" className="ghost-button" onClick={logout}>
-          Logout
+          <span className="nav-short" aria-hidden="true">L</span>
+          <span className="nav-label">Logout</span>
         </button>
       </aside>
 

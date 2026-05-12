@@ -48,12 +48,18 @@
 .admin-shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
+  transition: grid-template-columns 180ms ease;
+}
+
+.admin-shell.is-sidebar-collapsed {
+  grid-template-columns: 84px minmax(0, 1fr);
 }
 
 .admin-sidebar {
   position: sticky;
   top: 0;
   height: 100svh;
+  min-width: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 32px;
@@ -61,6 +67,27 @@
   padding: 24px;
   background: var(--color-ink);
   color: var(--color-white);
+}
+
+.sidebar-toggle {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 2;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  justify-content: center;
+  border-color: rgba(255, 253, 248, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-white);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.sidebar-brand {
+  min-width: 0;
+  padding-right: 42px;
 }
 
 .admin-sidebar h1 {
@@ -78,6 +105,8 @@
 .admin-content button,
 .login-panel button {
   min-height: 38px;
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
   padding: 0 12px;
@@ -128,6 +157,10 @@
   text-align: left;
 }
 
+.nav-short {
+  display: none;
+}
+
 .admin-sidebar nav button.is-active {
   border-color: var(--admin-accent);
   background: var(--admin-accent);
@@ -138,6 +171,39 @@
   border-color: rgba(255, 253, 248, 0.24);
   background: transparent;
   color: var(--color-white);
+}
+
+.admin-shell.is-sidebar-collapsed .admin-sidebar {
+  gap: 22px;
+  padding: 64px 14px 18px;
+}
+
+.admin-shell.is-sidebar-collapsed .sidebar-brand {
+  display: none;
+}
+
+.admin-shell.is-sidebar-collapsed .admin-sidebar nav {
+  gap: 10px;
+}
+
+.admin-shell.is-sidebar-collapsed .admin-sidebar :is(nav button, .ghost-button) {
+  min-height: 46px;
+  justify-content: center;
+  padding: 0;
+}
+
+.admin-shell.is-sidebar-collapsed .nav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.admin-shell.is-sidebar-collapsed .nav-short {
+  display: inline;
+  font-size: 0.95rem;
+  text-transform: uppercase;
 }
 
 .admin-content {
