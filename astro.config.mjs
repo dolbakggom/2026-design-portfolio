@@ -6,7 +6,8 @@ const optimizerExcludes = [
   "drizzle-orm",
   "drizzle-orm/d1",
   "drizzle-orm/sqlite-core",
-  "zod"
+  "zod",
+  "zod/v4"
 ];
 
 const optimizerIncludes = [
@@ -18,6 +19,8 @@ const optimizerIncludes = [
   "use-sync-external-store/shim/with-selector.js"
 ];
 
+const isDevCommand = process.argv.includes("dev");
+
 export default defineConfig({
   output: "server",
   adapter: cloudflare({
@@ -28,6 +31,7 @@ export default defineConfig({
   }),
   integrations: [react()],
   vite: {
+    cacheDir: isDevCommand ? "node_modules/.vite-portfolio-dev" : "node_modules/.vite-portfolio-build",
     optimizeDeps: {
       include: optimizerIncludes,
       exclude: optimizerExcludes

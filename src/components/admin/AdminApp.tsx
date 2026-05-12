@@ -37,6 +37,54 @@ type AssetResponse = {
 
 type Tab = "profile" | "timeline" | "works";
 type WorkAssetKind = "thumbnail" | "featuredThumbnail" | "hero";
+type AdminIconName = Tab | "logout";
+
+const navItems: Array<{ tab: Tab; label: string; icon: AdminIconName }> = [
+  { tab: "profile", label: "Profile", icon: "profile" },
+  { tab: "timeline", label: "Timeline", icon: "timeline" },
+  { tab: "works", label: "Works", icon: "works" }
+];
+
+function AdminIcon({ name }: { name: AdminIconName }) {
+  const paths: Record<AdminIconName, ReactNode> = {
+    profile: (
+      <>
+        <path d="M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+        <path d="M5 20a7 7 0 0 1 14 0" />
+      </>
+    ),
+    timeline: (
+      <>
+        <path d="M8 5h10" />
+        <path d="M8 12h10" />
+        <path d="M8 19h10" />
+        <path d="M4 5h.01" />
+        <path d="M4 12h.01" />
+        <path d="M4 19h.01" />
+      </>
+    ),
+    works: (
+      <>
+        <path d="M4 5h16v5H4z" />
+        <path d="M4 14h7v5H4z" />
+        <path d="M15 14h5v5h-5z" />
+      </>
+    ),
+    logout: (
+      <>
+        <path d="M10 5H6v14h4" />
+        <path d="M14 8l4 4-4 4" />
+        <path d="M8 12h10" />
+      </>
+    )
+  };
+
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      {paths[name]}
+    </svg>
+  );
+}
 
 const workMediaFields: Array<{
   kind: WorkAssetKind;
@@ -47,7 +95,7 @@ const workMediaFields: Array<{
   {
     kind: "thumbnail",
     label: "Gallery thumbnail",
-    hint: "WORK gallery card에 사용됩니다. 세로형 3:4 비율 권장.",
+    hint: "WORK gallery card와 상세 상단 transition cover에 사용됩니다. 세로형 3:4 비율 권장, 상세 상단에서는 cover로 crop됩니다.",
     aspect: "3 / 4"
   },
   {
@@ -128,7 +176,7 @@ const previewBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", par
   }) as CSSProperties;
 
 function WorkLivePreview({ work }: { work: WorkItem }) {
-  const heroUrl = work.hero?.url || work.thumbnail?.url;
+  const coverUrl = work.thumbnail?.url || work.hero?.url;
   const blocks = work.blocks ?? [];
 
   return (
@@ -145,7 +193,7 @@ function WorkLivePreview({ work }: { work: WorkItem }) {
 
       <div className="work-preview-scroll">
         <section className="preview-hero">
-          <div className="preview-hero-media">{heroUrl ? <img src={heroUrl} alt={work.hero?.alt ?? work.thumbnail?.alt ?? work.title} /> : null}</div>
+          <div className="preview-hero-media">{coverUrl ? <img src={coverUrl} alt={work.thumbnail?.alt ?? work.hero?.alt ?? work.title} /> : null}</div>
           <p>{work.category}</p>
           <h4>{work.title || "Untitled work"}</h4>
           <span>{work.summary || "Summary preview will appear here."}</span>
@@ -577,15 +625,15 @@ export default function AdminApp() {
           <h1>Portfolio Admin</h1>
         </div>
         <nav>
-          {(["profile", "timeline", "works"] as Tab[]).map((tab) => (
-            <button key={tab} type="button" className={activeTab === tab ? "is-active" : ""} onClick={() => setActiveTab(tab)}>
-              <span className="nav-short" aria-hidden="true">{tab.slice(0, 1)}</span>
-              <span className="nav-label">{tab}</span>
+          {navItems.map((item) => (
+            <button key={item.tab} type="button" className={activeTab === item.tab ? "is-active" : ""} onClick={() => setActiveTab(item.tab)}>
+              <span className="nav-icon" aria-hidden="true"><AdminIcon name={item.icon} /></span>
+              <span className="nav-label">{item.label}</span>
             </button>
           ))}
         </nav>
         <button type="button" className="ghost-button" onClick={logout}>
-          <span className="nav-short" aria-hidden="true">L</span>
+          <span className="nav-icon" aria-hidden="true"><AdminIcon name="logout" /></span>
           <span className="nav-label">Logout</span>
         </button>
       </aside>

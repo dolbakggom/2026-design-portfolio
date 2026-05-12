@@ -44,14 +44,12 @@ const props = Astro.props as Props;
       };
 
       button.addEventListener("click", () => {
-        const topEvent = new CustomEvent("portfolio:scroll-top", { cancelable: true });
-        if (window.dispatchEvent(topEvent)) {
-          if (document.querySelector(".site-shell")) {
-            document.documentElement.classList.remove("is-free-scroll");
-            window.history.replaceState(null, "", "/");
-          }
-          window.scrollTo(0, 0);
+        if (typeof window.__portfolioScrollToTop === "function") {
+          window.__portfolioScrollToTop();
+          return;
         }
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }, { signal: controller.signal });
       window.addEventListener("scroll", syncButton, { passive: true, signal: controller.signal });
       window.addEventListener("resize", syncButton, { signal: controller.signal });

@@ -2,6 +2,75 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-12 Smooth top scroll and gallery-cover transition alignment
+
+### 요구사항
+- Gallery 하단 top button은 새로고침/라우팅이 아니라 부드러운 스크롤로 intro까지 이동해야 합니다.
+- Top 이동 중에는 기존 snap/career lock/scroll snap이 중간에 다시 개입하지 않게 해야 합니다.
+- Gallery thumbnail에서 work detail 상단 cover로 이어지는 View Transition이 자연스럽도록 두 이미지 소스를 동일하게 맞춥니다.
+- Admin 이미지 업로드 설명도 변경된 이미지 역할에 맞게 정리합니다.
+
+### 구현
+- `src/layouts/PublicLayout.astro`
+  - Floating top button을 다시 `<button>`으로 바꾸고, 홈 페이지가 제공하는 `window.__portfolioScrollToTop()`이 있으면 해당 전용 스크롤 함수를 호출합니다.
+  - 홈 페이지가 아닌 detail 등에서는 일반 smooth `window.scrollTo({ top: 0 })` fallback을 사용합니다.
+- `src/components/HomePage.astro`
+  - Top button 전용 programmatic scroll 상태를 추가했습니다.
+  - Top 이동 중에는 `snapObserver`를 끄고, career item input lock을 초기화하며, `html/body` inline `scrollSnapType = "none"`을 임시 적용합니다.
+  - GSAP `scrollTo`는 `overwrite: true`로 실행하고, snap/lock 복구와 `ScrollTrigger.refresh()`는 `onComplete`에서 처리합니다. interrupt 시에도 inline snap style은 복구합니다.
+  - `/work` alias에서 top button으로 intro 이동 시 더 이상 `/work` route preserve가 남지 않도록 처리했습니다.
+- `src/pages/work/[slug].astro`
+  - Detail 상단 cover는 `hero`보다 `thumbnail`을 우선 사용합니다. Gallery tile의 `work-media-{slug}` transition source와 detail cover target이 같은 asset을 바라보게 됩니다.
+- `src/components/admin/AdminApp.tsx`
+  - Gallery thumbnail 설명에 “WORK gallery card와 상세 상단 transition cover에 사용”된다는 내용을 반영했습니다.
+  - Admin live preview의 상단 preview image도 thumbnail 우선으로 맞췄습니다.
+- `src/styles/global.css`
+  - Floating top button의 z-index를 높이고 touch action을 정리해 gallery card 위에서 클릭 target이 밀리지 않게 했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- `/work` HTML에서 floating top button이 button으로 출력되는 것 확인
+- `/work/rush-hour-app` HTML에서 detail 상단 cover가 gallery thumbnail과 같은 `/media/uploads/2026/05/00df4d6c...png`를 쓰고, 본문 대표 이미지는 기존 hero 이미지를 쓰는 것 확인
+
+## 2026-05-12 Admin hydration cache and media/sidebar polish
+
+### 요구사항
+- Gallery 하단 floating top button을 눌러도 반응하지 않는 문제를 해결합니다.
+- 로컬 `/admin`이 흰 화면 또는 `Loading admin...` 상태로 멈추는 문제를 중점적으로 해결합니다.
+- Admin WORK editor의 media upload card/preview가 편집 프레임 밖으로 튀어나가지 않게 합니다.
+- Admin sidebar collapse 상태에서 logout button 크기를 정상화하고, nav label 옆 icon을 추가합니다. Collapse 시에는 icon만 남깁니다.
+
+### 구현
+- `src/layouts/PublicLayout.astro`
+  - Floating top button을 custom scroll event 대신 `href="/"` + `data-astro-reload` 링크로 처리했습니다.
+  - Astro ClientRouter와 home scroll lock이 클릭을 가로막지 않도록 top 이동은 full navigation으로 분리했습니다.
+- `astro.config.mjs`
+  - iCloud 폴더의 `.vite/deps 2` 충돌을 피하기 위해 Vite cache를 `node_modules` 아래로 이동했습니다.
+  - Build가 만든 production `react/jsx-dev-runtime` cache를 dev server가 재사용하면서 `jsxDEV is not a function`으로 admin hydration이 깨지던 문제를 막기 위해 dev/build cache를 분리했습니다.
+  - `zod/v4`도 optimize exclude에 추가했습니다.
+- `src/pages/admin.astro`
+  - React island renderer 판별이 안정적으로 되도록 `AdminApp.tsx` 확장자를 명시해 import합니다.
+- `src/components/admin/AdminApp.tsx`
+  - Sidebar nav/logout에 inline SVG icon을 추가했습니다.
+  - Collapse 상태에서는 label을 숨기고 icon만 남기도록 구조를 정리했습니다.
+- `src/styles/admin.css`
+  - Collapsed sidebar의 nav/logout button을 `46px` 정사각형으로 고정해 logout button이 과도하게 길어지지 않게 했습니다.
+  - Media upload grid를 `auto-fit + minmax(min(100%, 240px), 1fr)`로 바꾸고, field/header/input/preview에 `min-width: 0`과 overflow containment를 적용했습니다.
+  - Remove button은 card 내부에서 줄바꿈/축소되도록 정리했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- Fresh dev server `http://127.0.0.1:4325`에서 `/admin` 확인
+  - `Admin Login` 렌더링 확인
+  - `Loading admin...` fallback이 사라지는 것 확인
+  - Build 실행 후에도 dev `/admin` hydration이 유지되는 것 확인
+- `/work` HTML에서 floating top button이 `href="/"`와 `data-astro-reload`를 가진 링크로 출력되는 것 확인
+
+### 참고
+- 기존 dev tab이 오래된 optimized React runtime을 물고 있으면 hard reload 또는 dev server 재시작이 필요할 수 있습니다. 현재 설정에서는 fresh tab/dev server 기준 정상 동작합니다.
+
 ## 2026-05-12 Admin isolation and top-button scroll fix
 
 ### 요구사항

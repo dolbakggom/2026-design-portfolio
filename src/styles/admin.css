@@ -150,6 +150,7 @@
 }
 
 .admin-sidebar nav button {
+  gap: 10px;
   justify-content: start;
   border-color: rgba(255, 253, 248, 0.18);
   background: transparent;
@@ -157,8 +158,22 @@
   text-align: left;
 }
 
-.nav-short {
-  display: none;
+.nav-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  flex: 0 0 22px;
+  place-items: center;
+}
+
+.nav-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .admin-sidebar nav button.is-active {
@@ -168,6 +183,8 @@
 }
 
 .admin-sidebar .ghost-button {
+  gap: 10px;
+  align-self: end;
   border-color: rgba(255, 253, 248, 0.24);
   background: transparent;
   color: var(--color-white);
@@ -187,8 +204,11 @@
 }
 
 .admin-shell.is-sidebar-collapsed .admin-sidebar :is(nav button, .ghost-button) {
+  width: 46px;
   min-height: 46px;
+  height: 46px;
   justify-content: center;
+  justify-self: center;
   padding: 0;
 }
 
@@ -200,10 +220,9 @@
   clip: rect(0 0 0 0);
 }
 
-.admin-shell.is-sidebar-collapsed .nav-short {
-  display: inline;
-  font-size: 0.95rem;
-  text-transform: uppercase;
+.admin-shell.is-sidebar-collapsed .nav-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .admin-content {
@@ -511,8 +530,9 @@ input[type="file"] {
 
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 14px;
+  min-width: 0;
 }
 
 .media-field {
@@ -523,11 +543,16 @@ input[type="file"] {
   border-radius: var(--radius-md);
   padding: 12px;
   background: #fbfaf6;
+  overflow: hidden;
+}
+
+.media-field > * {
+  min-width: 0;
 }
 
 .media-field header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: start;
 }
@@ -548,15 +573,17 @@ input[type="file"] {
 }
 
 .media-field button {
+  width: max-content;
+  max-width: 100%;
   min-height: 32px;
   padding-inline: 10px;
   font-size: 0.78rem;
+  justify-self: start;
 }
 
 .media-preview {
   position: relative;
   width: 100%;
-  max-height: 190px;
   display: grid;
   place-items: center;
   aspect-ratio: var(--media-aspect, 16 / 9);
@@ -572,7 +599,7 @@ input[type="file"] {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background: var(--color-ink);
+  background: transparent;
 }
 
 .media-preview span {
@@ -582,7 +609,9 @@ input[type="file"] {
 }
 
 .media-field input[type="file"] {
+  width: 100%;
   max-width: 100%;
+  overflow: hidden;
   font-size: 0.82rem;
 }
 

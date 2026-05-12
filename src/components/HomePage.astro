@@ -187,8 +187,17 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       let snapSyncFrame = 0;
       let initialScrollFrame = 0;
       let initialScrollTimeout = 0;
+      const portfolioWindow = window as Window & { __portfolioScrollToTop?: () => void };
+      let scrollToTopHandler: (() => void) | null = null;
+      let programmaticTopScroll = false;
+      let restoreTopScrollSnap = () => {};
 
       cleanupHomePage = () => {
+        if (scrollToTopHandler && portfolioWindow.__portfolioScrollToTop === scrollToTopHandler) {
+          delete portfolioWindow.__portfolioScrollToTop;
+        }
+        restoreTopScrollSnap();
+        programmaticTopScroll = false;
         pageController.abort();
         window.cancelAnimationFrame(snapSyncFrame);
         window.cancelAnimationFrame(initialScrollFrame);
@@ -205,6 +214,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const initialSection = shell.dataset.initialSection ?? "intro";
+    let preserveWorkRoute = initialSection === "work";
 
     const replaceRoute = (route: string) => {
       if (window.location.pathname === route) return;
@@ -212,7 +222,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     };
 
     const clearHomeRoute = () => {
-      if (initialSection === "work") {
+      if (preserveWorkRoute) {
         replaceRoute("/work");
         return;
       }
@@ -582,28 +592,64 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       });
     };
 
-    const scrollToIntroFromFloatingButton = (event: Event) => {
-      event.preventDefault();
+    const scrollToIntroFromFloatingButton = () => {
       const target = findSnapTarget("intro") ?? { y: 0, route: "/", kind: "intro" as const };
+      const duration = reduceMotion ? 0 : 1.05;
+      const html = document.documentElement;
+      const body = document.body;
+      const previousHtmlSnap = html.style.scrollSnapType;
+      const previousBodySnap = body.style.scrollSnapType;
 
+      preserveWorkRoute = false;
+      programmaticTopScroll = true;
       careerItemLockedUntil = 0;
+      lockedUntil = 0;
       snapTween?.kill();
       snapTween = null;
       snapObserver?.disable();
-      lockScroll(360);
-      document.documentElement.classList.remove("is-free-scroll");
+      html.classList.remove("is-free-scroll");
+      html.style.scrollSnapType = "none";
+      body.style.scrollSnapType = "none";
       replaceRoute("/");
-      window.scrollTo(0, Math.round(target.y));
-      applySnapState(target);
-      ScrollTrigger.refresh();
-      requestSnapObserverSync();
+
+      restoreTopScrollSnap = () => {
+        html.style.scrollSnapType = previousHtmlSnap;
+        body.style.scrollSnapType = previousBodySnap;
+        restoreTopScrollSnap = () => {};
+      };
+
+      const finishTopScroll = () => {
+        snapTween = null;
+        programmaticTopScroll = false;
+        restoreTopScrollSnap();
+        applySnapState(target);
+        replaceRoute("/");
+        lockedUntil = Date.now() + 180;
+        ScrollTrigger.refresh();
+        requestSnapObserverSync();
+      };
+
+      snapTween = gsap.to(window, {
+        scrollTo: { y: Math.round(target.y), autoKill: false },
+        duration,
+        ease: "power3.inOut",
+        overwrite: true,
+        onComplete: finishTopScroll,
+        onInterrupt: () => {
+          snapTween = null;
+          programmaticTopScroll = false;
+          restoreTopScrollSnap();
+          requestSnapObserverSync();
+        }
+      });
     };
 
-    window.addEventListener("portfolio:scroll-top", scrollToIntroFromFloatingButton, { signal: pageSignal });
+    scrollToTopHandler = scrollToIntroFromFloatingButton;
+    portfolioWindow.__portfolioScrollToTop = scrollToIntroFromFloatingButton;
 
     const goToSnap = (direction: 1 | -1) => {
       const targets = getSnapTargets();
-      if (!targets.length || isScrollLocked() || !shouldSnapInput()) return;
+      if (!targets.length || programmaticTopScroll || isScrollLocked() || !shouldSnapInput()) return;
 
       const target = getNextSnapTarget(targets, direction);
       if (!target) return;
@@ -612,7 +658,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     };
 
     const snapAcrossWorkBoundary = (direction: 1 | -1, event?: Event) => {
-      if (isScrollLocked()) return false;
+      if (programmaticTopScroll || isScrollLocked()) return false;
 
       const currentY = window.scrollY;
       const careerTarget = findSnapTarget("career");
@@ -644,6 +690,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     };
 
     const dispatchNativeSnapInput = (direction: 1 | -1, event?: Event) => {
+      if (programmaticTopScroll) {
+        event?.preventDefault();
+        return;
+      }
       if (isCareerItemInputLocked()) {
         event?.preventDefault();
         return;
@@ -669,6 +719,14 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       let previousScrollY = window.scrollY;
       const syncSnapObserver = () => {
         const currentY = window.scrollY;
+
+        if (programmaticTopScroll) {
+          document.documentElement.classList.remove("is-free-scroll");
+          if (snapObserver?.isEnabled) snapObserver.disable();
+          previousScrollY = currentY;
+          return;
+        }
+
         const movedDown = currentY > previousScrollY;
         const freeScroll = isFreeScrollRange();
         const shouldAutoSnapToWork =
@@ -723,6 +781,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         "wheel",
         (event) => {
           if (Math.abs(event.deltaY) < 4) return;
+          if (programmaticTopScroll) {
+            event.preventDefault();
+            return;
+          }
           if (isCareerItemInputLocked()) {
             event.preventDefault();
             return;
@@ -749,6 +811,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           const currentTouchY = event.touches[0]?.clientY ?? touchStartY;
           const deltaY = touchStartY - currentTouchY;
           if (Math.abs(deltaY) < 24) return;
+          if (programmaticTopScroll) {
+            event.preventDefault();
+            return;
+          }
           if (isCareerItemInputLocked()) {
             event.preventDefault();
             return;
@@ -762,6 +828,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
       window.addEventListener("keydown", (event) => {
         if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (programmaticTopScroll && ["ArrowDown", "PageDown", " ", "ArrowUp", "PageUp"].includes(event.key)) {
+          event.preventDefault();
+          return;
+        }
         if (isCareerItemInputLocked() && ["ArrowDown", "PageDown", " ", "ArrowUp", "PageUp"].includes(event.key)) {
           event.preventDefault();
           return;
