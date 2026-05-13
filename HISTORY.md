@@ -2,6 +2,45 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-13 Featured-only view transition rework
+
+### 요구사항
+- 사용자가 별도로 조정한 about-career scroll logic은 유지합니다.
+- 기존 gallery thumbnail -> detail cover shared view transition은 해제합니다.
+- Gallery에서 detail로 들어갈 때는 shared transition 없이 route-level fade 정도만 적용합니다.
+- Featured work에서 detail로 들어갈 때만 featured image -> detail cover shared transition을 적용합니다.
+- Shared transition 대상이 아닌 나머지 화면 요소는 부드럽게 fade되도록 정리합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Gallery `.work-tile-media`와 gallery title의 기존 `transition:name`을 제거했습니다.
+  - Featured work image에만 `transition:name="featured-media-{slug}"`를 부여했습니다.
+  - Featured work `더 알아보기` 링크의 `data-astro-reload`를 제거해 Astro ClientRouter transition을 다시 사용하게 했습니다.
+  - 사용자가 변경한 `careerEntry` 기반 scroll snap 로직은 유지했고, unused local 변수만 제거했습니다.
+- `src/pages/work/[slug].astro`
+  - Detail cover image가 `featuredThumbnail`을 우선 사용하고, 없으면 `thumbnail`으로 fallback하도록 변경했습니다.
+  - Detail cover image에 `transition:name="featured-media-{slug}"`를 부여했습니다.
+  - Detail title의 기존 `work-title` shared transition은 제거했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - Admin 설명을 현재 역할에 맞게 조정했습니다.
+  - `Gallery thumbnail`: WORK gallery card용
+  - `Featured thumbnail`: Featured work full-screen background와 detail 상단 cover용
+  - Live preview cover도 `featuredThumbnail` 우선으로 표시합니다.
+- `src/styles/global.css`
+  - ClientRouter route transition의 root old/new에 명시적인 fade animation을 추가했습니다.
+  - Shared image transition이 없는 gallery -> detail 이동은 root fade만 타도록 정리했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- 로컬 `http://127.0.0.1:4325/work` HTML 확인
+  - Featured image에만 `featured-media-*` view-transition-name 출력
+  - Gallery tile에는 `work-media`/`work-title` transition name이 출력되지 않음
+  - Featured link에 `data-astro-reload`가 없음
+- 로컬 `http://127.0.0.1:4325/work/rush-hour-app` HTML 확인
+  - Detail cover image에 `featured-media-rush-hour-app` transition name 출력
+  - Detail title에는 shared transition name 없음
+
 ## 2026-05-12 Work image role simplification
 
 ### 요구사항

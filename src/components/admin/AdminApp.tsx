@@ -95,13 +95,13 @@ const workMediaFields: Array<{
   {
     kind: "thumbnail",
     label: "Gallery thumbnail",
-    hint: "WORK gallery card와 상세 상단 transition cover에 같이 사용됩니다. 16:9 가로 이미지 권장.",
+    hint: "WORK gallery card에 사용됩니다. 16:9 가로 이미지 권장.",
     aspect: "16 / 9"
   },
   {
     kind: "featuredThumbnail",
     label: "Featured thumbnail",
-    hint: "Featured work full-screen 배경에 사용됩니다. 16:9 이상 와이드 이미지 권장.",
+    hint: "Featured work full-screen 배경과 상세 상단 cover에 사용됩니다. 16:9 이상 와이드 이미지 권장.",
     aspect: "16 / 9"
   }
 ];
@@ -170,7 +170,7 @@ const previewBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", par
   }) as CSSProperties;
 
 function WorkLivePreview({ work }: { work: WorkItem }) {
-  const coverUrl = work.thumbnail?.url;
+  const coverUrl = work.featuredThumbnail?.url || work.thumbnail?.url;
   const blocks = work.blocks ?? [];
 
   return (
@@ -187,7 +187,7 @@ function WorkLivePreview({ work }: { work: WorkItem }) {
 
       <div className="work-preview-scroll">
         <section className="preview-hero">
-          <div className="preview-hero-media">{coverUrl ? <img src={coverUrl} alt={work.thumbnail?.alt ?? work.title} /> : null}</div>
+          <div className="preview-hero-media">{coverUrl ? <img src={coverUrl} alt={work.featuredThumbnail?.alt ?? work.thumbnail?.alt ?? work.title} /> : null}</div>
           <p>{work.category}</p>
           <h4>{work.title || "Untitled work"}</h4>
           <span>{work.summary || "Summary preview will appear here."}</span>

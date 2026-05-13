@@ -95,6 +95,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                         alt={work.featuredThumbnail?.alt ?? work.thumbnail?.alt ?? work.title}
                         crossorigin="anonymous"
                         loading="lazy"
+                        transition:name={`featured-media-${work.slug}`}
                       />
                     ) : null}
                   </div>
@@ -106,7 +107,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                       <span>{work.client || "개인 프로젝트"}</span>
                       <span>{work.role || "Figma + Adobe Illustrator"}</span>
                     </p>
-                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기`} data-astro-reload>더 알아보기</a>
+                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기`}>더 알아보기</a>
                   </div>
                 </div>
               </article>
@@ -140,12 +141,11 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                 <div
                   class:list={["work-tile-media", work.thumbnail?.url && "has-image"]}
                   style={work.thumbnail?.url ? `--tile-image: url("${work.thumbnail.url}")` : undefined}
-                  transition:name={`work-media-${work.slug}`}
                   aria-label={work.thumbnail?.alt ?? work.title}
                   role="img"
                 />
                 <div>
-                  <h3 transition:name={`work-title-${work.slug}`}>{work.title}</h3>
+                  <h3>{work.title}</h3>
                 </div>
               </a>
             ))
@@ -440,7 +440,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     type SnapTarget = {
       y: number;
       route: string;
-      kind: "intro" | "about" | "career" | "work" | "featured" | "gallery";
+      kind: "intro" | "about" | "careerEntry" | "career" | "work" | "featured" | "gallery";
       featuredIndex?: number;
     };
 
@@ -458,7 +458,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const getCareerEntryTop = () => getIdentityTop() + getIdentityProgressRange() * careerStartProgress;
     const getCareerExitTop = () => getIdentityTop() + getIdentityProgressRange() * careerEndProgress;
     const isFreeScrollRange = () => window.scrollY >= getGalleryTop() - snapTolerance;
-    const isNativeCareerRange = () => window.scrollY >= getIdentityTop() - snapTolerance && window.scrollY <= getCareerExitTop() + snapTolerance;
+    const isNativeCareerRange = () => window.scrollY >= getCareerEntryTop() - snapTolerance && window.scrollY <= getCareerExitTop() + snapTolerance;
     const isCareerItemInputLocked = () => !snapTween && isNativeCareerRange() && Date.now() < careerItemLockedUntil;
 
     const getSnapTargets = () => {
@@ -472,6 +472,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       if (intro) targets.push({ y: intro.offsetTop, route: "/", kind: "intro" });
       if (identitySection) {
         targets.push({ y: identitySection.offsetTop, route: "/about", kind: "about" });
+        targets.push({ y: getCareerEntryTop(), route: "/career", kind: "careerEntry" });
         targets.push({ y: getCareerExitTop(), route: "/career", kind: "career" });
       }
       if (workSection) targets.push({ y: workSection.offsetTop, route: "/work", kind: "work" });
@@ -540,7 +541,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         }
       }
 
-      if (target.kind === "career") {
+      if (target.kind === "careerEntry" || target.kind === "career") {
         if (identity) {
           identity.dataset.aboutPlayed = "true";
         }
@@ -556,7 +557,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         if (careerList) {
           gsap.set(careerList, { autoAlpha: 1, x: 0, filter: "blur(0px)" });
         }
-        setIdentityMode("career", 0.999);
+        setIdentityMode("career", target.kind === "careerEntry" ? 0 : 0.999);
       }
     };
 
@@ -657,13 +658,13 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       snapToTarget(target);
     };
 
-    const snapAcrossWorkBoundary = (direction: 1 | -1, event?: Event) => {
-      if (programmaticTopScroll || isScrollLocked()) return false;
-
+    const snapAcrossBoundaries = (direction: 1 | -1, event?: Event) => {
       const currentY = window.scrollY;
+      const aboutTarget = findSnapTarget("about");
       const careerTarget = findSnapTarget("career");
       const workTarget = findSnapTarget("work");
 
+      // Career -> Work (Down)
       if (
         direction > 0 &&
         workTarget &&
@@ -675,6 +676,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         return true;
       }
 
+      // Work -> Career (Up)
       if (
         direction < 0 &&
         careerTarget &&
@@ -686,20 +688,28 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         return true;
       }
 
+      // CareerEntry -> About (Up)
+      if (
+        direction < 0 &&
+        aboutTarget &&
+        currentY <= getCareerEntryTop() + snapTolerance * 2 &&
+        currentY > getIdentityTop() + snapTolerance
+      ) {
+        event?.preventDefault();
+        snapToTarget(aboutTarget);
+        return true;
+      }
+
       return false;
     };
 
     const dispatchNativeSnapInput = (direction: 1 | -1, event?: Event) => {
-      if (programmaticTopScroll) {
+      if (programmaticTopScroll || isScrollLocked() || isCareerItemInputLocked()) {
         event?.preventDefault();
         return;
       }
-      if (isCareerItemInputLocked()) {
-        event?.preventDefault();
-        return;
-      }
-      if (snapAcrossWorkBoundary(direction, event)) return;
-      if (!shouldSnapInput() || isScrollLocked()) return;
+      if (snapAcrossBoundaries(direction, event)) return;
+      if (!shouldSnapInput()) return;
 
       event?.preventDefault();
       goToSnap(direction);
@@ -742,6 +752,18 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           previousScrollY > getWorkTop() + snapTolerance &&
           previousScrollY < getFirstFeaturedTop() - snapTolerance &&
           currentY <= getWorkTop() + snapTolerance;
+        const shouldAutoSnapToCareerEntry =
+          !snapTween &&
+          Date.now() >= lockedUntil &&
+          movedDown &&
+          currentY >= getIdentityTop() + snapTolerance &&
+          previousScrollY < getCareerEntryTop() - snapTolerance;
+        const shouldAutoSnapToAbout =
+          !snapTween &&
+          Date.now() >= lockedUntil &&
+          currentY < previousScrollY &&
+          previousScrollY >= getCareerEntryTop() - snapTolerance &&
+          currentY < getCareerEntryTop() - snapTolerance;
 
         document.documentElement.classList.toggle("is-free-scroll", freeScroll);
 
@@ -764,6 +786,20 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           const careerTarget = findSnapTarget("career");
           if (careerTarget) {
             window.requestAnimationFrame(() => snapToTarget(careerTarget));
+          }
+        }
+
+        if (shouldAutoSnapToCareerEntry) {
+          const entryTarget = findSnapTarget("careerEntry");
+          if (entryTarget) {
+            window.requestAnimationFrame(() => snapToTarget(entryTarget));
+          }
+        }
+
+        if (shouldAutoSnapToAbout) {
+          const aboutTarget = findSnapTarget("about");
+          if (aboutTarget) {
+            window.requestAnimationFrame(() => snapToTarget(aboutTarget));
           }
         }
       };

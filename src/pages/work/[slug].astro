@@ -7,7 +7,7 @@ export const prerender = false;
 
 const { slug } = Astro.params;
 const work = slug ? await getWorkBySlug(slug) : null;
-const coverImage = work?.thumbnail?.url ? work.thumbnail : null;
+const coverImage = work?.featuredThumbnail?.url ? work.featuredThumbnail : work?.thumbnail?.url ? work.thumbnail : null;
 const yearDateTime = work?.year?.match(/\d{4}/)?.[0] ?? "2026";
 
 if (!work) {
@@ -24,9 +24,9 @@ if (!work) {
             <a class="back-link work-back-link" href="/work" aria-label="Back to work">←</a>
             <span class="work-topbar-title" data-detail-topbar-title>{work.title}</span>
           </div>
-          <div class="work-detail-cover-fixed" transition:name={`work-media-${work.slug}`}>
+          <div class="work-detail-cover-fixed">
             {coverImage?.url ? (
-              <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" data-cover-image />
+              <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" data-cover-image transition:name={`featured-media-${work.slug}`} />
             ) : (
               <div class="work-detail-cover-placeholder" aria-hidden="true" />
             )}
@@ -36,7 +36,7 @@ if (!work) {
         <header class="work-hero">
           <div class="work-hero-copy">
             <p class="section-kicker">{work.category}</p>
-            <h1 transition:name={`work-title-${work.slug}`}>{work.title}</h1>
+            <h1>{work.title}</h1>
             <p>{work.summary}</p>
           </div>
           <dl class="work-meta">
