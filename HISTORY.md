@@ -2,6 +2,30 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-13 Gallery layout and identity width refinement
+
+### 요구사항
+- Featured work의 `더 알아보기 →` hover underline에서 화살표에는 밑줄이 생기지 않게 합니다.
+- 21:9 같은 와이드 화면에서 about/career의 왼쪽 텍스트 영역이 과도하게 넓어지지 않도록 16:9 기준 비율을 유지합니다.
+- WORK gallery grid를 5열에서 3열로 변경합니다.
+- Gallery category filter 전환 시 카드들이 즉시 사라지는 대신 자연스럽게 이동하도록 합니다.
+- Gallery thumbnail에도 detail 본문 이미지와 같은 radius를 적용합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Featured more link 텍스트를 `<span>`으로 감싸 label에만 underline이 적용되게 했습니다.
+  - Gallery filter는 View Transition 대신 GSAP FLIP 방식으로 구현했습니다.
+  - 필터에서 사라지는 tile은 clone을 만들어 짧게 fade/scale out하고, 남는 tile은 이전 위치에서 새 위치로 움직이게 했습니다.
+- `src/styles/global.css`
+  - `.identity-stage` 왼쪽 column을 `min(63.9vw, 113.6svh)`로 제한해 16:9 기준 폭 이상으로 늘어나지 않게 했습니다.
+  - `.work-grid`를 `repeat(3, minmax(0, 1fr))`로 변경했습니다.
+  - `.work-tile-media`에 `border-radius: var(--radius-md)`를 추가했습니다.
+  - Featured link underline은 내부 span에만 적용되도록 조정했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
 ## 2026-05-13 Detail back button adaptive contrast
 
 ### 요구사항

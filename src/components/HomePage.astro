@@ -106,7 +106,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                       <span>{work.client || "개인 프로젝트"}</span>
                       <span>{work.role || "Figma + Adobe Illustrator"}</span>
                     </p>
-                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기`}>더 알아보기</a>
+                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기`}><span>더 알아보기</span></a>
                   </div>
                 </div>
               </article>
@@ -984,15 +984,83 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     updateFeaturedContrast();
 
     const filterButtons = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
-    const tiles = document.querySelectorAll<HTMLElement>("[data-category]");
+    const tiles = Array.from(document.querySelectorAll<HTMLElement>("[data-category]"));
+
+    const animateGalleryFilter = (filter: string) => {
+      const previousRects = new Map<HTMLElement, DOMRect>();
+
+      tiles.forEach((tile) => {
+        if (!tile.hidden) {
+          previousRects.set(tile, tile.getBoundingClientRect());
+        }
+      });
+
+      const exitingTiles = tiles.filter((tile) => !tile.hidden && filter !== "ALL" && tile.dataset.category !== filter);
+
+      exitingTiles.forEach((tile) => {
+        const rect = tile.getBoundingClientRect();
+        const clone = tile.cloneNode(true) as HTMLElement;
+        clone.classList.add("gallery-filter-clone");
+        Object.assign(clone.style, {
+          position: "fixed",
+          left: `${rect.left}px`,
+          top: `${rect.top}px`,
+          width: `${rect.width}px`,
+          height: `${rect.height}px`,
+          margin: "0",
+          zIndex: "20",
+          pointerEvents: "none"
+        });
+        document.body.appendChild(clone);
+        gsap.to(clone, {
+          autoAlpha: 0,
+          scale: 0.96,
+          y: 10,
+          duration: 0.32,
+          ease: "power2.out",
+          onComplete: () => clone.remove()
+        });
+      });
+
+      tiles.forEach((tile) => {
+        const shouldShow = filter === "ALL" || tile.dataset.category === filter;
+        tile.hidden = !shouldShow;
+
+        if (shouldShow && !previousRects.has(tile)) {
+          gsap.set(tile, { autoAlpha: 0, scale: 0.97, y: 14 });
+        }
+      });
+
+      tiles.forEach((tile) => {
+        if (tile.hidden) return;
+
+        const previousRect = previousRects.get(tile);
+        const nextRect = tile.getBoundingClientRect();
+
+        if (previousRect) {
+          const deltaX = previousRect.left - nextRect.left;
+          const deltaY = previousRect.top - nextRect.top;
+
+          if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+            gsap.fromTo(
+              tile,
+              { x: deltaX, y: deltaY },
+              { x: 0, y: 0, duration: 0.48, ease: "power3.out", overwrite: true }
+            );
+          }
+        } else {
+          gsap.to(tile, { autoAlpha: 1, scale: 1, y: 0, duration: 0.42, ease: "power3.out", overwrite: true });
+        }
+      });
+    };
 
     filterButtons.forEach((button) => {
       button.addEventListener("click", () => {
         const filter = button.dataset.filter ?? "ALL";
+        if (button.classList.contains("is-active")) return;
+
         filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
-        tiles.forEach((tile) => {
-          tile.toggleAttribute("hidden", filter !== "ALL" && tile.dataset.category !== filter);
-        });
+        animateGalleryFilter(filter);
       }, { signal: pageSignal });
     });
 
