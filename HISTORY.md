@@ -2,6 +2,80 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-13 Detail back button adaptive contrast
+
+### 요구사항
+- Gemini가 detail cover blur를 제거한 현재 코드를 유지합니다.
+- Detail page 상단 back button이 cover 이미지 배경 밝기에 따라 흰색 또는 검은색으로 자동 전환되게 합니다.
+
+### 구현
+- `src/pages/work/[slug].astro`
+  - 기존 canvas luminance 계산을 전체 이미지 평균이 아니라 실제 back button 뒤쪽 영역 샘플링 방식으로 변경했습니다.
+  - Cover image의 `object-fit: cover` 렌더링 위치를 반영해 버튼 뒤쪽 72px 영역을 canvas에 그린 뒤 luminance를 계산합니다.
+  - 투명 PNG도 자연스럽게 판단되도록 이미지 opacity와 paper background를 합성한 밝기를 사용합니다.
+- `src/styles/global.css`
+  - `data-cover-tone="dark"`일 때 back button을 흰색으로 표시합니다.
+  - `data-cover-tone="light"`, title bar가 올라온 상태, cover fade가 진행된 상태에서는 검은색으로 표시합니다.
+  - 색 전환에 짧은 transition을 추가했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- 브라우저에서 `/work/rush-hour-app` 렌더링 및 `Back to work` button 존재 확인
+
+## 2026-05-13 Detail cover blur comparison page
+
+### 요구사항
+- Detail cover의 이미지 위에 들어가는 gradient/blur 차이를 빠르게 비교할 별도 페이지를 만듭니다.
+- 비교 기준은 `gradient + strong blur`와 `gradient only`입니다.
+- 실제 detail page 스타일은 아직 변경하지 않고, 비교 페이지에서만 판단할 수 있게 합니다.
+
+### 구현
+- `src/pages/cover-blur-compare.astro`
+  - 실제 WORK 데이터의 `featuredThumbnail` 또는 `thumbnail`을 자동으로 가져와 비교합니다.
+  - 좌측은 같은 이미지를 복제한 blur image layer를 gradient 아래에 올립니다.
+  - `backdrop-filter` 방식은 pseudo-element/mask 조합에서 시각 차이가 거의 안 보여, 비교 페이지에서는 `filter: blur()`가 걸린 복제 이미지로 차이가 명확하게 보이도록 바꿨습니다.
+  - Blur layer mask는 상단 0%, 하단 100%에 가깝게 적용해 gradient가 흰색으로 변하는 영역에서만 강하게 보이도록 조정했습니다.
+  - 우측은 같은 gradient만 적용하고 blur는 제외합니다.
+  - `Fade` range input은 기본값 0으로 두고, detail cover의 scroll fade 정도를 필요할 때만 바꿔볼 수 있게 했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- `/cover-blur-compare` 브라우저 확인
+  - `Gradient + Strong Blur`와 `Gradient Only` 비교 카드 렌더링 확인
+  - `Fade` range input 렌더링 확인
+
+## 2026-05-13 Disable shared view transitions
+
+### 요구사항
+- Shared View Transition이 gallery/detail/featured/detail 사이에서 꼬이므로 사용하지 않습니다.
+- Gallery -> detail과 featured -> detail 모두 shared element transition 없이 가벼운 fade 정도만 남깁니다.
+- Featured work에서 detail로 들어간 뒤 뒤로가기를 누르면 `/work` gallery로 고정 이동하지 말고, 이전 스크롤 위치로 돌아가야 합니다.
+- 사용자가 Gemini로 조정한 about-career scroll logic은 건드리지 않습니다.
+
+### 구현
+- `src/layouts/PublicLayout.astro`
+  - `astro:transitions`의 `ClientRouter`를 제거했습니다.
+  - `astro:after-swap`에서 `/work` 진입 시 gallery로 강제 스크롤하던 코드를 제거했습니다.
+  - 일반 링크 이동과 상세 back control에 수동 opacity fade를 적용하는 lightweight navigation handler를 추가했습니다.
+- `src/components/HomePage.astro`
+  - Featured work image의 `transition:name`을 제거했습니다.
+- `src/pages/work/[slug].astro`
+  - Detail cover image의 `transition:name`을 제거했습니다.
+  - 상단 back control을 `/work` anchor가 아니라 `history.back()` 기반 button으로 변경했습니다.
+  - 직접 진입 등 history back을 쓸 수 없는 경우에는 `/work`로 fallback합니다.
+- `src/styles/global.css`
+  - `::view-transition-*` CSS를 제거하고, `html.portfolio-fade-ready` / `html.portfolio-fade-leaving` 기반 opacity fade만 남겼습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+- `/work`와 `/work/rush-hour-app` HTML에서 `transition:name` / `view-transition` / `featured-media` / `work-media` / `work-title` 출력이 남지 않음 확인
+- 브라우저에서 `/work` featured link -> detail -> back control 흐름 확인
+  - Detail 상단 back control은 `/work` 고정 링크가 아니라 history back으로 동작
+  - 이전 `/work` 스크롤 위치가 Featured work로 복원됨 확인
+
 ## 2026-05-13 Featured-only view transition rework
 
 ### 요구사항

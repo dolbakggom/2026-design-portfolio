@@ -1,0 +1,223 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getHomeContent } from "../lib/content";
+
+const { featuredWorks, works } = await getHomeContent();
+const compareWork =
+  featuredWorks.find((work) => work.featuredThumbnail?.url || work.thumbnail?.url) ??
+  works.find((work) => work.featuredThumbnail?.url || work.thumbnail?.url);
+const coverImage = compareWork?.featuredThumbnail?.url ? compareWork.featuredThumbnail : compareWork?.thumbnail;
+---
+
+<BaseLayout title="Cover Blur Compare | 2026 Design Portfolio">
+  <main class="cover-compare-page" style="--cover-fade: 0;">
+    <header class="cover-compare-header">
+      <a href="/work" aria-label="Back to work">←</a>
+      <div>
+        <p>Detail Cover Test</p>
+        <h1>Blur + Gradient 비교</h1>
+      </div>
+      <label>
+        <span>Fade</span>
+        <input type="range" min="0" max="1" step="0.01" value="0" data-cover-fade-control />
+      </label>
+    </header>
+
+    <section class="cover-compare-grid" aria-label="Detail cover blur comparison">
+      <article>
+        <div>
+          <p>Option A</p>
+          <h2>Gradient + Strong Blur</h2>
+        </div>
+        <figure class="compare-cover-panel compare-cover-panel-blur">
+          {
+            coverImage?.url ? (
+              <>
+                <img class="compare-cover-base" src={coverImage.url} alt={coverImage.alt ?? compareWork?.title ?? "Cover image"} crossorigin="anonymous" />
+                <img class="compare-cover-blur-image" src={coverImage.url} alt="" crossorigin="anonymous" aria-hidden="true" />
+              </>
+            ) : (
+              <span class="compare-cover-placeholder" aria-hidden="true" />
+            )
+          }
+          <span class="compare-cover-fade" aria-hidden="true" />
+        </figure>
+      </article>
+
+      <article>
+        <div>
+          <p>Option B</p>
+          <h2>Gradient Only</h2>
+        </div>
+        <figure class="compare-cover-panel compare-cover-panel-gradient-only">
+          {
+            coverImage?.url ? (
+              <img class="compare-cover-base" src={coverImage.url} alt={coverImage.alt ?? compareWork?.title ?? "Cover image"} crossorigin="anonymous" />
+            ) : (
+              <span class="compare-cover-placeholder" aria-hidden="true" />
+            )
+          }
+          <span class="compare-cover-fade" aria-hidden="true" />
+        </figure>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const comparePage = document.querySelector<HTMLElement>(".cover-compare-page");
+    const fadeControl = document.querySelector<HTMLInputElement>("[data-cover-fade-control]");
+
+    fadeControl?.addEventListener("input", () => {
+      comparePage?.style.setProperty("--cover-fade", fadeControl.value);
+    });
+  </script>
+</BaseLayout>
+
+<style>
+  .cover-compare-page {
+    min-height: 100svh;
+    padding: 32px max(24px, 4vw) 56px;
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  .cover-compare-header {
+    display: grid;
+    grid-template-columns: auto 1fr minmax(180px, 280px);
+    gap: 28px;
+    align-items: center;
+    margin: 0 0 32px;
+  }
+
+  .cover-compare-header a {
+    color: currentColor;
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+  }
+
+  .cover-compare-header p,
+  .cover-compare-grid article > div p {
+    margin: 0 0 6px;
+    color: rgba(0, 0, 0, 0.5);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .cover-compare-header h1,
+  .cover-compare-grid h2 {
+    margin: 0;
+    font-size: clamp(28px, 3vw, 48px);
+    font-weight: 700;
+    line-height: 1.05;
+  }
+
+  .cover-compare-header label {
+    display: grid;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .cover-compare-header input {
+    width: 100%;
+  }
+
+  .cover-compare-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+
+  .cover-compare-grid article {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .compare-cover-panel {
+    position: relative;
+    height: clamp(320px, 52svh, 540px);
+    margin: 0;
+    overflow: hidden;
+    background: var(--color-paper);
+  }
+
+  .compare-cover-panel::before {
+    position: absolute;
+    inset: 0;
+    content: "";
+    pointer-events: none;
+  }
+
+  .compare-cover-panel::before {
+    z-index: 3;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(244, 244, 244, 0) 0%,
+        rgba(244, 244, 244, 0.12) 38%,
+        rgba(244, 244, 244, 0.72) 74%,
+        var(--color-paper) 100%
+      );
+  }
+
+  .compare-cover-blur-image {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.96;
+    filter: blur(calc(2.7rem + var(--cover-fade) * 2.4rem));
+    mask-image: linear-gradient(180deg, transparent 0%, transparent 28%, rgba(0, 0, 0, 0.08) 42%, rgba(0, 0, 0, 0.66) 68%, #000 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 28%, rgba(0, 0, 0, 0.08) 42%, rgba(0, 0, 0, 0.66) 68%, #000 100%);
+    pointer-events: none;
+    transform: scale(1.14);
+  }
+
+  .compare-cover-base,
+  .compare-cover-placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .compare-cover-base {
+    position: relative;
+    z-index: 1;
+    object-fit: cover;
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+
+  .compare-cover-placeholder {
+    background:
+      linear-gradient(135deg, rgba(0, 204, 72, 0.7), rgba(0, 0, 0, 0.82) 48%, rgba(0, 72, 255, 0.78)),
+      var(--color-paper);
+  }
+
+  .compare-cover-fade {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: var(--color-paper);
+    opacity: var(--cover-fade);
+    pointer-events: none;
+  }
+
+  @media (max-width: 900px) {
+    .cover-compare-header,
+    .cover-compare-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .cover-compare-header {
+      gap: 18px;
+    }
+  }
+</style>

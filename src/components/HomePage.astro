@@ -95,7 +95,6 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                         alt={work.featuredThumbnail?.alt ?? work.thumbnail?.alt ?? work.title}
                         crossorigin="anonymous"
                         loading="lazy"
-                        transition:name={`featured-media-${work.slug}`}
                       />
                     ) : null}
                   </div>

@@ -21,12 +21,12 @@ if (!work) {
       <main class="work-detail">
         <section class="work-detail-cover" data-detail-cover data-cover-tone="light">
           <div class="work-detail-topbar">
-            <a class="back-link work-back-link" href="/work" aria-label="Back to work">←</a>
+            <button class="back-link work-back-link" type="button" aria-label="Back to work" data-history-back>←</button>
             <span class="work-topbar-title" data-detail-topbar-title>{work.title}</span>
           </div>
           <div class="work-detail-cover-fixed">
             {coverImage?.url ? (
-              <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" data-cover-image transition:name={`featured-media-${work.slug}`} />
+              <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" data-cover-image />
             ) : (
               <div class="work-detail-cover-placeholder" aria-hidden="true" />
             )}
@@ -82,6 +82,8 @@ if (!work) {
       activeDetailCover = detailCover;
       const controller = new AbortController();
       const coverImage = document.querySelector<HTMLImageElement>("[data-cover-image]");
+      const coverFixed = document.querySelector<HTMLElement>(".work-detail-cover-fixed");
+      const backButton = document.querySelector<HTMLElement>("[data-history-back]");
       const detailTitle = document.querySelector<HTMLElement>(".work-hero h1");
       let coverFrame = 0;
 
@@ -93,36 +95,55 @@ if (!work) {
       };
 
       const updateCoverTone = () => {
-        if (!coverImage || !coverImage.naturalWidth) {
+        if (!coverImage || !coverImage.naturalWidth || !coverFixed || !backButton) {
           detailCover.setAttribute("data-cover-tone", "light");
           return;
         }
 
         try {
           const canvas = document.createElement("canvas");
-          const size = 36;
+          const size = 72;
           canvas.width = size;
           canvas.height = size;
           const context = canvas.getContext("2d", { willReadFrequently: true });
           if (!context) return;
 
-          context.drawImage(coverImage, 0, 0, size, size);
+          const coverRect = coverFixed.getBoundingClientRect();
+          const buttonRect = backButton.getBoundingClientRect();
+          const sampleSize = Math.max(buttonRect.width, buttonRect.height, size);
+          const sampleLeft = buttonRect.left + buttonRect.width / 2 - sampleSize / 2;
+          const sampleTop = buttonRect.top + buttonRect.height / 2 - sampleSize / 2;
+          const imageScale = Math.max(coverRect.width / coverImage.naturalWidth, coverRect.height / coverImage.naturalHeight) * 1.02;
+          const drawnWidth = coverImage.naturalWidth * imageScale;
+          const drawnHeight = coverImage.naturalHeight * imageScale;
+          const drawnLeft = coverRect.left + (coverRect.width - drawnWidth) / 2;
+          const drawnTop = coverRect.top + (coverRect.height - drawnHeight) / 2;
+
+          context.drawImage(
+            coverImage,
+            drawnLeft - sampleLeft,
+            drawnTop - sampleTop,
+            drawnWidth,
+            drawnHeight
+          );
+
           const pixels = context.getImageData(0, 0, size, size).data;
+          const paperChannel = 244;
+          const imageOpacity = 0.9;
           let total = 0;
           let count = 0;
 
           for (let index = 0; index < pixels.length; index += 4) {
-            const alpha = pixels[index + 3] / 255;
-            if (alpha < 0.2) continue;
-            const red = pixels[index];
-            const green = pixels[index + 1];
-            const blue = pixels[index + 2];
-            total += (0.2126 * red + 0.7152 * green + 0.0722 * blue) * alpha;
-            count += alpha;
+            const alpha = (pixels[index + 3] / 255) * imageOpacity;
+            const red = pixels[index] * alpha + paperChannel * (1 - alpha);
+            const green = pixels[index + 1] * alpha + paperChannel * (1 - alpha);
+            const blue = pixels[index + 2] * alpha + paperChannel * (1 - alpha);
+            total += 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+            count += 1;
           }
 
           const luminance = count ? total / count : 255;
-          detailCover.setAttribute("data-cover-tone", luminance > 148 ? "light" : "dark");
+          detailCover.setAttribute("data-cover-tone", luminance > 154 ? "light" : "dark");
         } catch {
           detailCover.setAttribute("data-cover-tone", "light");
         }
@@ -156,7 +177,10 @@ if (!work) {
 
       updateCoverFade();
       window.addEventListener("scroll", requestCoverFade, { passive: true, signal: controller.signal });
-      window.addEventListener("resize", requestCoverFade, { signal: controller.signal });
+      window.addEventListener("resize", () => {
+        updateCoverTone();
+        requestCoverFade();
+      }, { signal: controller.signal });
     };
 
     document.addEventListener("astro:before-swap", () => cleanupWorkDetail());
