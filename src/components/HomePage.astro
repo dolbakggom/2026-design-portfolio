@@ -115,8 +115,21 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         </div>
         {
           featuredWorks.length > 1 ? (
-            <div class="featured-dots" aria-hidden="true">
-              {featuredWorks.map((_, index) => <span class:list={[index === 0 && "is-active"]} data-featured-dot />)}
+            <div class="featured-dots" aria-label="Featured work navigation">
+              {
+                featuredWorks.map((work, index) => (
+                  <button
+                    type="button"
+                    class:list={[index === 0 && "is-active"]}
+                    data-featured-dot
+                    data-featured-target={index}
+                    aria-label={`${work.title} 보기`}
+                  >
+                    <span class="featured-dot-mark" aria-hidden="true" />
+                    <span class="featured-dot-label">{work.title}</span>
+                  </button>
+                ))
+              }
             </div>
           ) : null
         }
@@ -591,6 +604,20 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         }
       });
     };
+
+    featuredDots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        const targetIndex = Number(dot.dataset.featuredTarget ?? 0);
+        const target = getSnapTargets().find((item) => item.kind === "featured" && item.featuredIndex === targetIndex);
+        if (!target) return;
+
+        lockedUntil = 0;
+        snapTween?.kill();
+        snapTween = null;
+        preserveWorkRoute = true;
+        snapToTarget(target);
+      }, { signal: pageSignal });
+    });
 
     const scrollToIntroFromFloatingButton = () => {
       const target = findSnapTarget("intro") ?? { y: 0, route: "/", kind: "intro" as const };

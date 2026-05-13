@@ -2,6 +2,86 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-13 Gallery hover polish and SDR upload normalization
+
+### 요구사항
+- Gallery card hover 시 shadow를 조금 더 강하게 하고, 약간 floating 되는 느낌을 줍니다.
+- HDR 사진이 브라우저에서 HDR로 표시되지 않도록 가능하면 SDR로만 다룹니다.
+- 이후 확인 중 gallery category FLIP 애니메이션과 hover transform이 겹칠 수 있어 floating 이동은 제거합니다.
+- 추가 확인 결과 hover shadow 변화도 category animation 체감에 영향을 줄 수 있어 gallery card hover effect는 전부 제거합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `.work-tile-media` 기본 shadow만 유지하고 hover/focus-visible 변화는 제거했습니다.
+  - `.work-tile` 자체 transform/transition도 제거해 category filter의 GSAP transform과 간섭하지 않게 했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - Admin upload 직전에 raster image를 canvas에 다시 그린 뒤 sRGB/SDR 이미지로 재인코딩하도록 `normalizeImageForUpload`를 추가했습니다.
+  - PNG는 PNG로 다시 저장해 투명도를 보존하고, 그 외 사진 계열은 JPEG(`-sdr.jpg`)로 저장합니다.
+  - GIF/SVG는 HDR 사진 포맷이 아니고 canvas 변환 시 의미가 달라질 수 있어 그대로 통과시킵니다.
+
+### 주의
+- 기존에 이미 R2에 올라간 HDR asset은 자동 변환되지 않습니다. SDR로 고정해야 하는 기존 이미지는 admin에서 다시 업로드해야 합니다.
+- CSS만으로 HDR 이미지를 항상 SDR로 강제하는 것은 신뢰하기 어렵기 때문에 업로드 단계 변환을 사용합니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-13 Featured dot and gallery card polish
+
+### 요구사항
+- Featured work dots를 화면 오른쪽에 더 붙이고, dot 간격을 좁힙니다.
+- 선택되지 않은 featured dot도 투명도 없이 흰색으로 표시합니다.
+- Gallery card thumbnail의 border line을 제거하고 아주 연한 shadow로 대체합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `.featured-dots` right offset을 `clamp(18px, 2.35vw, 45px)`로 줄이고 gap을 8px로 조정했습니다.
+  - 비활성 `.featured-dot-mark`도 `#fff`와 opacity 1로 표시되게 했습니다.
+  - `.work-tile-media` border를 제거하고 `0 12px 36px rgba(0, 0, 0, 0.055)` shadow를 적용했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-13 Admin work pane scroll and featured dot navigation
+
+### 요구사항
+- Admin 작업물 관리 화면에서 WORK 목록, 에디터, 미리보기 각각이 독립 스크롤을 갖게 합니다.
+- Featured work 우측 dot에 hover하면 해당 작업물 제목 label이 표시되게 합니다.
+- Featured work dot을 누르면 해당 작업물 featured thumbnail 위치로 바로 이동하게 합니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - Works tab일 때 `.admin-content.is-works-tab` class를 추가했습니다.
+- `src/styles/admin.css`
+  - Works tab admin content를 `100svh` 높이의 grid로 만들고 내부 overflow를 숨겼습니다.
+  - `.work-list-panel`, `.work-editor`, `.work-preview-panel`을 각각 독립 scroll container로 정리했습니다.
+  - 모바일 폭에서는 기존처럼 페이지 흐름으로 돌아가게 override했습니다.
+- `src/components/HomePage.astro`
+  - Featured dots를 `span`에서 접근 가능한 `button`으로 변경했습니다.
+  - 각 dot에 작업물 title label과 target index를 부여했습니다.
+  - Dot click 시 현재 scroll lock/tween을 정리하고 해당 featured snap target으로 이동합니다.
+- `src/styles/global.css`
+  - Featured dot hover/focus label preview 스타일을 추가했습니다.
+  - Active/hover/focus dot 색상과 scale 상태를 marker 기준으로 조정했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-13 Remove obsolete cover blur comparison page
+
+### 요구사항
+- Detail cover blur를 사용하지 않기로 했으므로 이전에 만든 비교용 테스트 페이지가 더 이상 필요하지 않습니다.
+
+### 구현
+- `src/pages/cover-blur-compare.astro`를 삭제해 `/cover-blur-compare` 테스트 라우트가 배포에 포함되지 않게 했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
 ## 2026-05-13 Gallery layout and identity width refinement
 
 ### 요구사항

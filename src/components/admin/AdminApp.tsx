@@ -151,6 +151,73 @@ const moveItem = <T extends { id: string }>(items: T[], id: string, direction: -
   return next;
 };
 
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+  new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+
+      reject(new Error("이미지 SDR 변환에 실패했습니다."));
+    }, type, quality);
+  });
+
+const decodeImageSource = async (file: File) => {
+  if ("createImageBitmap" in window) {
+    const bitmap = await createImageBitmap(file);
+    return {
+      source: bitmap,
+      width: bitmap.width,
+      height: bitmap.height,
+      cleanup: () => bitmap.close()
+    };
+  }
+
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+  image.decoding = "async";
+  image.src = url;
+  await image.decode();
+
+  return {
+    source: image,
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+    cleanup: () => URL.revokeObjectURL(url)
+  };
+};
+
+const normalizeImageForUpload = async (file: File) => {
+  const passthroughTypes = new Set(["image/gif", "image/svg+xml"]);
+  if (!file.type.startsWith("image/") || passthroughTypes.has(file.type)) return file;
+
+  const decoded = await decodeImageSource(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = decoded.width;
+  canvas.height = decoded.height;
+  const context = canvas.getContext("2d", { colorSpace: "srgb" } as CanvasRenderingContext2DSettings);
+
+  if (!context) {
+    decoded.cleanup();
+    throw new Error("이미지 SDR 변환에 실패했습니다.");
+  }
+
+  context.drawImage(decoded.source, 0, 0, decoded.width, decoded.height);
+  decoded.cleanup();
+
+  const isPng = file.type === "image/png";
+  const outputType = isPng ? "image/png" : "image/jpeg";
+  const outputExtension = isPng ? "png" : "jpg";
+  const blob = await canvasToBlob(canvas, outputType, isPng ? undefined : 0.92);
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "upload";
+
+  return new File([blob], `${baseName}-sdr.${outputExtension}`, {
+    type: outputType,
+    lastModified: Date.now()
+  });
+};
+
 const contentText = (block: WorkBlock, key: string, fallback = "") => {
   const value = block.content[key];
   return typeof value === "string" ? value : fallback;
@@ -409,8 +476,9 @@ export default function AdminApp() {
   };
 
   const uploadAsset = async (file: File, alt = "") => {
+    const uploadFile = await normalizeImageForUpload(file);
     const form = new FormData();
-    form.set("file", file);
+    form.set("file", uploadFile);
     form.set("alt", alt);
 
     const response = await fetch("/api/admin/assets", {
@@ -634,7 +702,7 @@ export default function AdminApp() {
         </button>
       </aside>
 
-      <section className="admin-content">
+      <section className={`admin-content ${activeTab === "works" ? "is-works-tab" : ""}`}>
         <header className="admin-topbar">
           <div>
             <p>{activeTab}</p>
