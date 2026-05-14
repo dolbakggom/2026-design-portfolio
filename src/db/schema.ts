@@ -39,7 +39,7 @@ export const works = sqliteTable("works", {
   id: text("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   title: text("title").notNull(),
-  category: text("category", { enum: ["UI/UX", "BI/BX"] }).notNull(),
+  category: text("category", { enum: ["UI/UX", "BI/BX", "UI/UX, BI/BX"] }).notNull(),
   summary: text("summary").notNull().default(""),
   client: text("client").notNull().default(""),
   year: text("year").notNull().default(""),

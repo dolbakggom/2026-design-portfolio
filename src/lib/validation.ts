@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const workCategories = ["UI/UX", "BI/BX", "UI/UX, BI/BX"] as const;
+
 export const linkSchema = z.object({
   label: z.string().min(1).max(80),
   url: z.string().min(1).max(500)
@@ -8,7 +10,7 @@ export const linkSchema = z.object({
 export const profileSchema = z.object({
   headline: z.string().min(1).max(120),
   name: z.string().min(1).max(120),
-  role: z.string().min(1).max(160),
+  role: z.string().max(160).default(""),
   intro: z.string().min(1).max(500),
   bio: z.string().min(1).max(1600),
   portraitAssetId: z.string().nullable().optional(),
@@ -33,7 +35,7 @@ export const workBlockSchema = z.object({
 export const workSchema = z.object({
   slug: z.string().min(1).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   title: z.string().min(1).max(180),
-  category: z.enum(["UI/UX", "BI/BX"]),
+  category: z.enum(workCategories),
   summary: z.string().max(600).default(""),
   client: z.string().max(160).default(""),
   year: z.string().max(40).default(""),

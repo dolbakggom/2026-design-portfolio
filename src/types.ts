@@ -1,4 +1,4 @@
-export type WorkCategory = "UI/UX" | "BI/BX";
+export type WorkCategory = "UI/UX" | "BI/BX" | "UI/UX, BI/BX";
 export type WorkBlockType = "heading" | "paragraph" | "image" | "gallery" | "quote";
 
 export interface LinkItem {

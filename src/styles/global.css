@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 
 :root {
@@ -23,11 +25,14 @@
 }
 
 html {
+  max-width: 100%;
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-weight: 400;
   letter-spacing: 0;
+  overflow-x: hidden;
+  overflow-x: clip;
   scroll-behavior: smooth;
 }
 
@@ -62,9 +67,12 @@ html.home-scroll:not(.is-free-scroll)::-webkit-scrollbar {
 }
 
 body {
+  max-width: 100%;
   margin: 0;
   min-width: 320px;
   background: var(--color-paper);
+  overflow-x: hidden;
+  overflow-x: clip;
   overflow-wrap: break-word;
   word-break: keep-all;
 }
@@ -437,11 +445,15 @@ button:disabled {
   align-items: center;
 }
 
-.profile-contact img {
+.profile-contact svg {
   width: 21px;
   height: 21px;
   flex: 0 0 21px;
-  object-fit: contain;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .identity-side {
@@ -541,8 +553,7 @@ button:disabled {
 
 .timeline-card p,
 .timeline-card h3,
-.timeline-card span,
-.timeline-card div {
+.timeline-card span {
   margin: 0;
 }
 
@@ -554,8 +565,7 @@ button:disabled {
 }
 
 .timeline-card h3,
-.timeline-card span,
-.timeline-card div {
+.timeline-card span {
   max-height: 0;
   overflow: hidden;
   opacity: 0;
@@ -582,8 +592,7 @@ button:disabled {
 }
 
 .timeline-card.is-active h3,
-.timeline-card.is-active span,
-.timeline-card.is-active div {
+.timeline-card.is-active span {
   max-height: 96px;
   opacity: 1;
   transform: translateY(0);
@@ -596,8 +605,7 @@ button:disabled {
   line-height: 1.3;
 }
 
-.timeline-card.is-active span,
-.timeline-card.is-active div {
+.timeline-card.is-active span {
   max-width: 414px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 20px;
@@ -1498,7 +1506,6 @@ button:disabled {
   }
 
   .timeline-card.is-active span,
-  .timeline-card.is-active div,
   .timeline-card.is-active h3 {
     font-size: 16px;
   }

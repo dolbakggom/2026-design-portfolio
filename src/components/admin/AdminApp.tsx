@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Component, Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, PointerEvent, ReactNode, SyntheticEvent } from "react";
 import type { Profile, TimelineItem, WorkBlock, WorkCategory, WorkItem } from "../../types";
 import "../../styles/admin.css";
@@ -87,6 +87,39 @@ function AdminIcon({ name }: { name: AdminIconName }) {
   );
 }
 
+function ProfileLinkIcon({ label, url }: { label: string; url: string }) {
+  const lowerLabel = label.toLowerCase();
+  const lowerUrl = url.toLowerCase();
+  const isEmail = lowerUrl.startsWith("mailto:") || lowerLabel.includes("email") || lowerLabel.includes("메일");
+  const isPhone = lowerUrl.startsWith("tel:") || lowerLabel.includes("phone") || lowerLabel.includes("전화");
+  const isMap = lowerUrl.includes("map") || lowerUrl.includes("place") || lowerLabel.includes("location") || lowerLabel.includes("지역") || lowerLabel.includes("서울");
+
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      {isEmail ? (
+        <>
+          <path d="M4 6h16v12H4z" />
+          <path d="m4 7 8 6 8-6" />
+        </>
+      ) : isPhone ? (
+        <>
+          <path d="M6.5 4.5 9 4l2 5-1.5 1.2a11 11 0 0 0 4.3 4.3L15 13l5 2-.5 2.5c-.2 1-1.2 1.7-2.3 1.5C10.7 18 6 13.3 5 6.8c-.2-1.1.5-2.1 1.5-2.3Z" />
+        </>
+      ) : isMap ? (
+        <>
+          <path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" />
+          <path d="M12 10.5h.01" />
+        </>
+      ) : (
+        <>
+          <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+          <path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 const workMediaFields: Array<{
   kind: WorkAssetKind;
   label: string;
@@ -106,6 +139,24 @@ const workMediaFields: Array<{
     aspect: "16 / 9"
   }
 ];
+
+const workCategoryOptions = ["UI/UX", "BI/BX"] as const;
+
+const getWorkCategories = (category: string) => {
+  const values = category.split(",").map((value) => value.trim());
+  return workCategoryOptions.filter((option) => values.includes(option));
+};
+
+const normalizeWorkCategory = (categories: readonly string[]) => {
+  const ordered = workCategoryOptions.filter((option) => categories.includes(option));
+  return (ordered.join(", ") || "UI/UX") as WorkCategory;
+};
+
+const toggleWorkCategory = (category: string, option: (typeof workCategoryOptions)[number], checked: boolean) => {
+  const current = getWorkCategories(category);
+  const next = checked ? [...current, option] : current.filter((value) => value !== option);
+  return normalizeWorkCategory(next);
+};
 
 const emptyProfile: Profile = {
   headline: "Beyond the Answer.",
@@ -141,6 +192,15 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || `work-${Date.now()}`;
+
+const sanitizeSlugInput = (value: string) =>
+  value
+    .toLowerCase()
+    .trimStart()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 80);
 
 const reorderById = <T extends { id: string }>(items: T[], activeId: string, overId: string) => {
   if (activeId === overId) return items;
@@ -289,6 +349,12 @@ function WorkLivePreview({ work }: { work: WorkItem }) {
               <dt>Year</dt>
               <dd>{work.year || "2026"}</dd>
             </div>
+            {work.client ? (
+              <div>
+                <dt>Client</dt>
+                <dd>{work.client}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Role</dt>
               <dd>{work.role || "Design"}</dd>
@@ -377,6 +443,10 @@ export default function AdminApp() {
   const [dragOverWorkId, setDragOverWorkId] = useState("");
   const workDragMoved = useRef(false);
   const worksRef = useRef<WorkItem[]>([]);
+  const workEditorRef = useRef<HTMLElement | null>(null);
+  const workEditorScrollTop = useRef(0);
+  const shouldRestoreWorkEditorScroll = useRef(false);
+  const workEditorRestoreFrame = useRef(0);
 
   const selectedWork = useMemo(
     () => works.find((work) => work.id === selectedWorkId) ?? works[0],
@@ -392,6 +462,34 @@ export default function AdminApp() {
   useEffect(() => {
     worksRef.current = works;
   }, [works]);
+
+  useLayoutEffect(() => {
+    if (!shouldRestoreWorkEditorScroll.current) return;
+
+    const node = workEditorRef.current;
+    if (!node) {
+      shouldRestoreWorkEditorScroll.current = false;
+      return;
+    }
+
+    const target = Math.min(workEditorScrollTop.current, Math.max(0, node.scrollHeight - node.clientHeight));
+    node.scrollTop = target;
+    window.cancelAnimationFrame(workEditorRestoreFrame.current);
+    workEditorRestoreFrame.current = window.requestAnimationFrame(() => {
+      const currentNode = workEditorRef.current;
+      if (currentNode) {
+        currentNode.scrollTop = Math.min(target, Math.max(0, currentNode.scrollHeight - currentNode.clientHeight));
+      }
+      shouldRestoreWorkEditorScroll.current = false;
+    });
+  });
+
+  useEffect(
+    () => () => {
+      window.cancelAnimationFrame(workEditorRestoreFrame.current);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!authenticated || !selectedWorkDirty) return;
@@ -477,14 +575,20 @@ export default function AdminApp() {
     }
   };
 
-  const saveTimelineItem = async (item: TimelineItem) => {
+  const saveTimeline = async () => {
     try {
-      const data = await requestJson<{ timeline: TimelineItem[] }>(`/api/admin/timeline/${item.id}`, {
-        method: "PUT",
-        body: JSON.stringify(item)
-      });
-      setTimeline(data.timeline);
-      flash("이력이 저장되었습니다.");
+      let nextTimeline = timeline;
+
+      for (const item of timeline) {
+        const data = await requestJson<{ timeline: TimelineItem[] }>(`/api/admin/timeline/${item.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ ...item, description: "" })
+        });
+        nextTimeline = data.timeline;
+      }
+
+      setTimeline(nextTimeline);
+      flash("이력이 모두 저장되었습니다.");
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "이력 저장에 실패했습니다.");
     }
@@ -556,6 +660,11 @@ export default function AdminApp() {
   };
 
   const updateWorkLocal = (id: string, patch: Partial<WorkItem>) => {
+    if (workScreen === "editor" && workEditorRef.current) {
+      workEditorScrollTop.current = workEditorRef.current.scrollTop;
+      shouldRestoreWorkEditorScroll.current = true;
+    }
+
     setWorks((current) => current.map((work) => (work.id === id ? { ...work, ...patch } : work)));
   };
 
@@ -849,16 +958,18 @@ export default function AdminApp() {
 
       <section className={`admin-content ${activeTab === "works" ? "is-works-tab" : ""}`}>
         <header className="admin-topbar">
-          <div>
+          <div className="admin-title-block">
             <p>{activeTab}</p>
-            <h2>{activeTab === "profile" ? "자기소개 관리" : activeTab === "timeline" ? "이력 관리" : activeTab === "works" && workScreen === "editor" ? selectedWork?.title || "작업물 편집" : "작업물 관리"}</h2>
+            <div className="admin-title-row">
+              {activeTab === "works" && workScreen === "editor" ? (
+                <button type="button" className="admin-title-back" aria-label="Back to work list" onClick={() => void leaveWorkEditorForList()}>
+                  ←
+                </button>
+              ) : null}
+              <h2>{activeTab === "profile" ? "자기소개 관리" : activeTab === "timeline" ? "이력 관리" : activeTab === "works" && workScreen === "editor" ? selectedWork?.title || "작업물 편집" : "작업물 관리"}</h2>
+            </div>
           </div>
           <div className="admin-topbar-actions">
-            {activeTab === "works" && workScreen === "editor" ? (
-              <button type="button" onClick={() => void leaveWorkEditorForList()}>
-                Work list
-              </button>
-            ) : null}
             {activeTab === "works" ? (
               <button type="button" className="primary-action" onClick={addWork}>
                 Add work
@@ -883,10 +994,6 @@ export default function AdminApp() {
                   <input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} />
                 </label>
                 <label>
-                  Role
-                  <input value={profile.role} onChange={(event) => setProfile({ ...profile, role: event.target.value })} />
-                </label>
-                <label>
                   Profile Image
                   <input type="file" accept="image/*" onChange={(event) => uploadProfileImage(event.target.files?.[0])} />
                 </label>
@@ -903,45 +1010,37 @@ export default function AdminApp() {
 
             <section className="admin-panel">
               <div className="link-editor" style={{ marginTop: 0 }}>
-              <header>
-                <h3>Links</h3>
-                <button type="button" onClick={() => setProfile({ ...profile, links: [...profile.links, { label: "", url: "" }] })}>
-                  Add link
-                </button>
-              </header>
-              {profile.links.map((link, index) => (
-                <div className="link-fields" key={`${link.label}-${index}`}>
-                  <input
-                    placeholder="Label"
-                    value={link.label}
-                    onChange={(event) => {
-                      const links = [...profile.links];
-                      links[index] = { ...link, label: event.target.value };
-                      setProfile({ ...profile, links });
-                    }}
-                  />
-                  <input
-                    placeholder="URL"
-                    value={link.url}
-                    onChange={(event) => {
-                      const links = [...profile.links];
-                      links[index] = { ...link, url: event.target.value };
-                      setProfile({ ...profile, links });
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="danger"
-                    onClick={() => {
-                      if (!window.confirm("정말 삭제하시겠습니까?")) return;
-                      setProfile({ ...profile, links: profile.links.filter((_, linkIndex) => linkIndex !== index) });
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
+                <header>
+                  <h3>Links</h3>
+                </header>
+                {profile.links.map((link, index) => (
+                  <div className="link-fields" key={`profile-link-${index}`}>
+                    <span className="link-icon" aria-hidden="true">
+                      <ProfileLinkIcon label={link.label} url={link.url} />
+                    </span>
+                    <input
+                      aria-label="Displayed text"
+                      placeholder="Displayed text"
+                      value={link.label}
+                      onChange={(event) => {
+                        const links = [...profile.links];
+                        links[index] = { ...link, label: event.target.value };
+                        setProfile({ ...profile, links });
+                      }}
+                    />
+                    <input
+                      aria-label="Click action"
+                      placeholder="mailto:, tel:, https://"
+                      value={link.url}
+                      onChange={(event) => {
+                        const links = [...profile.links];
+                        links[index] = { ...link, url: event.target.value };
+                        setProfile({ ...profile, links });
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
             </section>
 
             <div className="action-row sticky-actions">
@@ -980,24 +1079,19 @@ export default function AdminApp() {
                         onChange={(event) => setTimeline(timeline.map((row) => (row.id === item.id ? { ...row, organization: event.target.value } : row)))}
                       />
                     </label>
-                    <label className="full-field">
-                      Description
-                      <textarea
-                        value={item.description}
-                        onChange={(event) => setTimeline(timeline.map((row) => (row.id === item.id ? { ...row, description: event.target.value } : row)))}
-                      />
-                    </label>
                   </div>
                   <div className="action-row" style={{ marginTop: "16px" }}>
-                    <button type="button" className="primary-action" onClick={() => saveTimelineItem(item)}>
-                      Save
-                    </button>
                     <button type="button" className="danger" onClick={() => deleteTimelineItem(item.id)}>
                       Delete
                     </button>
                   </div>
                 </article>
               ))}
+            </div>
+            <div className="action-row sticky-actions">
+              <button type="button" className="primary-action" onClick={saveTimeline}>
+                Save career
+              </button>
             </div>
           </section>
         ) : null}
@@ -1056,7 +1150,7 @@ export default function AdminApp() {
             <section className="works-editor-layout" style={{ "--work-preview-width": `${workPreviewWidth}px` } as CSSProperties}>
               {selectedWork ? (
                 <>
-                  <section className="work-editor" aria-label="Work editor">
+                  <section className="work-editor" aria-label="Work editor" ref={workEditorRef}>
                     <section className="admin-panel work-editor-card">
                       <header className="work-editor-card-header">
                         <div>
@@ -1080,16 +1174,25 @@ export default function AdminApp() {
                           Slug
                           <input
                             value={selectedWork.slug}
-                            onChange={(event) => updateWorkLocal(selectedWork.id, { slug: slugify(event.target.value) })}
+                            onChange={(event) => updateWorkLocal(selectedWork.id, { slug: sanitizeSlugInput(event.target.value) })}
+                            onBlur={(event) => updateWorkLocal(selectedWork.id, { slug: slugify(event.target.value) })}
                           />
                         </label>
-                        <label>
-                          Category
-                          <select value={selectedWork.category} onChange={(event) => updateWorkLocal(selectedWork.id, { category: event.target.value as WorkCategory })}>
-                            <option>UI/UX</option>
-                            <option>BI/BX</option>
-                          </select>
-                        </label>
+                        <div className="category-check-group">
+                          <span>Category</span>
+                          <div className="category-check-options">
+                            {workCategoryOptions.map((category) => (
+                              <label key={category}>
+                                <input
+                                  type="checkbox"
+                                  checked={getWorkCategories(selectedWork.category).includes(category)}
+                                  onChange={(event) => updateWorkLocal(selectedWork.id, { category: toggleWorkCategory(selectedWork.category, category, event.target.checked) })}
+                                />
+                                {category}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                         <label>
                           Year
                           <input value={selectedWork.year} onChange={(event) => updateWorkLocal(selectedWork.id, { year: event.target.value })} />

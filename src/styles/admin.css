@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 .login-shell,
 .admin-shell {
   --admin-accent: #08c840;
@@ -290,8 +292,51 @@
 }
 
 .admin-topbar h2 {
-  margin-top: 6px;
   font-size: 2rem;
+}
+
+.admin-title-block {
+  min-width: 0;
+}
+
+.admin-title-row {
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.admin-title-row h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-content button.admin-title-back {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.admin-content button.admin-title-back:hover:not(:disabled),
+.admin-content button.admin-title-back:focus-visible {
+  border-color: transparent;
+  background: rgba(8, 200, 64, 0.12);
+  color: var(--admin-accent-border);
+  box-shadow: none;
+  transform: translateX(-2px);
 }
 
 .admin-topbar-actions {
@@ -434,9 +479,31 @@ input[type="file"] {
 
 .link-fields {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr) auto;
-  gap: 10px;
-  margin-top: 10px;
+  grid-template-columns: 42px minmax(140px, 0.72fr) minmax(220px, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.link-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(8, 200, 64, 0.2);
+  border-radius: var(--radius-sm);
+  background: #e6f9ed;
+  color: var(--admin-accent-border);
+}
+
+.link-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .action-row {
@@ -578,6 +645,8 @@ input[type="file"] {
   align-content: start;
   gap: 14px;
   overflow: auto;
+  overflow-anchor: none;
+  scroll-behavior: auto;
 }
 
 .work-editor-card {
@@ -618,17 +687,63 @@ input[type="file"] {
 .toggle-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 18px;
+  gap: 8px;
 }
 
+.category-check-group {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.category-check-group > span {
+  margin-bottom: 2px;
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.category-check-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-check-group label,
 .toggle-row label {
-  display: inline-flex;
   min-height: 38px;
+  display: inline-flex;
+  gap: 8px;
   align-items: center;
   border: 1px solid var(--admin-border);
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   padding: 0 12px;
-  color: var(--color-ink);
+  background: #fbfbfd;
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.category-check-group label:has(input:checked),
+.toggle-row label:has(input:checked) {
+  border-color: rgba(8, 200, 64, 0.42);
+  background: #e6f9ed;
+  color: var(--admin-accent-border);
+  box-shadow: 0 4px 14px rgba(8, 200, 64, 0.12);
+}
+
+.category-check-group input,
+.toggle-row input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--admin-accent);
 }
 
 .media-grid {
@@ -727,12 +842,21 @@ input[type="file"] {
 }
 
 .block-toolbar {
-  justify-content: start;
+  display: grid;
+  justify-content: stretch;
+  justify-items: start;
+  gap: 12px;
+}
+
+.block-add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .block-width-control {
   min-width: min(220px, 100%);
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .block-style-controls {
@@ -785,15 +909,29 @@ input[type="file"] {
   align-items: center;
 }
 
-.block-drag-handle {
-  min-width: 38px;
+button.block-drag-handle {
+  min-width: 0;
+  min-height: 0;
+  padding: 4px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--color-muted);
   justify-content: center;
   cursor: grab;
   touch-action: none;
 }
 
-.block-drag-handle:active {
+button.block-drag-handle:hover {
+  color: var(--color-ink);
+}
+
+button.block-drag-handle:active {
   cursor: grabbing;
+}
+
+button.block-drag-handle svg {
+  display: block;
 }
 
 .rich-editor {
@@ -991,6 +1129,7 @@ input[type="file"] {
 .work-preview-scroll {
   min-height: 0;
   overflow: auto;
+  overflow-anchor: none;
   background: #f4f4f4;
 }
 

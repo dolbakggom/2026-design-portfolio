@@ -46,7 +46,7 @@ type WorkRow = {
   id: string;
   slug: string;
   title: string;
-  category: "UI/UX" | "BI/BX";
+  category: WorkItem["category"];
   summary: string;
   client: string;
   year: string;

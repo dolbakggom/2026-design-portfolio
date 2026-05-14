@@ -133,6 +133,8 @@ function RichTextBlock({
 export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
   const [draggedBlockId, setDraggedBlockId] = useState("");
   const [dragOverBlockId, setDragOverBlockId] = useState("");
+  const [dragEnabledId, setDragEnabledId] = useState("");
+
   const normalized = blocks.map((block, index) => ({ ...block, sortOrder: index + 1 }));
   const textBlocks = normalized.filter((block) => textBlockTypes.has(block.type));
   const editorWidth = textBlocks[0] ? optionFromBlock(textBlocks[0], "blockWidth", blockWidthOptions, "880px") : "880px";
@@ -176,7 +178,7 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
     );
   };
 
-  const startBlockDrag = (event: DragEvent<HTMLButtonElement>, id: string) => {
+  const startBlockDrag = (event: DragEvent<HTMLElement>, id: string) => {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", id);
     setDraggedBlockId(id);
@@ -186,8 +188,13 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
   const moveDraggedBlock = (event: DragEvent<HTMLElement>, overId: string) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    setDragOverBlockId(overId);
+    if (dragOverBlockId !== overId) {
+      setDragOverBlockId(overId);
+    }
+  };
 
+  const dropBlock = (event: DragEvent<HTMLElement>, overId: string) => {
+    event.preventDefault();
     if (!draggedBlockId || draggedBlockId === overId) return;
     onChange(reorderBlocks(normalized, draggedBlockId, overId));
   };
@@ -195,6 +202,7 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
   const finishBlockDrag = () => {
     setDraggedBlockId("");
     setDragOverBlockId("");
+    setDragEnabledId("");
   };
 
   const uploadForBlock = async (block: WorkBlock, file: File | undefined, alt?: string) => {
@@ -227,21 +235,23 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
   return (
     <div className="block-editor">
       <div className="block-toolbar">
-        <button type="button" onClick={() => addBlock("heading")}>
-          Heading
-        </button>
-        <button type="button" onClick={() => addBlock("paragraph")}>
-          Paragraph
-        </button>
-        <button type="button" onClick={() => addBlock("image")}>
-          Image
-        </button>
-        <button type="button" onClick={() => addBlock("gallery")}>
-          Gallery
-        </button>
-        <button type="button" onClick={() => addBlock("quote")}>
-          Quote
-        </button>
+        <div className="block-add-actions">
+          <button type="button" onClick={() => addBlock("heading")}>
+            Heading
+          </button>
+          <button type="button" onClick={() => addBlock("paragraph")}>
+            Paragraph
+          </button>
+          <button type="button" onClick={() => addBlock("image")}>
+            Image
+          </button>
+          <button type="button" onClick={() => addBlock("gallery")}>
+            Gallery
+          </button>
+          <button type="button" onClick={() => addBlock("quote")}>
+            Quote
+          </button>
+        </div>
         <label className="block-width-control">
           Content width
           <select value={editorWidth} onChange={(event) => updateEditorWidth(event.target.value)}>
@@ -259,8 +269,14 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
           <article
             className={`editor-block ${draggedBlockId === block.id ? "is-dragging" : ""} ${dragOverBlockId === block.id && draggedBlockId !== block.id ? "is-drag-over" : ""}`}
             key={block.id}
+            draggable={dragEnabledId === block.id}
+            onDragStart={(event) => startBlockDrag(event, block.id)}
             onDragOver={(event) => moveDraggedBlock(event, block.id)}
-            onDrop={finishBlockDrag}
+            onDrop={(event) => {
+              dropBlock(event, block.id);
+              finishBlockDrag();
+            }}
+            onDragEnd={finishBlockDrag}
           >
             <header>
               <strong>{block.type}</strong>
@@ -268,12 +284,15 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
                 <button
                   type="button"
                   className="block-drag-handle"
-                  draggable
                   aria-label={`${block.type} 블록 순서 이동`}
-                  onDragStart={(event) => startBlockDrag(event, block.id)}
-                  onDragEnd={finishBlockDrag}
+                  onPointerEnter={() => setDragEnabledId(block.id)}
+                  onPointerLeave={() => setDragEnabledId("")}
                 >
-                  ☰
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="4" y1="18" x2="20" y2="18"></line>
+                  </svg>
                 </button>
                 <button type="button" className="danger" onClick={() => removeBlock(block.id)}>
                   Delete

@@ -40,10 +40,12 @@ if (!work) {
             <p>{work.summary}</p>
           </div>
           <dl class="work-meta">
-            <div>
-              <dt>Client</dt>
-              <dd>{work.client || "Selected Project"}</dd>
-            </div>
+            {work.client ? (
+              <div>
+                <dt>Client</dt>
+                <dd>{work.client}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>Year</dt>
               <dd><time datetime={yearDateTime}>{work.year || "2026"}</time></dd>

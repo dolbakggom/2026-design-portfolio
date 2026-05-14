@@ -2,6 +2,121 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-14 Admin slug/link input fixes and contact icons
+
+### 요구사항
+- Works editor의 slug input에서 hyphen을 직접 입력할 수 있게 합니다.
+- Profile links의 click action input에서 한 글자 입력 후 focus가 빠지는 문제를 고칩니다.
+- About contact icon을 admin links에서 사용한 inline icon 스타일로 맞추고, 색상은 텍스트 색과 통일합니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - slug input에는 입력 중 trailing hyphen을 보존하는 `sanitizeSlugInput`을 사용하고, blur 시에만 기존 `slugify`로 최종 정리하도록 분리했습니다.
+  - Profile links row key를 URL 값 기반에서 index 기반 stable key로 바꿔 URL 입력 시 input이 remount되지 않게 했습니다.
+- `src/components/HomePage.astro`, `src/styles/global.css`
+  - About contact의 기존 이미지 SVG를 inline SVG로 대체했습니다.
+  - `.profile-contact svg`가 `stroke: currentColor`를 쓰도록 해 텍스트 색과 아이콘 색을 통일했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-14 Admin timeline bulk save
+
+### 요구사항
+- Career 이력 관리에서 item별 Save 버튼을 없애고 일괄 저장으로 바꿉니다.
+- 개별 Delete 버튼은 각 career card에 그대로 둡니다.
+- 일괄 저장 버튼은 자기소개 관리 하단 Save 버튼과 같은 위치/스타일로 맞춥니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - `saveTimelineItem`을 `saveTimeline`으로 바꾸고, 현재 timeline state의 모든 item을 순차적으로 `/api/admin/timeline/:id`에 `PUT`하도록 했습니다.
+  - 각 timeline card의 개별 Save 버튼을 제거하고 Delete만 남겼습니다.
+  - `Save career` 버튼을 timeline section 하단 `.action-row.sticky-actions`에 배치해 profile save button과 동일한 UX로 맞췄습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-14 Admin work editor back button
+
+### 요구사항
+- Works editor 화면의 기존 우측 `Work list` 버튼을 제거하고, 제목 왼쪽에 게시글 상세 상단바와 비슷한 뒤로가기 화살표 버튼을 둡니다.
+- 버튼은 기존 Work list 이동 로직을 그대로 사용해 저장하지 않은 변경사항 확인 흐름을 유지합니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - `.admin-topbar` 제목 영역에 `.admin-title-row`를 추가하고, works editor 상태일 때만 `←` 버튼을 표시합니다.
+  - 기존 `.admin-topbar-actions`의 `Work list` 버튼은 제거했습니다.
+- `src/styles/admin.css`
+  - `.admin-title-back`을 투명 배경의 원형 arrow button으로 스타일링하고 hover/focus 시 admin accent 색으로 반응하게 했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-14 Admin editor drag/category/profile polish
+
+### 요구사항
+- Works editor 본문 블록 순서 변경 시 드래그 중인 블록이 앞뒤로 흔들리는 불안정함을 줄입니다.
+- Works category checkbox 디자인을 개선하고, `UI/UX`와 `BI/BX` 중복 선택 값이 public 게시글에도 표시되도록 합니다.
+- Career timeline public/admin 화면에서 description을 사용하지 않습니다.
+- Work detail 가로 스크롤 막대와 CSS 인코딩 깨짐 가능성을 줄입니다.
+- Admin profile에서 사용처가 없는 role 입력을 제거하고, links 카드를 icon / 표시 텍스트 / 동작 URL 3열 구조로 정리합니다.
+- 본문 에디터의 block 추가 버튼을 content width 설정보다 위에 두고, content width control은 좌측 정렬합니다.
+
+### 구현
+- `src/components/admin/BlockEditor.tsx`
+  - block drag 중 `dragover`마다 배열을 재정렬하던 방식을 제거하고, `drop` 시점에 한 번만 `onChange(reorderBlocks(...))`를 실행하도록 변경했습니다.
+  - block 추가 버튼을 `.block-add-actions`로 묶어 toolbar 상단에 배치하고, `Content width` select는 아래쪽 좌측 정렬로 변경했습니다.
+- `src/components/admin/AdminApp.tsx`, `src/styles/admin.css`
+  - Works category를 pill형 checkbox group으로 개선했습니다.
+  - Profile role 입력 UI를 제거했습니다. DB/API 호환을 위해 내부 profile `role` field는 유지하되 validation은 빈 문자열도 허용합니다.
+  - Profile links는 Add/Remove 없이 기존 link 목록을 icon, displayed text, click action 3열로 편집하도록 바꿨습니다.
+  - Timeline editor에서 description 입력 UI를 제거하고, 저장 시 description은 빈 문자열로 보냅니다.
+- `src/components/HomePage.astro`, `src/styles/global.css`
+  - Public career timeline에서 description 렌더를 제거했습니다.
+  - `html`/`body`에 x-overflow 차단을 추가해 work detail의 가로 스크롤 막대가 생기는 현상을 줄였습니다.
+  - `global.css`와 `admin.css` 최상단에 `@charset "UTF-8";`을 추가했습니다.
+- `src/db/schema.ts`, `src/lib/admin-data.ts`, `src/lib/content.ts`, `src/lib/validation.ts`, `src/types.ts`
+  - Work category type/validation/row typing이 `UI/UX, BI/BX` 다중 category 문자열을 허용하도록 맞췄습니다.
+- `migrations/0004_allow_multi_work_category.sql`
+  - 기존 works 데이터를 보존하면서 D1 `works.category` CHECK 제약에 `UI/UX, BI/BX`를 추가하는 migration을 추가했습니다.
+
+### 검증
+- `npm run build` 통과
+  - sandbox 내부에서는 Cloudflare Vite plugin의 inspector port listen이 `EPERM`으로 막혀 실패했고, 승인된 sandbox 밖 실행에서는 `astro check`와 `astro build` 모두 통과했습니다.
+- `git diff --check` 통과
+- `npm run db:migrate:local`과 `npm run db:migrate:remote`로 `0004_allow_multi_work_category.sql`을 local/remote D1 모두에 적용했습니다.
+
+### 주의
+- 배포/로컬 D1의 `works.category` CHECK 제약은 현재 `UI/UX, BI/BX`를 허용합니다.
+- Profile role column/type은 기존 DB와 API 호환을 위해 아직 남겨두었습니다. public/admin UI에서는 쓰지 않습니다.
+
+## 2026-05-14 Admin works editor scroll stabilization
+
+### 요구사항
+- Gemini가 save button과 editor drag UX 일부를 수정한 상태를 유지합니다.
+- Admin Works editor 화면에서 본문 수정 중 스크롤 위치가 튀는 문제를 분석하고 완화합니다.
+- Gemini가 추가한 Works category 중복 체크와 Client 숨김 처리 로직을 검토하고, 잘못된 부분은 보정합니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - `.work-editor` scroll container ref를 추가하고, `updateWorkLocal` 직전에 현재 `scrollTop`을 저장한 뒤 React render 직후 `useLayoutEffect` + `requestAnimationFrame`으로 같은 위치를 복원합니다.
+  - category checkbox 로직을 helper 함수로 정리해 `UI/UX`, `BI/BX`, `UI/UX, BI/BX` 순서로만 저장되게 했고, 중복 category가 생기지 않도록 했습니다.
+  - preview와 detail의 Client 숨김 처리 방향은 유지했습니다.
+- `src/styles/admin.css`
+  - `.work-editor`와 `.work-preview-scroll`에 `overflow-anchor: none`을 추가해 브라우저 scroll anchoring이 editor state update와 충돌하지 않도록 했습니다.
+  - inline category 스타일을 `.category-check-group` class로 옮겼습니다.
+- `src/types.ts`, `src/lib/validation.ts`
+  - `WorkCategory`와 Zod validation이 `UI/UX, BI/BX` 다중 category 문자열도 허용하도록 확장했습니다.
+- `src/components/HomePage.astro`
+  - WORK gallery filter가 comma-separated category를 split해서 포함 여부로 판단하도록 변경했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
 ## 2026-05-14 Admin work editor unsaved guard
 
 ### 요구사항
