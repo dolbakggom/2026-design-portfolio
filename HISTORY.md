@@ -2,6 +2,35 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-14 Small viewport snap and detail polish
+
+### 요구사항
+- 개발자도구 등으로 세로 viewport가 작아질 때 home snap section 아래쪽에 다음 section이 보이는 문제를 줄입니다.
+- Admin WORK preview resize handle 위치가 어긋나지 않게 합니다.
+- Career timeline list는 right 정렬을 없애고 left padding/offset 기준으로 배치합니다.
+- Intro scroll cue는 위에서 아래로 나타나게 시작 위치를 바꿉니다.
+- Featured dot으로 여러 작업물을 건너뛸 때 중간 작업물로 스크롤 애니메이션이 지나가지 않게 하고, blur 전환감만 남깁니다.
+- Work detail `.work-hero-copy`의 summary 문단 bottom margin을 제거합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `--snap-panel-height`/`--snap-panel-offset`을 추가해 intro, identity sticky stage, work intro, featured stage/steps가 최소 `620px` 높이를 유지하게 했습니다.
+  - `.timeline-items`를 `right` 대신 `--timeline-left` 기반 `left` 배치로 바꿨습니다.
+  - `.intro-scroll-cue` 초기 transform을 위쪽 시작점으로 변경했습니다.
+  - Featured dot jump 중 `.featured-list` 자체를 흐리지 않고, `.featured-stage::after`의 투명 backdrop blur layer로 전환감을 적용합니다.
+  - `.work-hero-copy > p:not(.section-kicker)`의 bottom margin을 제거했습니다.
+- `src/components/HomePage.astro`
+  - Featured target 계산을 `window.innerHeight` 대신 실제 `.featured-step` 높이 기준으로 바꿔 작은 viewport에서도 CSS section 높이와 JS scroll target이 맞게 했습니다.
+  - Identity progress range도 실제 sticky stage 높이를 빼도록 변경했습니다.
+  - Featured dot click은 GSAP scroll tween이 아니라 짧은 blur 상태에서 `window.scrollTo(..., behavior: "auto")`로 즉시 target 위치에 맞춘 뒤 active panel을 적용합니다.
+- `src/styles/admin.css`
+  - `.work-splitter`에 `position: relative`, `align-self: stretch`, `height: 100%`를 지정해 pseudo handle이 splitter 기준으로 정렬되게 했습니다.
+
+### 검증
+- `npm run build` 통과
+  - sandbox 내부에서는 Cloudflare Vite plugin의 inspector port listen이 `EPERM`으로 막혀 실패했고, 승인된 sandbox 밖 실행에서는 통과했습니다.
+- `git diff --check` 통과
+
 ## 2026-05-13 Gallery hover polish and SDR upload normalization
 
 ### 요구사항

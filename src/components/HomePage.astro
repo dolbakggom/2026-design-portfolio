@@ -342,6 +342,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const timelineCards = gsap.utils.toArray<HTMLElement>("[data-timeline-card]");
     const featuredPanels = gsap.utils.toArray<HTMLElement>("[data-featured-panel]");
     const featuredDots = gsap.utils.toArray<HTMLElement>("[data-featured-dot]");
+    const featuredStage = document.querySelector<HTMLElement>(".featured-stage");
 
     if (!reduceMotion) {
       [aboutCopy, careerCopy].forEach((element) => {
@@ -466,7 +467,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const getFeaturedTop = () => document.querySelector<HTMLElement>("#featured-work")?.offsetTop ?? Number.POSITIVE_INFINITY;
     const getFirstFeaturedTop = getFeaturedTop;
     const getGalleryTop = () => document.querySelector<HTMLElement>(".gallery-section")?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - window.innerHeight);
+    const getSnapPanelHeight = () => document.querySelector<HTMLElement>("[data-featured-step]")?.offsetHeight || document.querySelector<HTMLElement>(".intro-section")?.offsetHeight || window.innerHeight;
+    const getStickyStageHeight = () => document.querySelector<HTMLElement>(".identity-stage")?.offsetHeight || window.innerHeight;
+    const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - getStickyStageHeight());
     const getCareerEntryTop = () => getIdentityTop() + getIdentityProgressRange() * careerStartProgress;
     const getCareerExitTop = () => getIdentityTop() + getIdentityProgressRange() * careerEndProgress;
     const isFreeScrollRange = () => window.scrollY >= getGalleryTop() - snapTolerance;
@@ -491,7 +494,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       if (featuredSection) {
         featuredPanels.forEach((_, index) => {
           targets.push({
-            y: featuredSection.offsetTop + window.innerHeight * index,
+            y: featuredSection.offsetTop + getSnapPanelHeight() * index,
             route: "/work",
             kind: "featured",
             featuredIndex: index
@@ -605,17 +608,42 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       });
     };
 
+    const jumpToFeaturedTarget = (target: SnapTarget) => {
+      if (target.kind !== "featured") return;
+
+      snapTween?.kill();
+      snapTween = null;
+      preserveWorkRoute = true;
+      lockedUntil = Date.now() + 360;
+
+      const completeJump = () => {
+        window.scrollTo({ top: Math.round(target.y), behavior: "auto" });
+        applySnapState(target);
+        ScrollTrigger.refresh();
+        requestSnapObserverSync();
+
+        window.setTimeout(() => {
+          featuredStage?.classList.remove("is-dot-jumping");
+          lockedUntil = Date.now() + 120;
+        }, reduceMotion ? 0 : 160);
+      };
+
+      if (reduceMotion || !featuredStage) {
+        completeJump();
+        return;
+      }
+
+      featuredStage.classList.add("is-dot-jumping");
+      window.setTimeout(completeJump, 90);
+    };
+
     featuredDots.forEach((dot) => {
       dot.addEventListener("click", () => {
         const targetIndex = Number(dot.dataset.featuredTarget ?? 0);
         const target = getSnapTargets().find((item) => item.kind === "featured" && item.featuredIndex === targetIndex);
         if (!target) return;
 
-        lockedUntil = 0;
-        snapTween?.kill();
-        snapTween = null;
-        preserveWorkRoute = true;
-        snapToTarget(target);
+        jumpToFeaturedTarget(target);
       }, { signal: pageSignal });
     });
 
