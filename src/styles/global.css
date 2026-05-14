@@ -399,6 +399,10 @@ button:disabled {
   margin: 0;
 }
 
+.profile-intro p:nth-of-type(3) {
+  margin-top: clamp(12px, 0.95vw, 18px);
+}
+
 .profile-intro strong,
 .profile-intro b {
   color: var(--color-ink);

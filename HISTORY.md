@@ -2,6 +2,23 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-14 About intro paragraph gap
+
+### 요구사항
+- Main about intro에서 `함시현입니다.` 문단과 `주어진 답...설계합니다.` 문단 사이에 여백을 추가합니다.
+- margin과 `<br>`를 같이 써서 적용합니다.
+- 후속 조정: `<br>`가 한 줄 높이를 추가해 여백이 과해졌으므로, 작은 margin만 남겨 reference 수준으로 줄입니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 최초에는 `profile.intro` HTML에서 `주어진 답`으로 시작하는 문단 앞에 `<br class="profile-intro-break" />`를 삽입했지만, 여백이 과해져 원래 `profile.intro` 렌더로 되돌렸습니다.
+- `src/styles/global.css`
+  - `.profile-intro p:nth-of-type(3)`에 responsive `margin-top`을 지정해 세 번째 문단 위에만 작은 여백을 줬습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
 ## 2026-05-14 Admin slug/link input fixes and contact icons
 
 ### 요구사항
