@@ -1,5 +1,5 @@
-import { Component, Suspense, lazy, useEffect, useMemo, useState } from "react";
-import type { CSSProperties, PointerEvent, ReactNode, SyntheticEvent } from "react";
+import { Component, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, DragEvent, PointerEvent, ReactNode, SyntheticEvent } from "react";
 import type { Profile, TimelineItem, WorkBlock, WorkCategory, WorkItem } from "../../types";
 import "../../styles/admin.css";
 
@@ -36,6 +36,7 @@ type AssetResponse = {
 };
 
 type Tab = "profile" | "timeline" | "works";
+type WorkScreen = "list" | "editor";
 type WorkAssetKind = "thumbnail" | "featuredThumbnail";
 type AdminIconName = Tab | "logout";
 
@@ -141,15 +142,40 @@ const slugify = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 80) || `work-${Date.now()}`;
 
-const moveItem = <T extends { id: string }>(items: T[], id: string, direction: -1 | 1) => {
-  const index = items.findIndex((item) => item.id === id);
-  const target = index + direction;
-  if (index < 0 || target < 0 || target >= items.length) return items;
+const reorderById = <T extends { id: string }>(items: T[], activeId: string, overId: string) => {
+  if (activeId === overId) return items;
+  const index = items.findIndex((item) => item.id === activeId);
+  const target = items.findIndex((item) => item.id === overId);
+  if (index < 0 || target < 0) return items;
   const next = [...items];
   const [item] = next.splice(index, 1);
   next.splice(target, 0, item);
   return next;
 };
+
+const workSnapshot = (work: WorkItem) =>
+  JSON.stringify({
+    slug: work.slug,
+    title: work.title,
+    category: work.category,
+    summary: work.summary,
+    client: work.client,
+    year: work.year,
+    role: work.role,
+    featured: work.featured,
+    published: work.published,
+    thumbnailAssetId: work.thumbnailAssetId ?? null,
+    featuredThumbnailAssetId: work.featuredThumbnailAssetId ?? null,
+    heroAssetId: work.heroAssetId ?? null,
+    blocks: (work.blocks ?? []).map((block) => ({
+      id: block.id,
+      type: block.type,
+      content: block.content
+    }))
+  });
+
+const workSnapshots = (items: WorkItem[]) =>
+  Object.fromEntries(items.map((work) => [work.id, workSnapshot(work)]));
 
 const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
   new Promise<Blob>((resolve, reject) => {
@@ -341,15 +367,43 @@ export default function AdminApp() {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [works, setWorks] = useState<WorkItem[]>([]);
   const [selectedWorkId, setSelectedWorkId] = useState<string>("");
+  const [workScreen, setWorkScreen] = useState<WorkScreen>("list");
+  const [savedWorkSnapshots, setSavedWorkSnapshots] = useState<Record<string, string>>({});
   const [workPreviewWidth, setWorkPreviewWidth] = useState(460);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [draggedWorkId, setDraggedWorkId] = useState("");
+  const [dragOverWorkId, setDragOverWorkId] = useState("");
+  const workDragMoved = useRef(false);
+  const worksRef = useRef<WorkItem[]>([]);
 
   const selectedWork = useMemo(
     () => works.find((work) => work.id === selectedWorkId) ?? works[0],
     [selectedWorkId, works]
   );
+  const selectedWorkDirty = Boolean(
+    selectedWork &&
+      workScreen === "editor" &&
+      savedWorkSnapshots[selectedWork.id] &&
+      savedWorkSnapshots[selectedWork.id] !== workSnapshot(selectedWork)
+  );
+
+  useEffect(() => {
+    worksRef.current = works;
+  }, [works]);
+
+  useEffect(() => {
+    if (!authenticated || !selectedWorkDirty) return;
+
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      Reflect.set(event, "returnValue", "");
+    };
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [authenticated, selectedWorkDirty]);
 
   const flash = (value: string) => {
     setMessage(value);
@@ -371,6 +425,7 @@ export default function AdminApp() {
       setProfile(profileData.profile ?? emptyProfile);
       setTimeline(timelineData.timeline);
       setWorks(worksData.works);
+      setSavedWorkSnapshots(workSnapshots(worksData.works));
       setSelectedWorkId((current) => current || worksData.works[0]?.id || "");
       setAuthenticated(true);
       setError("");
@@ -454,6 +509,7 @@ export default function AdminApp() {
   };
 
   const deleteTimelineItem = async (id: string) => {
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
     try {
       const data = await requestJson<{ timeline: TimelineItem[] }>(`/api/admin/timeline/${id}`, {
         method: "DELETE"
@@ -463,16 +519,6 @@ export default function AdminApp() {
     } catch (deleteError) {
       fail(deleteError instanceof Error ? deleteError.message : "이력 삭제에 실패했습니다.");
     }
-  };
-
-  const persistTimelineOrder = async (items: TimelineItem[]) => {
-    setTimeline(items);
-    await requestJson<{ timeline: TimelineItem[] }>("/api/admin/reorder", {
-      method: "PATCH",
-      body: JSON.stringify({ type: "timeline", ids: items.map((item) => item.id) })
-    })
-      .then((data) => setTimeline(data.timeline))
-      .catch(() => fail("이력 순서 저장에 실패했습니다."));
   };
 
   const uploadAsset = async (file: File, alt = "") => {
@@ -513,6 +559,118 @@ export default function AdminApp() {
     setWorks((current) => current.map((work) => (work.id === id ? { ...work, ...patch } : work)));
   };
 
+  const openWorkEditor = (id: string) => {
+    setSelectedWorkId(id);
+    setWorkScreen("editor");
+    window.history.pushState({ adminWorkEditor: id }, "", window.location.href);
+  };
+
+  const saveWork = async (work: WorkItem) => {
+    try {
+      const data = await requestJson<{ works: WorkItem[] }>(`/api/admin/works/${work.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          ...work,
+          heroAssetId: null,
+          hero: null,
+          blocks: (work.blocks ?? []).map((block, index) => ({ ...block, sortOrder: index + 1 }))
+        })
+      });
+      setWorks(data.works);
+      setSavedWorkSnapshots(workSnapshots(data.works));
+      setSelectedWorkId(work.id);
+      flash("작업물이 저장되었습니다.");
+      return true;
+    } catch (saveError) {
+      fail(saveError instanceof Error ? saveError.message : "작업물 저장에 실패했습니다.");
+      return false;
+    }
+  };
+
+  const confirmLeaveWorkEditor = async () => {
+    if (!selectedWork || !selectedWorkDirty) return true;
+
+    const shouldSave = window.confirm("저장하지 않은 작업물 수정사항이 있습니다. 저장하고 이동하시겠습니까?");
+    if (!shouldSave) return false;
+
+    return saveWork(selectedWork);
+  };
+
+  const leaveWorkEditorForList = async () => {
+    if (!(await confirmLeaveWorkEditor())) return;
+    setWorkScreen("list");
+    window.history.replaceState({ adminWorkScreen: "list" }, "", window.location.href);
+  };
+
+  const switchAdminTab = async (tab: Tab) => {
+    if (tab === activeTab) return;
+    if (activeTab === "works" && workScreen === "editor" && !(await confirmLeaveWorkEditor())) return;
+
+    setActiveTab(tab);
+    if (tab !== "works") {
+      setWorkScreen("list");
+    }
+  };
+
+  useEffect(() => {
+    if (!authenticated || workScreen !== "editor") return;
+
+    const handlePopState = () => {
+      void (async () => {
+        if (await confirmLeaveWorkEditor()) {
+          setWorkScreen("list");
+          return;
+        }
+
+        if (selectedWork) {
+          window.history.pushState({ adminWorkEditor: selectedWork.id }, "", window.location.href);
+        }
+      })();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [authenticated, workScreen, selectedWork, selectedWorkDirty]);
+
+  const startWorkDrag = (event: DragEvent<HTMLElement>, id: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    workDragMoved.current = false;
+    setDraggedWorkId(id);
+    setDragOverWorkId(id);
+  };
+
+  const moveDraggedWork = (event: DragEvent<HTMLElement>, overId: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverWorkId(overId);
+
+    if (!draggedWorkId || draggedWorkId === overId) return;
+
+    workDragMoved.current = true;
+    setWorks((current) => {
+      const next = reorderById(current, draggedWorkId, overId);
+      worksRef.current = next;
+      return next;
+    });
+  };
+
+  const finishWorkDrag = () => {
+    const shouldSave = workDragMoved.current;
+    const orderedWorks = worksRef.current;
+
+    setDraggedWorkId("");
+    setDragOverWorkId("");
+
+    window.setTimeout(() => {
+      workDragMoved.current = false;
+    }, 0);
+
+    if (shouldSave) {
+      void persistWorkOrder(orderedWorks);
+    }
+  };
+
   const resizeWorkPreview = (nextWidth: number) => {
     setWorkPreviewWidth(Math.min(1160, Math.max(260, nextWidth)));
   };
@@ -536,25 +694,6 @@ export default function AdminApp() {
     window.addEventListener("pointerup", stop);
   };
 
-  const saveWork = async (work: WorkItem) => {
-    try {
-      const data = await requestJson<{ works: WorkItem[] }>(`/api/admin/works/${work.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          ...work,
-          heroAssetId: null,
-          hero: null,
-          blocks: (work.blocks ?? []).map((block, index) => ({ ...block, sortOrder: index + 1 }))
-        })
-      });
-      setWorks(data.works);
-      setSelectedWorkId(work.id);
-      flash("작업물이 저장되었습니다.");
-    } catch (saveError) {
-      fail(saveError instanceof Error ? saveError.message : "작업물 저장에 실패했습니다.");
-    }
-  };
-
   const addWork = async () => {
     const title = "New Project";
     try {
@@ -574,8 +713,10 @@ export default function AdminApp() {
         })
       });
       setWorks(data.works);
+      setSavedWorkSnapshots(workSnapshots(data.works));
       setSelectedWorkId(data.works[data.works.length - 1]?.id ?? "");
       setActiveTab("works");
+      setWorkScreen("editor");
       flash("작업물이 추가되었습니다.");
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "작업물 추가에 실패했습니다.");
@@ -583,13 +724,16 @@ export default function AdminApp() {
   };
 
   const deleteSelectedWork = async () => {
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
     if (!selectedWork) return;
     try {
       const data = await requestJson<{ works: WorkItem[] }>(`/api/admin/works/${selectedWork.id}`, {
         method: "DELETE"
       });
       setWorks(data.works);
+      setSavedWorkSnapshots(workSnapshots(data.works));
       setSelectedWorkId(data.works[0]?.id ?? "");
+      setWorkScreen("list");
       flash("작업물이 삭제되었습니다.");
     } catch (deleteError) {
       fail(deleteError instanceof Error ? deleteError.message : "작업물 삭제에 실패했습니다.");
@@ -632,6 +776,7 @@ export default function AdminApp() {
   };
 
   const clearWorkAsset = (kind: WorkAssetKind) => {
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
     if (!selectedWork) return;
     updateWorkLocal(selectedWork.id, workAssetPatch(kind, null));
     flash("이미지가 제거되었습니다. 저장을 눌러 반영하세요.");
@@ -690,7 +835,7 @@ export default function AdminApp() {
         </div>
         <nav>
           {navItems.map((item) => (
-            <button key={item.tab} type="button" className={activeTab === item.tab ? "is-active" : ""} onClick={() => setActiveTab(item.tab)}>
+            <button key={item.tab} type="button" className={activeTab === item.tab ? "is-active" : ""} onClick={() => void switchAdminTab(item.tab)}>
               <span className="nav-icon" aria-hidden="true"><AdminIcon name={item.icon} /></span>
               <span className="nav-label">{item.label}</span>
             </button>
@@ -706,43 +851,58 @@ export default function AdminApp() {
         <header className="admin-topbar">
           <div>
             <p>{activeTab}</p>
-            <h2>{activeTab === "profile" ? "자기소개 관리" : activeTab === "timeline" ? "이력 관리" : "작업물 관리"}</h2>
+            <h2>{activeTab === "profile" ? "자기소개 관리" : activeTab === "timeline" ? "이력 관리" : activeTab === "works" && workScreen === "editor" ? selectedWork?.title || "작업물 편집" : "작업물 관리"}</h2>
           </div>
-          <a href="/" target="_blank" rel="noreferrer">
-            View site
-          </a>
+          <div className="admin-topbar-actions">
+            {activeTab === "works" && workScreen === "editor" ? (
+              <button type="button" onClick={() => void leaveWorkEditorForList()}>
+                Work list
+              </button>
+            ) : null}
+            {activeTab === "works" ? (
+              <button type="button" className="primary-action" onClick={addWork}>
+                Add work
+              </button>
+            ) : null}
+            <a href="/" target="_blank" rel="noreferrer">
+              View site
+            </a>
+          </div>
         </header>
 
         {activeTab === "profile" ? (
-          <section className="admin-panel profile-panel">
-            <div className="field-grid">
-              <label>
-                Headline
-                <input value={profile.headline} onChange={(event) => setProfile({ ...profile, headline: event.target.value })} />
-              </label>
-              <label>
-                Name
-                <input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} />
-              </label>
-              <label>
-                Role
-                <input value={profile.role} onChange={(event) => setProfile({ ...profile, role: event.target.value })} />
-              </label>
-              <label>
-                Profile Image
-                <input type="file" accept="image/*" onChange={(event) => uploadProfileImage(event.target.files?.[0])} />
-              </label>
-              <label className="full-field">
-                Intro
-                <textarea value={profile.intro} onChange={(event) => setProfile({ ...profile, intro: event.target.value })} />
-              </label>
-              <label className="full-field">
-                Bio
-                <textarea value={profile.bio} rows={6} onChange={(event) => setProfile({ ...profile, bio: event.target.value })} />
-              </label>
-            </div>
+          <div className="admin-profile-grid">
+            <section className="admin-panel">
+              <div className="field-grid">
+                <label>
+                  Headline
+                  <input value={profile.headline} onChange={(event) => setProfile({ ...profile, headline: event.target.value })} />
+                </label>
+                <label>
+                  Name
+                  <input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} />
+                </label>
+                <label>
+                  Role
+                  <input value={profile.role} onChange={(event) => setProfile({ ...profile, role: event.target.value })} />
+                </label>
+                <label>
+                  Profile Image
+                  <input type="file" accept="image/*" onChange={(event) => uploadProfileImage(event.target.files?.[0])} />
+                </label>
+                <label className="full-field">
+                  Intro
+                  <textarea value={profile.intro} onChange={(event) => setProfile({ ...profile, intro: event.target.value })} />
+                </label>
+                <label className="full-field">
+                  Bio
+                  <textarea value={profile.bio} rows={6} onChange={(event) => setProfile({ ...profile, bio: event.target.value })} />
+                </label>
+              </div>
+            </section>
 
-            <div className="link-editor">
+            <section className="admin-panel">
+              <div className="link-editor" style={{ marginTop: 0 }}>
               <header>
                 <h3>Links</h3>
                 <button type="button" onClick={() => setProfile({ ...profile, links: [...profile.links, { label: "", url: "" }] })}>
@@ -772,44 +932,38 @@ export default function AdminApp() {
                   <button
                     type="button"
                     className="danger"
-                    onClick={() => setProfile({ ...profile, links: profile.links.filter((_, linkIndex) => linkIndex !== index) })}
+                    onClick={() => {
+                      if (!window.confirm("정말 삭제하시겠습니까?")) return;
+                      setProfile({ ...profile, links: profile.links.filter((_, linkIndex) => linkIndex !== index) });
+                    }}
                   >
                     Remove
                   </button>
                 </div>
               ))}
             </div>
+            </section>
 
-            <div className="action-row">
+            <div className="action-row sticky-actions" style={{ borderTop: 0, paddingBottom: "24px" }}>
               <button type="button" className="primary-action" onClick={saveProfile}>
                 Save profile
               </button>
             </div>
-          </section>
+          </div>
         ) : null}
 
         {activeTab === "timeline" ? (
-          <section className="admin-panel">
-            <div className="panel-actions">
+          <section className="timeline-cards-layout">
+            <div className="panel-actions" style={{ marginBottom: "20px" }}>
               <button type="button" onClick={addTimelineItem}>
                 Add career item
               </button>
             </div>
-            <div className="timeline-editor-list">
-              {timeline.map((item, index) => (
-                <article className="admin-item" key={item.id}>
-                  <div className="item-order">
-                    <button type="button" disabled={index === 0} onClick={() => persistTimelineOrder(moveItem(timeline, item.id, -1))}>
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      disabled={index === timeline.length - 1}
-                      onClick={() => persistTimelineOrder(moveItem(timeline, item.id, 1))}
-                    >
-                      Down
-                    </button>
-                  </div>
+            <div className="timeline-editor-list" style={{ display: "grid", gap: "20px", marginTop: 0 }}>
+              {[...timeline]
+                .sort((a, b) => String(a.period || "").localeCompare(String(b.period || "")))
+                .map((item) => (
+                <article className="admin-panel admin-timeline-card" key={item.id}>
                   <div className="field-grid">
                     <label>
                       Period
@@ -834,7 +988,7 @@ export default function AdminApp() {
                       />
                     </label>
                   </div>
-                  <div className="action-row">
+                  <div className="action-row" style={{ marginTop: "16px" }}>
                     <button type="button" className="primary-action" onClick={() => saveTimelineItem(item)}>
                       Save
                     </button>
@@ -849,176 +1003,227 @@ export default function AdminApp() {
         ) : null}
 
         {activeTab === "works" ? (
-          <section className="works-admin-grid" style={{ "--work-preview-width": `${workPreviewWidth}px` } as CSSProperties}>
-            <aside className="work-list-panel">
-              <button type="button" onClick={addWork}>
-                Add work
-              </button>
-              <div className="work-list">
-                {works.map((work, index) => (
-                  <article key={work.id} className={selectedWork?.id === work.id ? "is-selected" : ""}>
-                    <button type="button" className="work-select" onClick={() => setSelectedWorkId(work.id)}>
-                      <strong>{work.title}</strong>
-                      <span>{work.category}</span>
-                    </button>
-                    <div className="item-order">
-                      <button type="button" disabled={index === 0} onClick={() => persistWorkOrder(moveItem(works, work.id, -1))}>
-                        Up
+          workScreen === "list" ? (
+            <section className={`works-list-view ${draggedWorkId ? "is-ordering" : ""}`}>
+              {works.length ? (
+                <div className="work-grid admin-work-grid">
+                  {works.map((work) => {
+                    const tileStyle = work.thumbnail?.url ? ({ "--tile-image": `url("${work.thumbnail.url}")` } as CSSProperties) : undefined;
+                    const isDragging = draggedWorkId === work.id;
+                    const isDragOver = dragOverWorkId === work.id && draggedWorkId !== work.id;
+
+                    return (
+                      <article
+                        key={work.id}
+                        className={`work-tile admin-work-card ${isDragging ? "is-dragging" : ""} ${isDragOver ? "is-drag-over" : ""}`}
+                        draggable
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${work.title} 편집`}
+                        onClick={() => {
+                          if (workDragMoved.current) return;
+                          openWorkEditor(work.id);
+                        }}
+                        onDragStart={(event) => startWorkDrag(event, work.id)}
+                        onDragOver={(event) => moveDraggedWork(event, work.id)}
+                        onDrop={finishWorkDrag}
+                        onDragEnd={finishWorkDrag}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          openWorkEditor(work.id);
+                        }}
+                      >
+                        <div
+                          className={`work-tile-media ${work.thumbnail?.url ? "has-image" : ""}`}
+                          style={tileStyle}
+                          aria-label={work.thumbnail?.alt ?? work.title}
+                          role="img"
+                        />
+                        <div className="admin-work-card-copy">
+                          <h3>{work.title}</h3>
+                          <span>{work.category}</span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <section className="admin-panel empty-panel">작업물이 없습니다. Add work로 새 작업물을 추가하세요.</section>
+              )}
+            </section>
+          ) : (
+            <section className="works-editor-layout" style={{ "--work-preview-width": `${workPreviewWidth}px` } as CSSProperties}>
+              {selectedWork ? (
+                <>
+                  <section className="work-editor" aria-label="Work editor">
+                    <section className="admin-panel work-editor-card">
+                      <header className="work-editor-card-header">
+                        <div>
+                          <p>Basic</p>
+                          <h3>작업물 기본 정보</h3>
+                        </div>
+                      </header>
+                      <div className="field-grid">
+                        <label>
+                          Title
+                          <input
+                            value={selectedWork.title}
+                            onChange={(event) =>
+                              updateWorkLocal(selectedWork.id, {
+                                title: event.target.value
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Slug
+                          <input
+                            value={selectedWork.slug}
+                            onChange={(event) => updateWorkLocal(selectedWork.id, { slug: slugify(event.target.value) })}
+                          />
+                        </label>
+                        <label>
+                          Category
+                          <select value={selectedWork.category} onChange={(event) => updateWorkLocal(selectedWork.id, { category: event.target.value as WorkCategory })}>
+                            <option>UI/UX</option>
+                            <option>BI/BX</option>
+                          </select>
+                        </label>
+                        <label>
+                          Year
+                          <input value={selectedWork.year} onChange={(event) => updateWorkLocal(selectedWork.id, { year: event.target.value })} />
+                        </label>
+                        <label>
+                          Client
+                          <input value={selectedWork.client} onChange={(event) => updateWorkLocal(selectedWork.id, { client: event.target.value })} />
+                        </label>
+                        <label>
+                          Role
+                          <input value={selectedWork.role} onChange={(event) => updateWorkLocal(selectedWork.id, { role: event.target.value })} />
+                        </label>
+                        <label className="full-field">
+                          Summary
+                          <textarea value={selectedWork.summary} onChange={(event) => updateWorkLocal(selectedWork.id, { summary: event.target.value })} />
+                        </label>
+                      </div>
+
+                      <div className="toggle-row">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={selectedWork.featured}
+                            onChange={(event) => updateWorkLocal(selectedWork.id, { featured: event.target.checked })}
+                          />
+                          Featured
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={selectedWork.published}
+                            onChange={(event) => updateWorkLocal(selectedWork.id, { published: event.target.checked })}
+                          />
+                          Published
+                        </label>
+                      </div>
+                    </section>
+
+                    <section className="admin-panel work-editor-card">
+                      <header className="work-editor-card-header">
+                        <div>
+                          <p>Images</p>
+                          <h3>썸네일 설정</h3>
+                        </div>
+                      </header>
+                      <div className="media-grid">
+                        {workMediaFields.map((field) => {
+                          const media = selectedWork[field.kind];
+
+                          return (
+                            <section className="media-field" key={field.kind} style={{ "--media-aspect": field.aspect } as CSSProperties}>
+                              <header>
+                                <div>
+                                  <strong>{field.label}</strong>
+                                  <p>{field.hint}</p>
+                                </div>
+                                <button type="button" className="danger" disabled={!media?.url} onClick={() => clearWorkAsset(field.kind)}>
+                                  Remove
+                                </button>
+                              </header>
+                              <div className="media-preview">
+                                {media?.url ? <img src={media.url} alt={media.alt ?? selectedWork.title} /> : <span>No image</span>}
+                              </div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(event) => {
+                                  const input = event.currentTarget;
+                                  void uploadWorkAsset(field.kind, input.files?.[0]).finally(() => {
+                                    input.value = "";
+                                  });
+                                }}
+                              />
+                            </section>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    <section className="admin-panel work-editor-card">
+                      <header className="work-editor-card-header">
+                        <div>
+                          <p>Body</p>
+                          <h3>본문 에디터</h3>
+                        </div>
+                      </header>
+                      <EditorBoundary>
+                        <Suspense fallback={<div className="admin-editor-loading">Loading editor...</div>}>
+                          <BlockEditor
+                            blocks={selectedWork.blocks ?? []}
+                            onUpload={uploadAsset}
+                            onChange={(blocks: WorkBlock[]) => updateWorkLocal(selectedWork.id, { blocks })}
+                          />
+                        </Suspense>
+                      </EditorBoundary>
+                    </section>
+
+                    <div className="action-row sticky-actions work-editor-actions">
+                      <button type="button" className="primary-action" onClick={() => saveWork(selectedWork)}>
+                        Save work
                       </button>
-                      <button type="button" disabled={index === works.length - 1} onClick={() => persistWorkOrder(moveItem(works, work.id, 1))}>
-                        Down
+                      <button type="button" className="danger" onClick={deleteSelectedWork}>
+                        Delete work
                       </button>
                     </div>
-                  </article>
-                ))}
-              </div>
-            </aside>
-
-            {selectedWork ? (
-              <>
-                <section className="admin-panel work-editor">
-                  <div className="field-grid">
-                    <label>
-                      Title
-                      <input
-                        value={selectedWork.title}
-                        onChange={(event) =>
-                          updateWorkLocal(selectedWork.id, {
-                            title: event.target.value
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Slug
-                      <input
-                        value={selectedWork.slug}
-                        onChange={(event) => updateWorkLocal(selectedWork.id, { slug: slugify(event.target.value) })}
-                      />
-                    </label>
-                    <label>
-                      Category
-                      <select value={selectedWork.category} onChange={(event) => updateWorkLocal(selectedWork.id, { category: event.target.value as WorkCategory })}>
-                        <option>UI/UX</option>
-                        <option>BI/BX</option>
-                      </select>
-                    </label>
-                    <label>
-                      Year
-                      <input value={selectedWork.year} onChange={(event) => updateWorkLocal(selectedWork.id, { year: event.target.value })} />
-                    </label>
-                    <label>
-                      Client
-                      <input value={selectedWork.client} onChange={(event) => updateWorkLocal(selectedWork.id, { client: event.target.value })} />
-                    </label>
-                    <label>
-                      Role
-                      <input value={selectedWork.role} onChange={(event) => updateWorkLocal(selectedWork.id, { role: event.target.value })} />
-                    </label>
-                    <label className="full-field">
-                      Summary
-                      <textarea value={selectedWork.summary} onChange={(event) => updateWorkLocal(selectedWork.id, { summary: event.target.value })} />
-                    </label>
-                  </div>
-
-                  <div className="toggle-row">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={selectedWork.featured}
-                        onChange={(event) => updateWorkLocal(selectedWork.id, { featured: event.target.checked })}
-                      />
-                      Featured
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={selectedWork.published}
-                        onChange={(event) => updateWorkLocal(selectedWork.id, { published: event.target.checked })}
-                      />
-                      Published
-                    </label>
-                  </div>
-
-                  <div className="media-grid">
-                    {workMediaFields.map((field) => {
-                      const media = selectedWork[field.kind];
-
-                      return (
-                        <section className="media-field" key={field.kind} style={{ "--media-aspect": field.aspect } as CSSProperties}>
-                          <header>
-                            <div>
-                              <strong>{field.label}</strong>
-                              <p>{field.hint}</p>
-                            </div>
-                            <button type="button" className="danger" disabled={!media?.url} onClick={() => clearWorkAsset(field.kind)}>
-                              Remove
-                            </button>
-                          </header>
-                          <div className="media-preview">
-                            {media?.url ? <img src={media.url} alt={media.alt ?? selectedWork.title} /> : <span>No image</span>}
-                          </div>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(event) => {
-                              const input = event.currentTarget;
-                              void uploadWorkAsset(field.kind, input.files?.[0]).finally(() => {
-                                input.value = "";
-                              });
-                            }}
-                          />
-                        </section>
-                      );
-                    })}
-                  </div>
-
-                  <EditorBoundary>
-                    <Suspense fallback={<div className="admin-editor-loading">Loading editor...</div>}>
-                      <BlockEditor
-                        blocks={selectedWork.blocks ?? []}
-                        onUpload={uploadAsset}
-                        onChange={(blocks: WorkBlock[]) => updateWorkLocal(selectedWork.id, { blocks })}
-                      />
-                    </Suspense>
-                  </EditorBoundary>
-
-                  <div className="action-row sticky-actions">
-                    <button type="button" className="primary-action" onClick={() => saveWork(selectedWork)}>
-                      Save work
-                    </button>
-                    <button type="button" className="danger" onClick={deleteSelectedWork}>
-                      Delete work
-                    </button>
-                  </div>
-                </section>
-                <div
-                  aria-label="Resize live preview"
-                  aria-orientation="vertical"
-                  aria-valuemax={1160}
-                  aria-valuemin={260}
-                  aria-valuenow={workPreviewWidth}
-                  className="work-splitter"
-                  role="separator"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "ArrowLeft") {
-                      event.preventDefault();
-                      resizeWorkPreview(workPreviewWidth + 32);
-                    }
-                    if (event.key === "ArrowRight") {
-                      event.preventDefault();
-                      resizeWorkPreview(workPreviewWidth - 32);
-                    }
-                  }}
-                  onPointerDown={startWorkPreviewResize}
-                />
-                <WorkLivePreview work={selectedWork} />
-              </>
-            ) : (
-              <section className="admin-panel empty-panel">No work selected.</section>
-            )}
-          </section>
+                  </section>
+                  <div
+                    aria-label="Resize live preview"
+                    aria-orientation="vertical"
+                    aria-valuemax={1160}
+                    aria-valuemin={260}
+                    aria-valuenow={workPreviewWidth}
+                    className="work-splitter"
+                    role="separator"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowLeft") {
+                        event.preventDefault();
+                        resizeWorkPreview(workPreviewWidth + 32);
+                      }
+                      if (event.key === "ArrowRight") {
+                        event.preventDefault();
+                        resizeWorkPreview(workPreviewWidth - 32);
+                      }
+                    }}
+                    onPointerDown={startWorkPreviewResize}
+                  />
+                  <WorkLivePreview work={selectedWork} />
+                </>
+              ) : (
+                <section className="admin-panel empty-panel">No work selected.</section>
+              )}
+            </section>
+          )
         ) : null}
       </section>
       </main>

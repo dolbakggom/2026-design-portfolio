@@ -2,6 +2,76 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-14 Admin work editor unsaved guard
+
+### 요구사항
+- Admin 작업물 에디터에서 본문이나 상세 정보를 수정한 뒤 저장하지 않고 Work list로 돌아가거나 뒤로가기/닫기를 시도하면 저장 여부를 묻는 팝업을 띄웁니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - 서버에서 마지막으로 저장된 work snapshot과 현재 편집 중인 work snapshot을 비교해 `selectedWorkDirty` 상태를 계산합니다.
+  - Work list 버튼, sidebar tab 이동, browser back(popstate) 시 unsaved 상태면 `window.confirm`으로 저장 여부를 묻습니다.
+  - 확인을 누르면 현재 작업물을 저장한 뒤 이동하고, 취소를 누르면 에디터 화면에 머무릅니다.
+  - 브라우저 닫기/새로고침처럼 직접 저장 실행이 불가능한 이동에는 `beforeunload` 기본 경고를 띄웁니다.
+  - 저장, 신규 생성, 삭제, 최초 로드 후에는 saved snapshot을 갱신해 dirty 상태가 해제되도록 했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-14 Admin works management restructure
+
+### 요구사항
+- 기존 한 화면형 작업물 관리 구조를 버리고, 작업물 리스트 화면과 작업물 에디터/미리보기 화면으로 나눕니다.
+- 작업물 리스트는 public WORK gallery 카드 구조를 재사용하되 category filter는 제외하고, 카드 제목 아래에 작은 category label을 표시합니다.
+- 작업물 카드를 드래그하면 순서 배치 모드가 되고, 변경된 순서가 public gallery 순서에도 반영되도록 저장합니다.
+- 작업물 에디터는 기본 정보, 썸네일 설정, 본문 에디터를 각각 카드로 묶습니다.
+- 본문 블록별 width 설정은 제거하고, 본문 에디터 전체 content width를 일괄 조정하는 방식으로 바꿉니다.
+- 본문 블록 순서는 Up/Down 버튼 대신 우측 햄버거 handle drag로 변경합니다.
+- 우측 live preview는 유지합니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - Works tab에 `workScreen` 상태를 추가해 `list`와 `editor` 화면을 분리했습니다.
+  - 리스트 화면은 `.work-grid`, `.work-tile`, `.work-tile-media` 계열 public gallery class를 재사용합니다.
+  - 작업물 카드는 native drag/drop으로 재정렬하고, drop 종료 시 `/api/admin/reorder`에 `type: "works"`로 저장합니다.
+  - 에디터 화면은 `works-editor-layout` 안에 좌측 scroll editor, splitter, 우측 `WorkLivePreview` 구조를 유지합니다.
+  - 에디터 좌측은 Basic, Images, Body editor 카드로 분리했습니다.
+  - 더 이상 사용하지 않는 timeline reorder helper와 work Up/Down 목록 구조를 제거했습니다.
+- `src/components/admin/BlockEditor.tsx`
+  - block-level width select를 제거했습니다.
+  - toolbar에 `Content width` select를 추가해 heading/paragraph/quote block의 `blockWidth`를 일괄 업데이트합니다.
+  - 각 editor block 우측에 draggable hamburger handle을 추가하고, native drag/drop으로 block 배열 순서를 변경합니다.
+- `src/styles/admin.css`
+  - Gemini가 조정한 white surface + green accent 스타일을 유지하면서 Works list grid, editor card layout, drag states, block drag handle 스타일을 추가했습니다.
+  - 이전 sidebar list 방식의 `.work-list`/`.work-select` 스타일은 제거했습니다.
+
+### 검증
+- `npm run build` 통과
+- `git diff --check` 통과
+
+## 2026-05-14 Floating top button tab style
+
+### 요구사항
+- Gemini가 조정한 admin page CSS 스타일을 이후 작업에서 보존합니다.
+- Public page floating top button을 첨부 reference처럼 오른쪽 edge에 붙은 흰색 tab 형태로 변경합니다.
+- Hover/focus/active 상태에서는 main accent color로 바뀌고, arrow는 흰색으로 바뀌어야 합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `.floating-top-button`을 원형 floating button에서 right edge에 붙는 rounded-left tab 형태로 변경했습니다.
+  - 기본 상태는 48px white surface + black arrow + soft shadow입니다.
+  - hover/focus/active 상태는 `var(--color-acid)` 배경과 white arrow를 사용합니다.
+  - mobile width에서도 같은 48px 기준 크기를 유지합니다.
+- Admin CSS 참고 상태
+  - Gemini 수정본은 white surface, light gray background, green accent, soft card shadow 중심입니다.
+  - 이후 admin 수정 시 기존 pastel/dark sidebar 스타일로 되돌리지 않도록 주의하세요.
+
+### 검증
+- `npm run build` 통과
+  - 현재 admin 작업 변경분에서 `persistTimelineOrder`, `index` unused hint 2개가 표시되지만 build는 성공합니다.
+- `git diff --check` 통과
+
 ## 2026-05-14 Small viewport snap and detail polish
 
 ### 요구사항

@@ -1,3 +1,5 @@
+import { useState } from "react";
+import type { DragEvent } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -20,6 +22,7 @@ const lineHeightOptions = ["1.3", "1.5", "1.7", "1.9"];
 const paragraphGapOptions = ["0px", "10px", "18px", "28px"];
 const blockWidthOptions = ["680px", "880px", "1080px", "100%"];
 const alignOptions = ["left", "center"];
+const textBlockTypes = new Set<WorkBlockType>(["heading", "paragraph", "quote"]);
 
 const newBlock = (type: WorkBlockType): WorkBlock => ({
   id: crypto.randomUUID(),
@@ -40,6 +43,17 @@ const newBlock = (type: WorkBlockType): WorkBlock => ({
             },
   sortOrder: 0
 });
+
+const reorderBlocks = (items: WorkBlock[], activeId: string, overId: string) => {
+  if (activeId === overId) return items;
+  const index = items.findIndex((item) => item.id === activeId);
+  const target = items.findIndex((item) => item.id === overId);
+  if (index < 0 || target < 0) return items;
+  const next = [...items];
+  const [item] = next.splice(index, 1);
+  next.splice(target, 0, item);
+  return next;
+};
 
 const htmlFromBlock = (block: WorkBlock) => {
   const value = block.content.html;
@@ -117,7 +131,11 @@ function RichTextBlock({
 }
 
 export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
+  const [draggedBlockId, setDraggedBlockId] = useState("");
+  const [dragOverBlockId, setDragOverBlockId] = useState("");
   const normalized = blocks.map((block, index) => ({ ...block, sortOrder: index + 1 }));
+  const textBlocks = normalized.filter((block) => textBlockTypes.has(block.type));
+  const editorWidth = textBlocks[0] ? optionFromBlock(textBlocks[0], "blockWidth", blockWidthOptions, "880px") : "880px";
 
   const updateBlock = (updated: WorkBlock) => {
     onChange(normalized.map((block) => (block.id === updated.id ? updated : block)));
@@ -134,21 +152,49 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
   };
 
   const removeBlock = (id: string) => {
+    if (!window.confirm("정말 삭제하시겠습니까?")) return;
     onChange(normalized.filter((block) => block.id !== id));
-  };
-
-  const moveBlock = (id: string, direction: -1 | 1) => {
-    const index = normalized.findIndex((block) => block.id === id);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= normalized.length) return;
-    const next = [...normalized];
-    const [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
-    onChange(next);
   };
 
   const addBlock = (type: WorkBlockType) => {
     onChange([...normalized, newBlock(type)]);
+  };
+
+  const updateEditorWidth = (value: string) => {
+    onChange(
+      normalized.map((block) =>
+        textBlockTypes.has(block.type)
+          ? {
+              ...block,
+              content: {
+                ...block.content,
+                blockWidth: value
+              }
+            }
+          : block
+      )
+    );
+  };
+
+  const startBlockDrag = (event: DragEvent<HTMLButtonElement>, id: string) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    setDraggedBlockId(id);
+    setDragOverBlockId(id);
+  };
+
+  const moveDraggedBlock = (event: DragEvent<HTMLElement>, overId: string) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverBlockId(overId);
+
+    if (!draggedBlockId || draggedBlockId === overId) return;
+    onChange(reorderBlocks(normalized, draggedBlockId, overId));
+  };
+
+  const finishBlockDrag = () => {
+    setDraggedBlockId("");
+    setDragOverBlockId("");
   };
 
   const uploadForBlock = async (block: WorkBlock, file: File | undefined, alt?: string) => {
@@ -196,19 +242,38 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
         <button type="button" onClick={() => addBlock("quote")}>
           Quote
         </button>
+        <label className="block-width-control">
+          Content width
+          <select value={editorWidth} onChange={(event) => updateEditorWidth(event.target.value)}>
+            {blockWidthOptions.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="block-list">
-        {normalized.map((block, index) => (
-          <article className="editor-block" key={block.id}>
+        {normalized.map((block) => (
+          <article
+            className={`editor-block ${draggedBlockId === block.id ? "is-dragging" : ""} ${dragOverBlockId === block.id && draggedBlockId !== block.id ? "is-drag-over" : ""}`}
+            key={block.id}
+            onDragOver={(event) => moveDraggedBlock(event, block.id)}
+            onDrop={finishBlockDrag}
+          >
             <header>
               <strong>{block.type}</strong>
-              <div>
-                <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={index === 0}>
-                  Up
-                </button>
-                <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={index === normalized.length - 1}>
-                  Down
+              <div className="editor-block-actions">
+                <button
+                  type="button"
+                  className="block-drag-handle"
+                  draggable
+                  aria-label={`${block.type} 블록 순서 이동`}
+                  onDragStart={(event) => startBlockDrag(event, block.id)}
+                  onDragEnd={finishBlockDrag}
+                >
+                  ☰
                 </button>
                 <button type="button" className="danger" onClick={() => removeBlock(block.id)}>
                   Delete
@@ -240,16 +305,6 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
                     </select>
                   </label>
                 ) : null}
-                <label>
-                  Width
-                  <select value={optionFromBlock(block, "blockWidth", blockWidthOptions, "880px")} onChange={(event) => updateContent(block, "blockWidth", event.target.value)}>
-                    {blockWidthOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <label>
                   Align
                   <select value={optionFromBlock(block, "align", alignOptions, "left")} onChange={(event) => updateContent(block, "align", event.target.value)}>
@@ -315,6 +370,7 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
                         <button
                           type="button"
                           onClick={() => {
+                            if (!window.confirm("정말 삭제하시겠습니까?")) return;
                             const images = Array.isArray(block.content.images) ? [...block.content.images] : [];
                             images.splice(imageIndex, 1);
                             updateBlock({ ...block, content: { ...block.content, images } });
