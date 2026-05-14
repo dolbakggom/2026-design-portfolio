@@ -880,10 +880,16 @@ input[type="file"] {
 
 .sticky-actions {
   position: sticky;
-  bottom: 0;
-  border-top: 1px solid var(--admin-border);
-  padding: 14px 0 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--admin-surface) 38%);
+  bottom: 24px;
+  border-top: none;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.sticky-actions > * {
+  pointer-events: auto;
 }
 
 .empty-panel {

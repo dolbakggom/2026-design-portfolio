@@ -944,7 +944,7 @@ export default function AdminApp() {
             </div>
             </section>
 
-            <div className="action-row sticky-actions" style={{ borderTop: 0, paddingBottom: "24px" }}>
+            <div className="action-row sticky-actions">
               <button type="button" className="primary-action" onClick={saveProfile}>
                 Save profile
               </button>
