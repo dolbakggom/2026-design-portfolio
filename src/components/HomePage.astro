@@ -16,6 +16,7 @@ const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
 const phoneLink = profile.links.find((link) => link.url.startsWith("tel:") || /010[-\d]+/.test(link.label));
 const locationLink = profile.links.find((link) => link.label.includes("서울") || link.label.toLowerCase() === "location");
 const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
+const mobileIdentityTravelSvh = Math.max(330, 190 + timeline.length * 34);
 const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.[0] ?? "2026";
 ---
 
@@ -33,7 +34,13 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       </div>
     </section>
 
-    <section class="identity-section snap-panel" id="about" data-identity data-route="/about" style={`min-height:${identityTravelSvh}svh;`}>
+    <section
+      class="identity-section snap-panel"
+      id="about"
+      data-identity
+      data-route="/about"
+      style={`--identity-travel:${identityTravelSvh}svh; --identity-mobile-travel:${mobileIdentityTravelSvh}svh;`}
+    >
       <div class="identity-stage">
         <div class="identity-copy">
           <img class="profile-logo" src={logoSrc} alt="" />
@@ -365,6 +372,31 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const featuredPanels = gsap.utils.toArray<HTMLElement>("[data-featured-panel]");
     const featuredDots = gsap.utils.toArray<HTMLElement>("[data-featured-dot]");
     const featuredStage = document.querySelector<HTMLElement>(".featured-stage");
+    const mobileIdentityQuery = window.matchMedia("(max-width: 1180px)");
+
+    const isMobileIdentityLayout = () => mobileIdentityQuery.matches;
+
+    const setCareerListStage = (visible: boolean, immediate = false) => {
+      identity?.classList.toggle("is-career-list", visible);
+      if (!careerList) return;
+
+      const values = {
+        autoAlpha: visible ? 1 : 0,
+        x: visible ? 0 : 64,
+        filter: visible ? "blur(0px)" : "blur(12px)"
+      };
+
+      if (immediate || reduceMotion) {
+        gsap.set(careerList, values);
+        return;
+      }
+
+      gsap.to(careerList, {
+        ...values,
+        duration: 0.26,
+        overwrite: true
+      });
+    };
 
     if (!reduceMotion) {
       [aboutCopy, careerCopy].forEach((element) => {
@@ -374,8 +406,8 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       gsap.set([profileLogo, profileContact, profileMedia], { autoAlpha: 0 });
       gsap.set(profileLogo, { y: 18, filter: "brightness(0) blur(12px)" });
       gsap.set(profileContact, { y: 24 });
-      gsap.set(profileMedia, { clipPath: "inset(10% 0% 10% 100%)", scale: 1.08, filter: "blur(10px)" });
-      gsap.set(careerList, { autoAlpha: 0, x: 64, filter: "blur(12px)" });
+      gsap.set(profileMedia, { "--profile-media-enter-blur": "18px", clipPath: "inset(0% 0% 0% 0%)", scale: 1.04, filter: "blur(18px)" });
+      setCareerListStage(false, true);
     }
 
     const playAboutIntro = () => {
@@ -388,7 +420,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       timeline
         .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.72, ease: "power3.out" })
         .add(() => typeElement(aboutCopy, 24), "-=0.06")
-        .to(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)", duration: 1.12, ease: "power4.out" }, "<")
+        .to(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: 1.16, ease: "power3.out" }, "<")
         .to(profileContact, { autoAlpha: 1, y: 0, duration: 0.62, ease: "power3.out" }, "+=0.24");
     };
 
@@ -400,6 +432,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       if (!identity) return;
       const isCareer = mode === "career";
       identity.classList.toggle("is-career", isCareer);
+      if (!isCareer) {
+        identity.classList.remove("is-career-list");
+      }
 
       if (isCareer && careerCopy) {
         typeElement(careerCopy, 24);
@@ -417,6 +452,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
     const careerStartProgress = 0.38;
     const careerEndProgress = 0.92;
+    const careerListStartProgress = careerStartProgress + (careerEndProgress - careerStartProgress) * 0.34;
 
     const setActiveFeatured = (activeIndex: number) => {
       featuredPanels.forEach((panel, index) => {
@@ -436,16 +472,14 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         onEnter: playAboutIntro,
         onEnterBack: playAboutIntro,
         onUpdate: (self) => {
+          const mobileIdentity = isMobileIdentityLayout();
           const showCareer = self.progress >= careerStartProgress * 0.92;
-          const careerProgress = gsap.utils.clamp(0, 1, (self.progress - careerStartProgress) / (careerEndProgress - careerStartProgress));
-          setIdentityMode(showCareer ? "career" : "about", careerProgress);
-          gsap.to(careerList, {
-            autoAlpha: showCareer ? 1 : 0,
-            x: showCareer ? 0 : 64,
-            filter: showCareer ? "blur(0px)" : "blur(12px)",
-            duration: 0.26,
-            overwrite: true
-          });
+          const showCareerList = showCareer && (!mobileIdentity || self.progress >= careerListStartProgress);
+          const timelineProgress = mobileIdentity
+            ? (showCareerList ? gsap.utils.clamp(0, 1, (self.progress - careerListStartProgress) / (careerEndProgress - careerListStartProgress)) : 0)
+            : gsap.utils.clamp(0, 1, (self.progress - careerStartProgress) / (careerEndProgress - careerStartProgress));
+          setIdentityMode(showCareer ? "career" : "about", timelineProgress);
+          setCareerListStage(showCareerList);
         }
       }));
     }
@@ -568,11 +602,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
             gsap.set(profileContact, { autoAlpha: 1, y: 0, filter: "blur(0px)" });
           }
           if (profileMedia) {
-            gsap.set(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
+            gsap.set(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
           }
-          if (careerList) {
-            gsap.to(careerList, { autoAlpha: 0, x: 64, filter: "blur(12px)", duration: 0.25, overwrite: true });
-          }
+          setCareerListStage(false);
         } else {
           playAboutIntro();
         }
@@ -589,11 +621,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           gsap.set(profileContact, { autoAlpha: 0, y: 24 });
         }
         if (profileMedia) {
-          gsap.set(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
+          gsap.set(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
         }
-        if (careerList) {
-          gsap.set(careerList, { autoAlpha: 1, x: 0, filter: "blur(0px)" });
-        }
+        setCareerListStage(target.kind === "career" || !isMobileIdentityLayout(), true);
         setIdentityMode("career", target.kind === "careerEntry" ? 0 : 0.999);
       }
     };
@@ -991,12 +1021,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           gsap.set(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)" });
         }
         if (profileMedia) {
-          gsap.set(profileMedia, { autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
+          gsap.set(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
         }
-        if (careerList) {
-          gsap.set(careerList, { autoAlpha: 1, x: 0, filter: "blur(0px)" });
-        }
-        setIdentityMode("career", 0);
+        setCareerListStage(!isMobileIdentityLayout(), true);
+        setIdentityMode("career", isMobileIdentityLayout() ? 0 : 0.999);
       }
       ScrollTrigger.refresh();
       if (initialSection === "work") {

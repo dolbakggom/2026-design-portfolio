@@ -2,6 +2,174 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-18 Mobile career timeline pacing
+
+### 요구사항
+- 모바일 career에서 timeline point들이 한 번에 빠르게 지나가는 느낌을 줄이고, 데스크톱처럼 항목이 하나씩 이동하는 체감으로 조정합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 모바일 identity travel 높이를 `mobileIdentityTravelSvh`로 별도 계산해 1180px 이하에서 더 긴 scroll range를 확보했습니다.
+  - 모바일 timeline active progress는 career intro 시작점이 아니라 timeline list가 실제로 보이는 `careerListStartProgress`부터 0으로 시작하도록 분리했습니다.
+  - 이에 따라 리스트가 보이기 전에 point가 미리 넘어가는 문제를 줄였습니다.
+- `src/styles/global.css`
+  - `.identity-section` 기본 높이를 `--identity-travel` 변수로 받고, 1180px 이하에서는 `--identity-mobile-travel`을 사용하도록 변경했습니다.
+
+### 검증
+- `npm run build` 통과
+
+## 2026-05-18 Identity mobile breakpoint unification
+
+### 요구사항
+- 1180px 미만에서 about/career가 어색한 세로 배치로 전환되는 문제를 없애고, 이 구간도 모바일형 배경 이미지 레이아웃으로 통합합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `mobileIdentityQuery` 기준을 `max-width: 760px`에서 `max-width: 1180px`로 변경했습니다.
+  - 이에 따라 1180px 이하에서는 career intro 단계와 career list 단계가 모바일형으로 분리됩니다.
+- `src/styles/global.css`
+  - 기존 `@media (max-width: 1180px)`의 중간 세로 배치 규칙을 제거하고, identity 모바일 배경 이미지 레이아웃을 이 breakpoint로 이동했습니다.
+  - `@media (max-width: 760px)`에는 작은 화면 보정과 work/gallery 관련 compact 스타일만 남겼습니다.
+
+### 검증
+- `npm run build` 통과
+
+## 2026-05-18 Revert profile media CSS variable cleanup
+
+### 요구사항
+- 모바일 profile media의 `!important` 제거를 위해 CSS variable 중심으로 정리했으나, home scroll/career background 상태가 기존 GSAP 제어 방식에 의존해 스크롤 전환과 데스크톱 career 배경 밝기가 흔들렸습니다.
+- 안정적으로 동작하던 GSAP 기반 profile media 제어로 되돌립니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `profileMedia`는 다시 GSAP `autoAlpha`, `scale`, `filter` inline 제어를 사용합니다.
+  - 등장 blur만 모바일 CSS와 합성하기 위해 `--profile-media-enter-blur` 변수는 유지합니다.
+- `src/styles/global.css`
+  - 데스크톱 career profile background는 다시 `opacity: 0.16 !important`, `grayscale(1) contrast(1.1) blur(2px)` 조합으로 복구했습니다.
+  - 모바일 profile background는 GSAP inline filter를 이겨야 하므로 `!important`를 유지합니다.
+
+### 검증
+- `npm run build` 통과
+
+## 2026-05-18 Profile image blur entrance
+
+### 요구사항
+- About 진입 시 프로필 사진이 열리는 듯한 clip reveal보다 blur로 자연스럽게 뜨도록 변경합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `profileMedia` 초기 상태를 clip reveal 대신 `autoAlpha: 0`, `blur(18px)`, 약한 scale 상태로 두고, about intro에서 opacity/blur/scale로 등장하게 바꿨습니다.
+  - 모바일에서는 CSS filter가 `!important`로 배경 밝기를 유지하므로 `--profile-media-enter-blur` CSS 변수를 같이 애니메이션합니다.
+- `src/styles/global.css`
+  - 모바일 profile background filter에 `var(--profile-media-enter-blur)`를 합성해 모바일에서도 blur entrance가 보이게 했습니다.
+
+### 검증
+- `npm run build` 통과
+
+## 2026-05-18 Mobile about/career layout split
+
+### 요구사항
+- PC/mobile 2가지 레이아웃을 유지하면서 모바일 about/career 표현을 다시 잡습니다.
+- 모바일 about에서는 프로필 이미지를 어둡게 처리한 배경 이미지로 깔고, 텍스트는 흰색으로 올립니다.
+- 모바일 career는 같은 배경 이미지 위에서 2단계로 나눕니다.
+  - 첫 단계: career 소개 문구만 표시
+  - 다음 스크롤 단계: timeline 이력만 full로 표시
+
+### 구현
+- `src/components/HomePage.astro`
+  - `max-width: 760px` media query 상태를 JS에서 감지해 mobile identity layout 여부를 판단합니다.
+  - `is-career-list` 클래스를 추가해 career intro 단계와 career list 단계를 분리했습니다.
+  - PC에서는 기존처럼 career 진입 시 copy와 timeline을 함께 노출하고, 모바일에서만 timeline 노출 시점을 뒤로 미뤘습니다.
+- `src/styles/global.css`
+  - 모바일에서 `.identity-side`/`.profile-media`를 stage 전체 배경 레이어로 전환했습니다.
+  - about/career copy를 흰색 텍스트로 바꾸고, profile image에는 어두운 overlay와 brightness/filter를 적용했습니다.
+  - 모바일 career list 단계에서는 copy panel을 숨기고 `.timeline-items`만 같은 배경 위에 표시되게 했습니다.
+  - 모바일 sticky stage는 `overflow: hidden`으로 닫아 좁은 세로 화면에서 아래 섹션이 비치지 않도록 했습니다.
+
+### 검증
+- `npm run build` 통과
+
+## 2026-05-18 Featured work readability blur
+
+### 요구사항
+- Featured work 썸네일 위 텍스트 시인성을 높이기 위해 좌상단에서 우하단으로 흐르는 gradient blur를 추가합니다.
+- 모바일에서는 상단 텍스트 영역이 더 잘 보이도록 blur mask 각도와 범위를 다르게 적용합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `.featured-work .work-visual::after`에 masked `backdrop-filter` 레이어를 추가했습니다.
+  - 기존 featured panel 전환용 `.featured-link::before` blur와 overlay gradient는 그대로 유지했습니다.
+  - `max-width: 760px`에서는 더 세로 방향에 가까운 mask를 적용해 모바일 상단 copy 뒤쪽 blur 영역을 넓혔습니다.
+
+### 검증
+- `npm run build` 통과
+
+## 2026-05-18 Remote D1/R2 to local sync
+
+### 요구사항
+- 배포 사이트에서 쓰는 Cloudflare D1과 R2 데이터를 현재 로컬 개발 환경으로 동기화해 dev 서버와 퍼블리싱 상태를 맞춥니다.
+
+### 구현
+- Cloudflare Wrangler OAuth session이 만료되어 `npx wrangler login`으로 다시 로그인했습니다.
+- `npx wrangler d1 export portfolio-db --local --output d1-backups/local-before-sync-2026-05-18.sql --skip-confirmation`
+  - 기존 local D1을 먼저 백업했습니다.
+- `npx wrangler d1 export portfolio-db --remote --output d1-backups/remote-prod-2026-05-18.sql --skip-confirmation`
+  - remote D1 production dump를 받았습니다.
+- `d1-backups/reset-local-before-import-2026-05-18.sql`
+  - local D1의 기존 테이블을 drop하는 reset SQL을 만들었습니다.
+- `npx wrangler d1 execute portfolio-db --local --file d1-backups/reset-local-before-import-2026-05-18.sql --yes`
+  - local D1 테이블을 초기화했습니다.
+- `npx wrangler d1 execute portfolio-db --local --file d1-backups/remote-prod-2026-05-18.sql --yes`
+  - remote D1 dump를 local D1에 import했습니다.
+- `d1-backups/sync-r2-from-d1-export-2026-05-18.mjs`
+  - remote D1 dump의 `assets.r2_key` 값을 기준으로 R2 object 30개를 remote `portfolio-media`에서 내려받고 local `portfolio-media`에 업로드했습니다.
+  - 다운로드 백업은 `r2-backups/remote-prod-2026-05-18/`에 남겼습니다.
+
+### 검증
+- import 후 local D1 주요 row count:
+  - `assets`: 30
+  - `works`: 7
+  - `timeline_items`: 5
+  - `work_blocks`: 0
+  - `d1_migrations`: 4
+- local R2 sample object 확인:
+  - `uploads/2026/05/35a1acf4-035f-421c-9513-d9427197e099-poster-sdr.png`
+  - `/private/tmp/r2-sync-check-poster.png`로 다운로드 성공, 파일 크기 1.5M
+
+### 주의
+- Wrangler `r2 object` 명령에는 전체 object list 기능이 없어 D1 `assets` 테이블에 기록된 R2 key만 동기화했습니다.
+- D1에서 참조하지 않는 orphan R2 object가 있으면 이번 동기화에는 포함되지 않습니다.
+- `d1-backups/`와 `r2-backups/`는 로컬 백업/동기화 산출물입니다.
+
+## 2026-05-14 Remote D1 to local D1 sync
+
+### 요구사항
+- 배포 사이트에서 쓰는 remote D1 DB 내용을 현재 로컬 개발 D1과 동기화합니다.
+
+### 구현
+- `npx wrangler d1 export portfolio-db --local --output d1-backups/local-before-sync-2026-05-14.sql --skip-confirmation`
+  - 기존 로컬 D1을 먼저 SQL로 백업했습니다.
+- `npx wrangler d1 export portfolio-db --remote --output d1-backups/remote-prod-2026-05-14.sql --skip-confirmation`
+  - Cloudflare remote D1을 SQL로 export했습니다.
+- `d1-backups/reset-local-before-import-2026-05-14.sql`
+  - local D1의 기존 테이블을 drop하는 reset SQL을 만들었습니다.
+- `npx wrangler d1 execute portfolio-db --local --file d1-backups/reset-local-before-import-2026-05-14.sql --yes`
+  - local D1 테이블을 초기화했습니다.
+- `npx wrangler d1 execute portfolio-db --local --file d1-backups/remote-prod-2026-05-14.sql --yes`
+  - remote D1 dump를 local D1에 import했습니다.
+
+### 검증
+- import 후 local D1 주요 row count:
+  - `assets`: 30
+  - `works`: 7
+  - `timeline_items`: 5
+  - `work_blocks`: 0
+  - `d1_migrations`: 4
+
+### 주의
+- 이 동기화는 D1 metadata/data만 복사합니다. R2의 실제 이미지 바이너리는 별도 저장소라 필요 시 따로 동기화해야 합니다.
+- `d1-backups/`는 로컬 백업/덤프용 untracked 폴더입니다.
+
 ## 2026-05-14 About intro paragraph gap
 
 ### 요구사항
