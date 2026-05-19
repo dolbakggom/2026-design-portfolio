@@ -1690,6 +1690,23 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .work-hero {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    align-items: start;
+    padding: 44px 0 42px;
+  }
+
+  .work-meta {
+    width: 100%;
+    gap: 14px;
+  }
+
+  .work-meta div:first-child {
+    border-top: 1px solid var(--color-line);
+    padding-top: 14px;
+  }
+
   .work-detail,
   .not-found {
     width: min(100% - 32px, 1180px);

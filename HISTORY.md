@@ -2,6 +2,58 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-19 Mobile scroll audit handoff
+
+### 요구사항
+- Safari/Chrome 구분 없이 모바일 스크롤 로직을 검수하고 자기검증합니다.
+- 필요하면 설치된 Chrome 확장/브라우저 환경을 활용해 직접 확인합니다.
+
+### 검수 내용
+- `src/components/HomePage.astro`
+  - Safari/iOS WebKit에서는 `ScrollTrigger.observe({ preventDefault: true })`를 쓰지 않고 native wheel/touch fallback으로 처리하는 현재 분기를 확인했습니다.
+  - gallery/free-scroll 범위에서는 observer가 비활성화되고, snap boundary에서만 다시 section 전환이 걸리는 구조를 확인했습니다.
+  - `/work` history back/forward 복귀 시 기존 scrollY가 있으면 초기 gallery top 강제 이동을 건너뛰는 guard를 확인했습니다.
+  - floating top button은 GSAP `overwrite: true`, snap observer disable, temporary `scrollSnapType = "none"` 복구 흐름을 유지하고 있습니다.
+- `src/styles/global.css`
+  - 모바일 detail에서 `.work-hero`와 `.work-meta`가 세로로 쌓이도록 조정한 상태입니다.
+  - 모바일 viewport 높이는 `100dvh` 지원 환경에서 `--snap-viewport-height`를 따라가도록 되어 있습니다.
+
+### 직접 확인
+- Chrome DevTools device toolbar에서 iPhone 14 Pro Max, 430 x 932 환경으로 확인했습니다.
+- 확인 흐름:
+  - intro -> about cover 전환 정상
+  - about -> career 진입 정상
+  - career timeline point가 순차적으로 이동하는 것 확인
+  - career -> work cover 전환 정상
+  - work intro -> featured work 3개 카드 순차 이동 정상
+  - featured -> gallery 진입 후 `is-free-scroll` 상태에서 native gallery scroll 정상
+  - gallery 위쪽 boundary에서 featured로 되돌아가는 흐름 확인
+  - featured의 `Orbit Brand`에서 detail 진입 후 브라우저 뒤로가기로 같은 featured 카드 위치에 복귀하는 것 확인
+  - mobile detail에서 hero copy와 meta가 세로 배치로 보이는 것 확인
+
+### 검증
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+- `git diff --check` 통과
+
+### 다음 작업 주의
+- Chrome mobile emulation으로는 실제 iOS Safari의 하단 주소창 collapse/expand를 완전히 재현할 수 없습니다. 해당 증상이 다시 나오면 실제 iPhone Safari 또는 Safari Web Inspector 기준으로 추가 확인이 필요합니다.
+- 현재 커밋 전 변경 파일은 `HISTORY.md`, `src/styles/global.css`입니다.
+
+## 2026-05-19 Mobile work detail hero/meta stack
+
+### 요구사항
+- 모바일에서 작업물 detail 페이지에 들어가면 hero copy와 work meta가 좌우 정렬로 보여 읽기 어렵기 때문에 세로 배치로 변경합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `@media (max-width: 760px)`에서 `.work-hero`를 1열 grid로 전환했습니다.
+  - `.work-meta`가 hero copy 아래에 전체 폭으로 이어지도록 폭/간격을 보정했습니다.
+  - 첫 meta row에도 상단 구분선을 넣어 본문과 메타 정보가 모바일에서 자연스럽게 분리되도록 했습니다.
+
+### 검증
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+- `git diff --check` 통과
+
 ## 2026-05-19 Career/Work cover transition
 
 ### 요구사항
