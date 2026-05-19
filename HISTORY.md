@@ -2,6 +2,63 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-19 Career/Work cover transition
+
+### 요구사항
+- career에서 work intro로 넘어갈 때도 기존 슬라이드 전환이 아니라, work 섹션이 career 위에 덮이는 방식으로 전환합니다.
+- 반대로 work intro에서 career로 올라갈 때는 work cover가 치워지며 career가 드러나야 합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `snapCareerWorkCover()`를 추가해 career ↔ work boundary에서만 별도 cover transition을 실행합니다.
+  - career → work에서는 현재 career stage를 fixed underlay 복제본으로 깔고, work intro 복제본을 아래에서 위로 올려 덮습니다.
+  - work → career에서는 work intro 복제본을 화면 위에 둔 상태로 실제 스크롤 위치를 career로 복원한 뒤, work cover를 아래로 내리며 치웁니다.
+  - 실제 `#work` 섹션을 fixed로 바꾸지 않고 복제본만 움직여서, 전환 중 문서 높이와 snap offset이 흔들리지 않게 했습니다.
+  - career underlay는 부모 `.identity-section`의 `is-career`/`is-career-list` 상태를 잃지 않도록 복제본에 같은 상태 클래스를 붙입니다.
+- `src/styles/global.css`
+  - `.career-work-cover-underlay`와 `.work-cover-panel` fixed layer 스타일을 추가했습니다.
+  - 원본 `.identity-stage`, `.work-intro-section`의 position 규칙에 덮이지 않도록 cover selector 명시도를 높였습니다.
+  - `.career-work-cover-underlay.is-career` 상태에서도 timeline heading, profile intro/contact/media, 모바일 timeline visibility가 원본 career 상태와 동일하게 보이도록 selector를 추가했습니다.
+
+### 검증
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+- `git diff --check` 통과
+
+## 2026-05-19 Safari work back scroll restoration
+
+### 요구사항
+- Safari에서 `/work` gallery/featured 위치에서 작업물 detail로 들어갔다가 뒤로가기를 하면, 처음에는 이전 클릭 위치로 돌아오는 듯하다가 잠시 후 위쪽으로 스크롤이 올라가는 문제를 수정합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `/work` route는 shared `HomePage`를 `initialSection="work"`로 열면서 120ms 뒤 gallery top으로 강제 이동하는 초기화가 있습니다.
+  - Safari의 history scroll restoration이 먼저 이전 클릭 위치를 복원한 뒤, 이 초기화가 다시 gallery top으로 보내면서 점프가 발생하는 구조였습니다.
+  - `performance.getEntriesByType("navigation")[0].type === "back_forward"`인 history traversal에서, 이미 `window.scrollY > 0`으로 복원된 상태라면 `/work` 초기 강제 스크롤을 건너뛰고 `is-free-scroll` 상태만 맞추도록 변경했습니다.
+  - 직접 `/work`로 진입하거나 복원된 scrollY가 없는 경우에는 기존처럼 gallery top으로 이동합니다.
+
+### 검증
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+- `git diff --check` 통과
+
+## 2026-05-19 Intro/About cover transition
+
+### 요구사항
+- intro에서 about으로 넘어갈 때 기존의 일반 스크롤 슬라이드처럼 밀리는 전환이 아니라, about 섹션이 intro 위를 덮는 방식으로 보이게 수정합니다.
+- about에서 intro로 올라갈 때는 덮였던 about 패널이 아래로 치워지며 intro가 드러나는 반대 방향 전환으로 동작해야 합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `snapToTarget()` 안에서 intro ↔ about 이동만 별도 `snapIntroAboutCover()` 경로로 처리했습니다.
+  - intro는 실제 레이아웃을 고정시키지 않고 복제한 fixed underlay를 만들어 배경에 깔아, 문서 흐름과 offset 계산이 흔들리지 않게 했습니다.
+  - 실제 `.identity-stage`를 fixed cover panel로 올린 뒤 `yPercent`를 GSAP으로 제어해 intro → about은 아래에서 위로 덮고, about → intro는 아래로 빠지며 치워지게 했습니다.
+  - 전환 완료 후에는 fixed class, transform, 복제 underlay를 모두 정리하고 기존 ScrollTrigger/snap 상태 동기화를 호출합니다.
+- `src/styles/global.css`
+  - `.intro-cover-underlay`와 `.identity-stage.is-cover-panel` fixed layer 스타일을 추가했습니다.
+
+### 검증
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+- `git diff --check` 통과
+
 ## 2026-05-19 Mobile Safari dynamic viewport height
 
 ### 요구사항
