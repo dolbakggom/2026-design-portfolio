@@ -2,6 +2,22 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-19 Mobile Safari dynamic viewport height
+
+### 요구사항
+- 모바일 Safari에서 스크롤 후 하단 주소창이 내려가 viewport가 커졌을 때, full-screen 섹션이 여전히 작은 `svh` 기준으로 남아 하단 주소창 영역만큼 검정 배경이 보이는 문제를 수정합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `--snap-panel-height` 계산 기준을 `--snap-viewport-height` 변수로 분리했습니다.
+  - 기본값은 기존처럼 `100svh`를 유지합니다.
+  - `@supports (height: 100dvh)`와 `@media (max-width: 1180px)` 조건에서만 `--snap-viewport-height: 100dvh`를 적용해 모바일/태블릿 레이아웃이 Safari 주소창 collapse 후 실제 viewport 높이를 따라가게 했습니다.
+  - `--snap-panel-offset`은 `--snap-panel-height`의 음수값으로 계산해 featured sticky offset도 같은 높이 기준을 쓰게 했습니다.
+  - `.profile-media img`의 min-height도 `100svh` 고정값 대신 `--snap-panel-height`를 따르게 했습니다.
+
+### 검증
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+
 ## 2026-05-19 Safari physical mouse wheel fix
 
 ### 요구사항
@@ -9,9 +25,9 @@
 
 ### 구현
 - `src/styles/global.css`
-  - WebKit(Safari) 환경에서 `::-webkit-scrollbar { width: 0; height: 0; display: none; }` 등 스크롤바의 크기를 없애거나 숨기는 CSS가 적용되면, 터치패드는 정상 작동하지만 일반 물리 마우스 휠(Physical Mouse Wheel)의 네이티브 스크롤이 완전히 무시되는 WebKit 고유 버그가 있습니다.
-  - 기존 코드에서 `.home-scroll:not(.is-free-scroll)::-webkit-scrollbar`에 `width: 0; height: 0;`이 적용되어 있어 career 구간 등 네이티브 스크롤이 필요한 영역에서 마우스 휠이 막히고 있었습니다.
-  - 이를 해결하기 위해 `width: 0; height: 0;` 대신 `width: 1px; height: 1px; background: transparent;`를 적용하고 thumb/track도 투명하게 처리하여 휠 스크롤 이벤트가 정상적으로 발생하도록 수정했습니다.
+  - WebKit(Safari) 환경에서 `::-webkit-scrollbar`를 조작하거나 `overscroll-behavior-y: contain`을 지정하면, 터치패드는 정상 작동하지만 일반 물리 마우스 휠(Physical Mouse Wheel)의 네이티브 스크롤이 무시되거나 오작동하는 버그가 있습니다.
+  - 1px 꼼수로 우회하려 했으나 Safari의 버전 파편화로 인해 완벽하게 해결되지 않아, 문제가 되는 `.home-scroll:not(.is-free-scroll)::-webkit-scrollbar` 관련 블록과 `overscroll-behavior-y: contain` 선언을 **완전히 제거**했습니다.
+  - 최신 브라우저들은 표준 속성인 `scrollbar-width: none;`만으로도 스크롤바가 숨겨지며 마우스 휠을 차단하지 않습니다.
 
 ### 검증
 - `npm run build` 및 `git diff --check` 통과 확인 예정
