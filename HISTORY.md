@@ -2,6 +2,42 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-19 Safari physical mouse wheel fix
+
+### 요구사항
+- 직전 Codex 에이전트가 Safari/WebKit scroll guard를 수정해 `/work` 자동 스크롤(튕김) 현상은 해결했으나, 여전히 about → career 이후 물리 마우스 휠 스크롤이 작동하지 않는 현상(터치패드만 작동)이 남아있어 이를 수정합니다.
+
+### 구현
+- `src/styles/global.css`
+  - WebKit(Safari) 환경에서 `::-webkit-scrollbar { width: 0; height: 0; display: none; }` 등 스크롤바의 크기를 없애거나 숨기는 CSS가 적용되면, 터치패드는 정상 작동하지만 일반 물리 마우스 휠(Physical Mouse Wheel)의 네이티브 스크롤이 완전히 무시되는 WebKit 고유 버그가 있습니다.
+  - 기존 코드에서 `.home-scroll:not(.is-free-scroll)::-webkit-scrollbar`에 `width: 0; height: 0;`이 적용되어 있어 career 구간 등 네이티브 스크롤이 필요한 영역에서 마우스 휠이 막히고 있었습니다.
+  - 이를 해결하기 위해 `width: 0; height: 0;` 대신 `width: 1px; height: 1px; background: transparent;`를 적용하고 thumb/track도 투명하게 처리하여 휠 스크롤 이벤트가 정상적으로 발생하도록 수정했습니다.
+
+### 검증
+- `npm run build` 및 `git diff --check` 통과 확인 예정
+
+## 2026-05-19 Safari/WebKit home scroll guard
+
+### 요구사항
+- Safari 엔진에서만 home scroll이 꼬이는 현상을 수정합니다.
+  - Mac Safari 마우스 휠에서는 about -> career 이후 timeline point 스크롤이 진행되지 않습니다.
+  - Safari 터치패드/iPhone Safari에서는 `/work`까지 이동한 뒤 불규칙하게 위로 되감기는 현상이 있습니다.
+- 직전 floating top button 지연 표시 수정은 원인과 다르므로 롤백합니다.
+
+### 구현
+- `src/layouts/PublicLayout.astro`
+  - floating top button 표시/클릭 로직을 이전 즉시 표시 방식으로 되돌렸습니다.
+- `src/components/HomePage.astro`
+  - Safari/iOS WebKit에서는 `ScrollTrigger.observe({ preventDefault: true })`를 생성하지 않고, 기존 native `wheel`/`touchmove` fallback만으로 snap 입력을 처리하도록 분기했습니다.
+  - Safari/WebKit에서는 programmatic scroll 이후 `ScrollTrigger.refresh()` 대신 `ScrollTrigger.update()`만 호출해 sticky/svh 레이아웃 재계산으로 인한 scroll 위치 보정을 피합니다.
+  - Safari/WebKit에서는 career native scroll range에서 `careerItemLockedUntil`이 wheel/touch 입력을 막지 않게 했습니다.
+  - home scroll `syncSnapObserver`의 자동 boundary snap 조건이 gallery/free-scroll 범위에서는 실행되지 않도록 `canAutoBoundarySnap = !freeScroll && ...` 가드를 추가했습니다.
+  - `career -> work` 자동 snap은 실제 career/work 경계 사이에서만 작동하도록 `currentY < getWorkTop() - snapTolerance` 상한을 추가했습니다.
+  - `about -> careerEntry` 자동 snap도 실제 careerEntry/careerExit 사이에서만 작동하도록 범위를 좁혔습니다.
+
+### 검증
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+
 ## 2026-05-18 Mobile career timeline pacing
 
 ### 요구사항
