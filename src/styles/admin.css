@@ -291,6 +291,10 @@
   margin-bottom: 22px;
 }
 
+.admin-hamburger {
+  display: none;
+}
+
 .admin-topbar h2 {
   font-size: 2rem;
 }
@@ -1319,6 +1323,7 @@ button.block-drag-handle svg {
 
   .admin-shell,
   .admin-shell.is-sidebar-collapsed,
+  .admin-shell.is-mobile-drawer-open,
   .works-editor-layout,
   .admin-item {
     grid-template-columns: 1fr;
@@ -1338,7 +1343,7 @@ button.block-drag-handle svg {
 
   /* --- Type C Mobile Drawer Layout --- */
   .sidebar-toggle {
-    display: none !important;
+    display: none;
   }
 
   .admin-drawer-overlay {
@@ -1360,7 +1365,7 @@ button.block-drag-handle svg {
   }
 
   .admin-sidebar {
-    position: fixed !important;
+    position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
@@ -1380,17 +1385,15 @@ button.block-drag-handle svg {
     box-shadow: 12px 0 36px rgba(0, 0, 0, 0.12);
   }
 
-  /* Drawer collapsed state */
-  .admin-shell.is-sidebar-collapsed .admin-sidebar {
+  .admin-shell:not(.is-mobile-drawer-open) .admin-sidebar {
     transform: translateX(-100%);
     box-shadow: none;
   }
 
-  /* Reset navigation list styling inside mobile drawer */
   .admin-sidebar nav {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 8px !important;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
     align-content: start;
   }
 
@@ -1401,46 +1404,31 @@ button.block-drag-handle svg {
     background: transparent;
     color: var(--color-muted);
     text-align: left;
-    width: 100% !important;
-    height: auto !important;
-    padding: 0 16px !important;
-    min-height: 38px !important;
-    border-radius: var(--radius-sm) !important;
+    width: 100%;
+    height: auto;
+    padding: 0 16px;
+    min-height: 38px;
+    border-radius: var(--radius-sm);
   }
 
   .admin-sidebar nav button.is-active {
-    border-color: #e6f9ed !important;
-    background: #e6f9ed !important;
-    color: var(--admin-accent-border) !important;
+    border-color: #e6f9ed;
+    background: #e6f9ed;
+    color: var(--admin-accent-border);
   }
 
-  /* Prevent icon-only collapsed styling overrides on mobile drawer */
-  .admin-shell.is-sidebar-collapsed .admin-sidebar nav button .nav-label,
-  .admin-shell.is-sidebar-collapsed .admin-sidebar .ghost-button .nav-label {
-    position: static !important;
-    width: auto !important;
-    height: auto !important;
-    overflow: visible !important;
-    clip: auto !important;
-  }
-
-  .admin-shell.is-sidebar-collapsed .admin-sidebar :is(nav button, .ghost-button) {
-    width: 100% !important;
-    height: auto !important;
-    padding: 0 16px !important;
-    justify-content: start !important;
-  }
-
-  .admin-shell.is-sidebar-collapsed .admin-sidebar .sidebar-brand {
-    display: block !important;
+  .admin-sidebar .ghost-button {
+    width: 100%;
+    height: auto;
+    padding: 0 16px;
+    justify-content: start;
   }
 
   /* Topbar modifications on mobile */
   .admin-topbar {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 12px !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     width: 100%;
   }
 

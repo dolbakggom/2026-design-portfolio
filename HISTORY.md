@@ -2,6 +2,36 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-20 Remote D1 link cleanup and admin drawer state split
+
+### 요구사항
+- 로컬 D1에서는 삭제했지만 배포 D1에는 남아 있는 admin profile link 중 `test`로 시작하는 메일 링크만 원격 D1에서 삭제합니다.
+- 모바일 admin drawer 구현이 데스크톱 admin 레이아웃과 충돌해 화면이 이상해지는 문제를 수정합니다.
+- 코드 수정은 worker 에이전트가 맡고, explorer 에이전트가 리뷰합니다.
+
+### 구현
+- 원격 D1 데이터 정리
+  - `npx wrangler d1 execute DB --remote`로 production D1 binding `DB`에 접근했습니다.
+  - `profile.links` JSON 배열에서 `label`이 `test%`이고 `url`이 `mailto:%`인 항목만 제거했습니다.
+  - 삭제 전 링크는 `hampenta@icloud.com`, `010 2672 1912`, `서울특별시, 강서구`, `test1` 4개였고, 삭제 후에는 앞의 3개만 남았습니다.
+  - 참고: `portfolio-db` 이름으로 remote query를 처음 시도했을 때 Cloudflare API 7403 권한 오류가 났지만, wrangler binding 이름 `DB`로 실행하면 정상 동작했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - 데스크톱 sidebar collapse 상태(`sidebarCollapsed`)와 모바일 drawer 상태(`isMobileAdmin`, `mobileDrawerOpen`)를 분리했습니다.
+  - `.admin-drawer-overlay`는 모바일이고 drawer가 열린 상태에서만 DOM에 렌더링됩니다.
+  - 모바일 hamburger도 모바일 상태에서만 렌더링되며, 데스크톱 grid 레이아웃에는 영향을 주지 않습니다.
+- `src/styles/admin.css`
+  - `.admin-hamburger` 기본값을 `display: none`으로 두고, 모바일 media query 안에서만 보이게 했습니다.
+  - 모바일 drawer 표시 상태를 `.is-mobile-drawer-open`으로 분리했습니다.
+  - 기존 `.is-sidebar-collapsed`와 모바일 drawer reset selector가 섞이던 부분을 정리하고 `!important` 의존을 줄였습니다.
+
+### 검증
+- Worker 에이전트가 `git diff --check`와 `npm run build` 통과를 확인했습니다.
+- Explorer 에이전트가 수정 범위를 리뷰했고 findings 없음으로 확인했습니다.
+- 메인 세션에서 `git diff --check` 통과를 재확인했습니다.
+- 메인 세션에서 `npm run build` 재확인:
+  - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+  - 승인된 재실행에서는 `astro check` 0 errors / 0 warnings / 0 hints, build complete 확인했습니다.
+
 ## 2026-05-20 Admin mobile drawer UI, Links editor & Works editor improvements
 
 ### 요구사항

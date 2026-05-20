@@ -437,6 +437,8 @@ export default function AdminApp() {
   const [savedWorkSnapshots, setSavedWorkSnapshots] = useState<Record<string, string>>({});
   const [workPreviewWidth, setWorkPreviewWidth] = useState(460);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isMobileAdmin, setIsMobileAdmin] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [draggedWorkId, setDraggedWorkId] = useState("");
@@ -535,10 +537,19 @@ export default function AdminApp() {
   };
 
   useEffect(() => {
-    if (window.innerWidth <= 980) {
-      setSidebarCollapsed(true);
-    }
+    const mediaQuery = window.matchMedia("(max-width: 980px)");
+    const syncMobileState = () => {
+      setIsMobileAdmin(mediaQuery.matches);
+      if (!mediaQuery.matches) {
+        setMobileDrawerOpen(false);
+      }
+    };
+
+    syncMobileState();
+    mediaQuery.addEventListener("change", syncMobileState);
     void loadAll();
+
+    return () => mediaQuery.removeEventListener("change", syncMobileState);
   }, []);
 
   const login = async (event: SyntheticEvent<HTMLFormElement>) => {
@@ -722,6 +733,11 @@ export default function AdminApp() {
     if (tab !== "works") {
       setWorkScreen("list");
     }
+  };
+
+  const handleAdminNavClick = async (tab: Tab) => {
+    await switchAdminTab(tab);
+    setMobileDrawerOpen(false);
   };
 
   useEffect(() => {
@@ -930,14 +946,20 @@ export default function AdminApp() {
           {error || message}
         </div>
       ) : null}
-      <main className={`admin-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
-        {!sidebarCollapsed && (
+      <main
+        className={[
+          "admin-shell",
+          !isMobileAdmin && sidebarCollapsed ? "is-sidebar-collapsed" : "",
+          isMobileAdmin && mobileDrawerOpen ? "is-mobile-drawer-open" : ""
+        ].filter(Boolean).join(" ")}
+      >
+        {isMobileAdmin && mobileDrawerOpen ? (
           <div
             className="admin-drawer-overlay"
-            onClick={() => setSidebarCollapsed(true)}
+            onClick={() => setMobileDrawerOpen(false)}
             aria-hidden="true"
           />
-        )}
+        ) : null}
       <aside className="admin-sidebar">
         <button
           type="button"
@@ -954,7 +976,7 @@ export default function AdminApp() {
         </div>
         <nav>
           {navItems.map((item) => (
-            <button key={item.tab} type="button" className={activeTab === item.tab ? "is-active" : ""} onClick={() => void switchAdminTab(item.tab)}>
+            <button key={item.tab} type="button" className={activeTab === item.tab ? "is-active" : ""} onClick={() => void handleAdminNavClick(item.tab)}>
               <span className="nav-icon" aria-hidden="true"><AdminIcon name={item.icon} /></span>
               <span className="nav-label">{item.label}</span>
             </button>
@@ -968,12 +990,13 @@ export default function AdminApp() {
 
       <section className={`admin-content ${activeTab === "works" ? "is-works-tab" : ""}`}>
         <header className="admin-topbar">
-          {!(activeTab === "works" && workScreen === "editor") ? (
+          {isMobileAdmin && !(activeTab === "works" && workScreen === "editor") ? (
             <button
               type="button"
               className="admin-hamburger"
-              aria-label="Toggle menu"
-              onClick={() => setSidebarCollapsed((current) => !current)}
+              aria-label="Open menu"
+              aria-expanded={mobileDrawerOpen}
+              onClick={() => setMobileDrawerOpen(true)}
             >
               ☰
             </button>
