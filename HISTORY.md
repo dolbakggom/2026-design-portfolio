@@ -2,6 +2,66 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-20 Admin mobile drawer UI, Links editor & Works editor improvements
+
+### 요구사항
+- 관리자(admin) 페이지 자기소개 수정 Links 부분의 test 항목 및 불필요한 삭제(×)/추가 버튼을 제거합니다.
+- 관리자 페이지 모바일 뷰포트에서 상단바와 메뉴 아이콘 등 어색하게 들어간 UI 개선을 위해 C안(슬라이딩 드로어 메뉴형)을 적용합니다.
+- 작품 에디터(Works Editor) 화면의 UI 사용성을 전반적으로 개선합니다. (상단 타이틀 잘림 방지, 햄버거 메뉴 숨김, 콤팩트한 카테고리 알약 크기 복원, 중간에 위치한 Save 버튼을 상단 탑바로 통합 및 하단 노출 숨김)
+
+### 구현 및 수정 내용
+- **자기소개 링크 편집 간소화 및 D1 데이터 정리 (`src/components/admin/AdminApp.tsx`):**
+  - 로컬 DB `profile` 테이블에서 불필요한 test 링크 데이터를 수동 쿼리로 제거 완료했습니다.
+  - CRUD 삭제(×) 및 추가 버튼이 현재 기획상 필요치 않다는 피드백에 따라 UI에서 완전히 덜어냈습니다.
+  - 모바일(660px 이하)에서 아이콘과 함께 이메일/링크 주소가 상하로 예쁘게 감싸지도록 2열 반응형 그리드(`.link-fields` grid-template-columns: 42px 1fr)로 간소화했습니다.
+- **모바일 드로어 뷰 및 인터랙션 구현 (`src/components/admin/AdminApp.tsx`):**
+  - 화면 너비가 980px 이하일 때, 모바일 드로어가 닫힌 상태(`sidebarCollapsed = true`)로 최초 로드되도록 `useEffect` 감지 로직을 추가했습니다.
+  - 모바일 탑바에 ☰ (햄버거) 토글 버튼을 얹어 메뉴 상태(`sidebarCollapsed`)와 연동시켰습니다.
+  - 드로어 오픈 상태에서 뒷배경을 어둡고 흐리게 덮어주는 반투명 글래스모피즘 오버레이 배경(`.admin-drawer-overlay`)을 바인딩했습니다.
+- **작품 에디터 상단바 및 타이틀 개선 (`src/components/admin/AdminApp.tsx`, `src/styles/admin.css`):**
+  - 에디터 화면(`workScreen === "editor"`)에서는 모바일 상단바의 ☰ 햄버거 토글 버튼을 숨겨 뒤로가기(←) 화살표 하나만 노출하도록 JSX 조건처리를 추가해 공간을 대폭 확보했습니다.
+  - 모바일(980px 이하)에서 탑바 내부의 "View site" 외부 링크를 `display: none`으로 비활성화하여 저장을 위한 공간을 넓혔습니다.
+  - `.admin-title-block`, `.admin-title-row`에 `min-width: 0`을 지정하고 `h2` 요소에 `text-overflow: ellipsis; white-space: nowrap; overflow: hidden;`을 적용해 타이틀이 아무리 길어도 상단 액션 버튼들과 겹쳐서 깨지지 않고 한 줄로 단정히 줄임표 처리되도록 보완했습니다.
+- **작품 에디터 폼 필드 및 저장 위치 최적화 (`src/components/admin/AdminApp.tsx`, `src/styles/admin.css`):**
+  - 에디터 하단의 sticky-actions에 있던 `Save work` 버튼이 모바일에서 에디터 필드 아래 및 라이브 프리뷰 위에 끼여 중간에 뜬금없이 위치하던 사용성 문제를 파악하고, 모바일 980px 이하에서 `.work-editor-actions .primary-action`을 `display: none`으로 비활성화했습니다.
+  - 대신 상단 탑바 액션에 항시 노출되는 주황색 `Save` 버튼을 추가하여, 스크롤을 무한히 내리지 않아도 편집 중 언제든 즉각 저장할 수 있도록 최상위 접근성을 보장했습니다.
+  - 모바일 660px 이하 해상도에서 폼 필드를 100% 폭으로 정렬하던 `.field-grid label` 스타일을 직계 자식만을 지정하는 `.field-grid > label`로 교정하여, nested label 구조인 카테고리 체크박스 pill 버튼(UI/UX, BI/BX 등)들이 100% 가로로 뚱뚱하게 늘어나던 현상을 복구했습니다.
+
+### 검증 결과
+- 모바일 해상도(390x844) 상태의 `/admin` 페이지에서 테스트용 서브에이전트가 검증을 성공적으로 마쳤습니다.
+  - 햄버거 메뉴를 탭할 때 드로어가 우아하게 등장하고, 뒷배경 오버레이 탭 시 드로어가 자동으로 감춰지는 전환 플로우를 기록했습니다.
+  - 모바일 상단바 타이틀이 ellipsis로 축약되고 옆에 Save가 배치된 모습, 콤팩트한 둥근 알약 모양으로 복구된 카테고리 체크 박스, 하단 Save 버튼 숨김 및 오직 Delete 버튼만 보이는 깔끔한 에디터 인터페이스를 검증 완료했습니다.
+  - **검증 스크린샷 및 영상:**
+    - 드로어 닫힘: [admin_mobile_drawer_closed.png](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/admin_mobile_drawer_closed.png)
+    - 드로어 열림: [admin_mobile_drawer_open.png](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/admin_mobile_drawer_open.png)
+    - 에디터 모바일 탑바: [work_editor_mobile_topbar_fixed.png](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/work_editor_mobile_topbar_fixed.png)
+    - 에디터 카테고리 알약: [work_editor_mobile_basic_info_fixed.png](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/work_editor_mobile_basic_info_fixed.png)
+    - 에디터 하단 액션: [work_editor_mobile_buttons_fixed.png](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/work_editor_mobile_buttons_fixed.png)
+    - 에디터 데스크톱 전체: [work_editor_desktop_fixed.png](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/work_editor_desktop_fixed.png)
+    - 모바일 검증 레코딩: [work_editor_mobile_fixed.webm](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/work_editor_mobile_fixed.webm)
+
+## 2026-05-20 Safari physical mouse wheel & Mobile scroll verification
+
+### 요구사항
+- Safari/WebKit 환경에서 마우스 휠 스크롤이 작동하지 않는 현상(터치패드만 작동)을 수정하고 모바일 웹 환경의 전반적인 스크롤 동작과 뒤로가기 시 스크롤 복원 동작을 검증합니다.
+- Career의 마지막 부분에서 Work 섹션으로 전환될 때, 50~100px 정도 추가로 스크롤되어 다음 작품(featured work)의 상단 영역이 삐져나와 보이는 간헐적 버그를 수정합니다.
+
+### 구현 및 수정 내용
+- `src/styles/global.css`
+  - WebKit(Safari) 환경에서 `::-webkit-scrollbar`를 임의로 조작하거나 `overscroll-behavior-y: contain` 속성을 사용할 때, 일반 물리 마우스 휠(Physical Mouse Wheel)의 네이티브 스크롤이 완전히 무시되는 WebKit 고유 버그가 있었습니다.
+  - 이를 해결하기 위해 `.home-scroll:not(.is-free-scroll)::-webkit-scrollbar` 관련 스크롤바 조작 코드와 `overscroll-behavior-y: contain` 선언을 **완전히 제거**했습니다.
+  - 모던 Safari(16.4+) 및 크롬/파이어폭스 환경에서는 표준 속성인 `scrollbar-width: none;` 만으로도 휠 스크롤 끊김 없이 깔끔하게 스크롤바가 숨겨집니다.
+- `src/components/HomePage.astro`
+  - **프로그래매틱 스크롤 직후 위치 보정 해결:** `updateScrollTriggersAfterProgrammaticScroll()` 함수에서 모든 브라우저(Safari 포함 Chrome 등)를 대상으로 programmatic scroll 직후에는 `ScrollTrigger.refresh()` 대신 `ScrollTrigger.update()`만 호출하도록 수정했습니다. `ScrollTrigger.refresh()`는 전체 레이아웃 bounds를 강제로 재계산하여 sticky/svh/dvh 스크롤 위치 보정(50~100px 튕김 현상)을 유발하는 문제가 있어 이를 제거했습니다.
+  - **모바일 터치 이동 스크롤 누수 차단:** `touchmove` 리스너에서 첫 번째 스크롤 신호를 처리해 스냅이 진행 중이거나(`isScrollLocked()`), 스냅 영역(`shouldSnapInput()`)에 있는 동안 사용자의 손가락 드래그 제스처로 인한 추가적인 네이티브 스크롤(터치 누수)이 페이지를 어긋나게 만들지 않도록, 두 번째 이후 터치 이벤트에서도 `event.preventDefault()`를 계속 호출해 차단하도록 로직을 강화했습니다.
+
+### 검증 결과
+- 모바일 뷰포트(390x844) 및 데스크톱 Chrome 환경에서 다음 시나리오를 검증하고 녹화본을 기록했습니다. (녹화본 경로: `walkthrough.md`에 연결된 `/Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/recording.webm`)
+  - **스크롤 전환 흐름:** `Intro -> About -> Career -> Work Intro -> Featured -> Work Gallery` 패널 간의 스냅 및 스크롤 모드 전환이 매끄럽게 동작하며, Career -> Work 전환 시 아래로 50~100px 밀려나던 오차가 더 이상 발생하지 않습니다.
+  - **커리어 타임라인:** Y축 스크롤에 따른 5개 카드의 순차적 활성화 및 360ms의 중복 입력 방지 락(`careerItemLockDuration`)이 의도대로 동작합니다.
+  - **뒤로가기 복원:** 일반 갤러리 카드 및 Featured 카드의 상세 페이지 진입 후 브라우저 뒤로가기(또는 상단 목록 버튼)를 실행했을 때 기존 목록의 스크롤 위치가 정확하게 복원됩니다.
+  - **레이아웃:** 모바일 뷰포트에서 가로 스크롤(Horizontal overflow)이 발생하지 않는 구조적 안정성을 확인했습니다.
+
 ## 2026-05-19 Mobile scroll audit handoff
 
 ### 요구사항

@@ -275,12 +275,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const shouldPreserveRestoredWorkScroll = initialSection === "work" && navigationEntry?.type === "back_forward";
 
     const updateScrollTriggersAfterProgrammaticScroll = () => {
-      if (usesSafariScrollEngine) {
-        ScrollTrigger.update();
-        return;
-      }
-
-      ScrollTrigger.refresh();
+      // scroll-behavior 및 sticky/svh 레이아웃 재계산으로 인한 스크롤 위치 보정(튕김) 현상을 방지하기 위해,
+      // 모든 브라우저에서 programmatic scroll 직후에는 ScrollTrigger.refresh() 대신 ScrollTrigger.update()만 호출합니다.
+      ScrollTrigger.update();
     };
 
     const replaceRoute = (route: string) => {
@@ -1140,7 +1137,12 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       window.addEventListener(
         "touchmove",
         (event) => {
-          if (touchHandled) return;
+          if (touchHandled) {
+            if (isScrollLocked() || shouldSnapInput()) {
+              event.preventDefault();
+            }
+            return;
+          }
           const currentTouchY = event.touches[0]?.clientY ?? touchStartY;
           const deltaY = touchStartY - currentTouchY;
           if (Math.abs(deltaY) < 24) return;

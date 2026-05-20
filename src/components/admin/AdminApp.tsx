@@ -535,6 +535,9 @@ export default function AdminApp() {
   };
 
   useEffect(() => {
+    if (window.innerWidth <= 980) {
+      setSidebarCollapsed(true);
+    }
     void loadAll();
   }, []);
 
@@ -928,6 +931,13 @@ export default function AdminApp() {
         </div>
       ) : null}
       <main className={`admin-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
+        {!sidebarCollapsed && (
+          <div
+            className="admin-drawer-overlay"
+            onClick={() => setSidebarCollapsed(true)}
+            aria-hidden="true"
+          />
+        )}
       <aside className="admin-sidebar">
         <button
           type="button"
@@ -958,6 +968,16 @@ export default function AdminApp() {
 
       <section className={`admin-content ${activeTab === "works" ? "is-works-tab" : ""}`}>
         <header className="admin-topbar">
+          {!(activeTab === "works" && workScreen === "editor") ? (
+            <button
+              type="button"
+              className="admin-hamburger"
+              aria-label="Toggle menu"
+              onClick={() => setSidebarCollapsed((current) => !current)}
+            >
+              ☰
+            </button>
+          ) : null}
           <div className="admin-title-block">
             <p>{activeTab}</p>
             <div className="admin-title-row">
@@ -970,9 +990,14 @@ export default function AdminApp() {
             </div>
           </div>
           <div className="admin-topbar-actions">
-            {activeTab === "works" ? (
+            {activeTab === "works" && workScreen === "list" ? (
               <button type="button" className="primary-action" onClick={addWork}>
                 Add work
+              </button>
+            ) : null}
+            {activeTab === "works" && workScreen === "editor" && selectedWork ? (
+              <button type="button" className="primary-action" onClick={() => saveWork(selectedWork)}>
+                Save
               </button>
             ) : null}
             <a href="/" target="_blank" rel="noreferrer">
