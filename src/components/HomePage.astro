@@ -223,6 +223,8 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       const pageSignal = pageController.signal;
       const homeScrollTriggers: ScrollTrigger[] = [];
       let lockedUntil = 0;
+      let lastScrollEventTime = 0;
+      let needsQuietPeriod = false;
       let snapTween: gsap.core.Tween | gsap.core.Timeline | null = null;
       let snapObserver: ReturnType<typeof ScrollTrigger.observe> | null = null;
       let snapSyncFrame = 0;
@@ -306,7 +308,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       lockedUntil = Math.max(lockedUntil, Date.now() + duration);
     };
 
-    const isScrollLocked = () => Date.now() < lockedUntil || Boolean(snapTween);
+    const isScrollLocked = () => Date.now() < lockedUntil || Boolean(snapTween) || needsQuietPeriod;
 
     const typeText = (target: HTMLElement, value: string, speed = 58, done?: () => void) => {
       target.textContent = "";
@@ -554,7 +556,12 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const getCareerExitTop = () => getIdentityTop() + getIdentityProgressRange() * careerEndProgress;
     const isFreeScrollRange = () => window.scrollY >= getGalleryTop() - snapTolerance;
     const isNativeCareerRange = () => window.scrollY >= getCareerEntryTop() - snapTolerance && window.scrollY <= getCareerExitTop() + snapTolerance;
-    const isCareerItemInputLocked = () => !snapTween && isNativeCareerRange() && Date.now() < careerItemLockedUntil;
+    const isCareerItemInputLocked = () => {
+      if (snapTween) return false;
+      const currentY = window.scrollY;
+      const inIdentitySection = currentY >= getIdentityTop() - 100 && currentY <= getWorkTop() + 100;
+      return inIdentitySection && Date.now() < careerItemLockedUntil;
+    };
     const shouldBlockCareerItemInput = () => !usesSafariScrollEngine && isCareerItemInputLocked();
 
     const getSnapTargets = () => {
@@ -715,6 +722,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           if (!movingToAbout) {
             applySnapState(target);
           }
+          lockedUntil = Date.now() + 240;
           updateScrollTriggersAfterProgrammaticScroll();
           requestSnapObserverSync();
         },
@@ -794,6 +802,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         onComplete: () => {
           snapTween = null;
           clearCareerWorkCover();
+          lockedUntil = Date.now() + 240;
           updateScrollTriggersAfterProgrammaticScroll();
           requestSnapObserverSync();
         },
@@ -818,8 +827,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       return true;
     };
 
-    const snapToTarget = (target: SnapTarget) => {
-      if (isScrollLocked()) return;
+    const snapToTarget = (target: SnapTarget, force = false) => {
+      if (!force && isScrollLocked()) return;
+      needsQuietPeriod = true;
+      lastScrollEventTime = Date.now();
       if (snapIntroAboutCover(target)) return;
       if (snapCareerWorkCover(target)) return;
 
@@ -837,6 +848,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         onComplete: () => {
           snapTween = null;
           applySnapState(target);
+          lockedUntil = Date.now() + 240;
           updateScrollTriggersAfterProgrammaticScroll();
           requestSnapObserverSync();
         },
@@ -1024,6 +1036,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       let previousScrollY = window.scrollY;
       const syncSnapObserver = () => {
         const currentY = window.scrollY;
+        const now = Date.now();
+        if (needsQuietPeriod && now - lastScrollEventTime > 150) {
+          needsQuietPeriod = false;
+        }
 
         if (programmaticTopScroll) {
           document.documentElement.classList.remove("is-free-scroll");
@@ -1034,13 +1050,21 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
         const movedDown = currentY > previousScrollY;
         const freeScroll = isFreeScrollRange();
-        const canAutoBoundarySnap = !freeScroll && !snapTween && Date.now() >= lockedUntil;
-        const shouldAutoSnapToWork =
-          canAutoBoundarySnap &&
+        const guardedWorkOvershoot =
+          !snapTween &&
+          (needsQuietPeriod || now < lockedUntil || now < careerItemLockedUntil) &&
+          currentY > getWorkTop() + snapTolerance &&
+          currentY < getFirstFeaturedTop() - snapTolerance;
+        const canAutoBoundaryCorrect = !freeScroll && !snapTween && !needsQuietPeriod;
+        const canAutoBoundarySnap = canAutoBoundaryCorrect && Date.now() >= lockedUntil;
+        const crossedCareerToWork =
+          canAutoBoundaryCorrect &&
+          Date.now() >= lockedUntil &&
+          Date.now() >= careerItemLockedUntil &&
           movedDown &&
+          previousScrollY < getWorkTop() - snapTolerance &&
           currentY >= getCareerExitTop() - snapTolerance &&
-          currentY < getWorkTop() - snapTolerance &&
-          previousScrollY < getWorkTop() - snapTolerance;
+          currentY < getFirstFeaturedTop() - snapTolerance;
         const shouldAutoSnapToCareer =
           canAutoBoundarySnap &&
           currentY < previousScrollY &&
@@ -1061,6 +1085,14 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
         document.documentElement.classList.toggle("is-free-scroll", freeScroll);
 
+        if (guardedWorkOvershoot) {
+          const workTop = Math.round(getWorkTop());
+          window.scrollTo({ top: workTop, behavior: "auto" });
+          previousScrollY = workTop;
+          updateScrollTriggersAfterProgrammaticScroll();
+          return;
+        }
+
         if (snapTween || shouldSnapInput()) {
           if (snapObserver && !snapObserver.isEnabled) snapObserver.enable();
         } else if (snapObserver?.isEnabled) {
@@ -1069,10 +1101,10 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
         previousScrollY = currentY;
 
-        if (shouldAutoSnapToWork) {
+        if (crossedCareerToWork) {
           const workTarget = findSnapTarget("work");
           if (workTarget) {
-            window.requestAnimationFrame(() => snapToTarget(workTarget));
+            window.requestAnimationFrame(() => snapToTarget(workTarget, true));
           }
         }
 
@@ -1111,6 +1143,11 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         "wheel",
         (event) => {
           if (Math.abs(event.deltaY) < 4) return;
+          const now = Date.now();
+          if (needsQuietPeriod && now - lastScrollEventTime > 150) {
+            needsQuietPeriod = false;
+          }
+          lastScrollEventTime = now;
           if (programmaticTopScroll) {
             event.preventDefault();
             return;
@@ -1137,6 +1174,11 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       window.addEventListener(
         "touchmove",
         (event) => {
+          const now = Date.now();
+          if (needsQuietPeriod && now - lastScrollEventTime > 150) {
+            needsQuietPeriod = false;
+          }
+          lastScrollEventTime = now;
           if (touchHandled) {
             if (isScrollLocked() || shouldSnapInput()) {
               event.preventDefault();

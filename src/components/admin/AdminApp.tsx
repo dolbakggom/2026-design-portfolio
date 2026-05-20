@@ -961,15 +961,17 @@ export default function AdminApp() {
           />
         ) : null}
       <aside className="admin-sidebar">
-        <button
-          type="button"
-          className="sidebar-toggle"
-          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-pressed={sidebarCollapsed}
-          onClick={() => setSidebarCollapsed((current) => !current)}
-        >
-          {sidebarCollapsed ? "›" : "‹"}
-        </button>
+        {!isMobileAdmin ? (
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-pressed={sidebarCollapsed}
+            onClick={() => setSidebarCollapsed((current) => !current)}
+          >
+            {sidebarCollapsed ? "›" : "‹"}
+          </button>
+        ) : null}
         <div className="sidebar-brand">
           <p>Beyond CMS</p>
           <h1>Portfolio Admin</h1>
@@ -1338,10 +1340,7 @@ export default function AdminApp() {
                       </EditorBoundary>
                     </section>
 
-                    <div className="action-row sticky-actions work-editor-actions">
-                      <button type="button" className="primary-action" onClick={() => saveWork(selectedWork)}>
-                        Save work
-                      </button>
+                    <div className="action-row work-editor-actions">
                       <button type="button" className="danger" onClick={deleteSelectedWork}>
                         Delete work
                       </button>

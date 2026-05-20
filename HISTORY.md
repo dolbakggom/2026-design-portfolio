@@ -2,6 +2,73 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-20 Admin work editor bottom actions cleanup
+
+### 요구사항
+- 작업물 에디터 화면은 상단바에 Save 버튼이 있으므로, 에디터 하단의 플로팅 Save 버튼은 제거합니다.
+- Delete는 플로팅 액션이 아니라 에디터 최하단에 정적으로 배치합니다.
+- 데스크톱과 모바일 모두 같은 구조로 동작하게 합니다.
+- 모바일에서는 상단 햄버거 드로어가 사이드바 제어 역할을 하므로, 사이드바 내부 collapse 토글은 노출하지 않습니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - 작업물 에디터 하단 `.work-editor-actions`에서 `Save work` 버튼을 제거했습니다.
+  - 해당 row에서 `sticky-actions` 클래스를 제거해, `Delete work`만 에디터 콘텐츠 끝에 정적으로 남도록 했습니다.
+  - 모바일 admin 상태(`isMobileAdmin`)에서는 `.sidebar-toggle` 버튼을 렌더링하지 않도록 조건 처리했습니다.
+- `src/styles/admin.css`
+  - `.work-editor-actions` 간격을 정적 하단 액션에 맞게 조정했습니다.
+  - 모바일에서 하단 Save 버튼만 숨기던 임시 CSS를 제거했습니다. 이제 하단 Save 자체가 렌더링되지 않습니다.
+
+### 검증
+- `git diff --check` 통과
+- `npm run build`
+  - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+  - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.
+
+## 2026-05-20 Scroll Snap & Trackpad Inertia Filtering Heuristic
+
+### 요구사항
+- Career에서 Work 섹션으로 전환되는 순간, 마우스 한 틱의 스크롤만으로 다음 Featured Work 카드로 premature하게 즉시 넘어가거나, 트랙패드 관성(Inertia)으로 인해 Work 섹션 정렬이 엇나가고 다음 카드로 흘러내리는 현상을 완전히 해결합니다.
+- 트랙패드의 긴 스와이프 관성(Momentum)이 애니메이션 및 포스트-스냅 락 시간(240ms)보다 길게 지속되더라도 다음 transition을 트리거하지 않도록 방어 로직을 강화합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - **Quiet Period Heuristic 도입:** `needsQuietPeriod` 상태 플래그와 `lastScrollEventTime` 타임스탬프를 도입했습니다.
+  - 스냅 애니메이션이 시작될 때(`snapToTarget`) `needsQuietPeriod = true`를 세팅하고, `wheel` 및 `touchmove` 이벤트가 발생할 때마다 `lastScrollEventTime`을 갱신합니다.
+  - 마우스 휠/터치패드 관성 스크롤 스트림이 완전히 끝나 150ms 이상 조용해질 때까지(`Date.now() - lastScrollEventTime > 150`) `needsQuietPeriod` 상태를 유지하며 이 기간 동안의 모든 휠/터치 입력을 무시하고 `preventDefault()` 처리합니다.
+  - `isScrollLocked()`에 `needsQuietPeriod` 조건을 통합하여 관성 감쇠 동안 어떠한 추가 스냅 트랜지션도 접수되지 않도록 차단했습니다.
+  - 자동 경계 보정 로직(`canAutoBoundaryCorrect`)에 `!needsQuietPeriod` 조건을 적용하여 관성이 유입되는 동안 자동으로 오버슈트 보정이 오작동하지 않게 보호했습니다.
+  - 커리어 마지막 카드가 활성화된 직후의 스크롤 락(`careerItemLockedUntil`) 감지 범위를 `identity` 섹션 전체 근처(`[getIdentityTop() - 100, getWorkTop() + 100]`)로 넓혀 경계면 이탈 락이 누수되지 않도록 수정했습니다.
+  - 후속 점검에서 `needsQuietPeriod`가 새 스냅 트랜지션뿐 아니라 이미 밀린 Work intro 위치 보정까지 막을 수 있는 경로를 발견했습니다.
+  - `syncSnapObserver()`에서 quiet/lock 상태 중 `workTop`과 첫 featured 사이로 scrollY가 밀린 경우, 새로운 section snap을 발생시키지 않고 `window.scrollTo(workTop)`으로 즉시 보정하는 `guardedWorkOvershoot` 경로를 추가했습니다.
+  - `syncSnapObserver()`가 매 scroll event마다 `lastScrollEventTime`을 갱신하던 부분은 제거했습니다. quiet 판정은 실제 wheel/touch 입력 시간 기준이어야 하며, programmatic scroll 동기화가 입력 시간을 계속 갱신하면 quiet window가 의도와 다르게 유지될 수 있습니다.
+
+### 검증
+- Puppeteer 기반의 브라우저 스크롤 시뮬레이터를 사용해 60fps 감속 프레임으로 모사된 트랙패드 관성(30회 연속 감속 WheelEvent)을 Work 진입 순간 주입하는 테스트를 수행했습니다.
+- 관성 스크롤이 들어오는 동안 Work 섹션 시작 좌표(`scrollY = 2616`)에 완벽하게 Snapped된 채 움직이지 않는 것을 확인했습니다.
+- 관성이 완전히 소멸된 후(300ms 대기) 새로 입력한 deliberate wheel event에 의해서만 다음 Featured Work 카드로 부드럽게 스냅되는 것을 확인했습니다.
+- 검증 시나리오 기록 비디오 `scroll_transition_inertia_fix.webm`을 생성하여 아티팩트 폴더에 저장했습니다.
+- `npm run build` 결과 `0 errors / 0 warnings / 0 hints`로 성공하였습니다.
+
+## 2026-05-20 Chrome strong wheel career-to-work overshoot guard
+
+### 요구사항
+- Chrome에서 career point 시작 부근에서 강하게 스크롤하면 Work intro에 도착했을 때 정렬점보다 아래로 밀려 featured work 일부가 보이는 문제를 수정합니다.
+- Safari에서는 정상 동작하므로 Safari 분기는 건드리지 않습니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `syncSnapObserver()`의 career -> work 자동 스냅 조건을 확장했습니다.
+  - 기존에는 현재 scrollY가 `careerExitTop` 이후이면서 아직 `workTop` 이전일 때만 Work intro로 snap했습니다.
+  - Chrome 큰 wheel delta는 한 frame 안에 `workTop`을 넘어 Work intro 내부로 들어갈 수 있어 조건을 놓쳤습니다.
+  - 이전 scrollY가 work 위에 있었고 현재 scrollY가 career exit 이후부터 첫 featured 이전 사이에 있으면 `work` target으로 다시 snap하도록 보정했습니다.
+  - 사용자가 1000ms 입력 차단도 효과가 없다고 확인해, 마지막 career point 입력 차단 방식은 제거했습니다.
+  - 실제 원인은 직전 section snap의 `lockedUntil`이 남아 있을 때 자동 경계 보정도 `snapToTarget()`의 early return에 막히는 경로로 보고, career -> work overshoot 보정에 한해서 lock을 우회하는 `force` option을 추가했습니다.
+
+### 검증
+- `git diff --check` 통과
+- `npm run build` 통과, 0 errors / 0 warnings / 0 hints
+
 ## 2026-05-20 Remote D1 link cleanup and admin drawer state split
 
 ### 요구사항
@@ -70,25 +137,29 @@
     - 에디터 데스크톱 전체: [work_editor_desktop_fixed.png](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/work_editor_desktop_fixed.png)
     - 모바일 검증 레코딩: [work_editor_mobile_fixed.webm](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/work_editor_mobile_fixed.webm)
 
-## 2026-05-20 Safari physical mouse wheel & Mobile scroll verification
+## 2026-05-20 Safari physical mouse wheel, Mobile scroll & Career-to-Work transition locks
 
 ### 요구사항
 - Safari/WebKit 환경에서 마우스 휠 스크롤이 작동하지 않는 현상(터치패드만 작동)을 수정하고 모바일 웹 환경의 전반적인 스크롤 동작과 뒤로가기 시 스크롤 복원 동작을 검증합니다.
-- Career의 마지막 부분에서 Work 섹션으로 전환될 때, 50~100px 정도 추가로 스크롤되어 다음 작품(featured work)의 상단 영역이 삐져나와 보이는 간헐적 버그를 수정합니다.
+- Career의 마지막 부분에서 Work 섹션으로 전환될 때, 마우스 휠 한 틱만 굴려도 과도하게 빠르게 넘어가거나, 전환 직후 유입되는 관성 스크롤(Inertia)로 인해 Work 섹션의 위치가 딱 들어맞지 않고 어긋나는 현상을 해결합니다.
 
 ### 구현 및 수정 내용
 - `src/styles/global.css`
-  - WebKit(Safari) 환경에서 `::-webkit-scrollbar`를 임의로 조작하거나 `overscroll-behavior-y: contain` 속성을 사용할 때, 일반 물리 마우스 휠(Physical Mouse Wheel)의 네이티브 스크롤이 완전히 무시되는 WebKit 고유 버그가 있었습니다.
-  - 이를 해결하기 위해 `.home-scroll:not(.is-free-scroll)::-webkit-scrollbar` 관련 스크롤바 조작 코드와 `overscroll-behavior-y: contain` 선언을 **완전히 제거**했습니다.
-  - 모던 Safari(16.4+) 및 크롬/파이어폭스 환경에서는 표준 속성인 `scrollbar-width: none;` 만으로도 휠 스크롤 끊김 없이 깔끔하게 스크롤바가 숨겨집니다.
+  - WebKit(Safari) 환경에서 `::-webkit-scrollbar`를 임의로 조작하거나 `overscroll-behavior-y: contain` 속성을 사용할 때, 일반 물리 마우스 휠(Physical Mouse Wheel)의 네이티브 스크롤이 완전히 무시되는 WebKit 고유 버그를 해결하기 위해 스크롤바 조작 코드와 `overscroll-behavior-y: contain` 선언을 **완전히 제거**했습니다.
 - `src/components/HomePage.astro`
-  - **프로그래매틱 스크롤 직후 위치 보정 해결:** `updateScrollTriggersAfterProgrammaticScroll()` 함수에서 모든 브라우저(Safari 포함 Chrome 등)를 대상으로 programmatic scroll 직후에는 `ScrollTrigger.refresh()` 대신 `ScrollTrigger.update()`만 호출하도록 수정했습니다. `ScrollTrigger.refresh()`는 전체 레이아웃 bounds를 강제로 재계산하여 sticky/svh/dvh 스크롤 위치 보정(50~100px 튕김 현상)을 유발하는 문제가 있어 이를 제거했습니다.
-  - **모바일 터치 이동 스크롤 누수 차단:** `touchmove` 리스너에서 첫 번째 스크롤 신호를 처리해 스냅이 진행 중이거나(`isScrollLocked()`), 스냅 영역(`shouldSnapInput()`)에 있는 동안 사용자의 손가락 드래그 제스처로 인한 추가적인 네이티브 스크롤(터치 누수)이 페이지를 어긋나게 만들지 않도록, 두 번째 이후 터치 이벤트에서도 `event.preventDefault()`를 계속 호출해 차단하도록 로직을 강화했습니다.
+  - **프로그래매틱 스크롤 직후 위치 보정 해결:** `updateScrollTriggersAfterProgrammaticScroll()` 함수에서 모든 브라우저를 대상으로 programmatic scroll 직후에는 `ScrollTrigger.refresh()` 대신 `ScrollTrigger.update()`만 호출하도록 수정해 50~100px 튕김 현상을 유발하는 강제 레이아웃 계산을 제거했습니다.
+  - **이중 스크롤 락 및 경계 차단 구현:**
+    - `isCareerItemInputLocked()` 함수가 기존에 경계를 벗어나는 순간 즉시 무력화되던 버그를 고쳤습니다. 이제 스크롤 위치가 identity 섹션 부근(`[getIdentityTop() - 100, getWorkTop() + 100]`)에 있는 동안은 카드가 전환된 직후 360ms 동안 스크롤 입력을 완전히 잠급니다.
+    - 경계를 이탈해 작품으로 스냅하는 `crossedCareerToWork` 조건식에도 `Date.now() >= lockedUntil && Date.now() >= careerItemLockedUntil` 조건을 추가하여, 마지막 카드가 켜진 직후 360ms의 락 타임 동안 한 틱의 휠 입력만으로 조기 이탈하는 문제를 철저히 예방했습니다.
+  - **관성 필터링용 Post-completion Lock 도입:**
+    - `snapCareerWorkCover`, `snapIntroAboutCover`, `snapToTarget` 등 모든 스냅 애니메이션의 `onComplete` 시점에 `lockedUntil = Date.now() + 240;` 을 지정했습니다.
+    - 애니메이션 완성 직후 240ms 동안 입력 잠금을 걸어, 사용자의 이전 드래그/휠 제스처에서 발생한 잔여 관성 스크롤(Inertia)이 유입되어 스냅 타겟(Work 섹션 등)의 위치를 미세하게 어긋나게 만드는 버그를 완전히 차단했습니다.
 
 ### 검증 결과
-- 모바일 뷰포트(390x844) 및 데스크톱 Chrome 환경에서 다음 시나리오를 검증하고 녹화본을 기록했습니다. (녹화본 경로: `walkthrough.md`에 연결된 `/Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/recording.webm`)
-  - **스크롤 전환 흐름:** `Intro -> About -> Career -> Work Intro -> Featured -> Work Gallery` 패널 간의 스냅 및 스크롤 모드 전환이 매끄럽게 동작하며, Career -> Work 전환 시 아래로 50~100px 밀려나던 오차가 더 이상 발생하지 않습니다.
-  - **커리어 타임라인:** Y축 스크롤에 따른 5개 카드의 순차적 활성화 및 360ms의 중복 입력 방지 락(`careerItemLockDuration`)이 의도대로 동작합니다.
+- 모바일 뷰포트 및 데스크톱 Chrome 환경에서 검증 시나리오를 통과했습니다. (녹화본 경로: [scroll_transition_fix.webm](file:///Users/sihyeon/.gemini/antigravity/brain/4deba52f-c0d2-4360-8d3c-f8c39a9520df/scroll_transition_fix.webm))
+  - **이탈 및 락 동작:** 커리어 마지막 카드가 활성화된 직후 마우스를 재차 스크롤해도 360ms 동안 정지 상태를 유지하여 정보를 충분히 보여줍니다.
+  - **작품 정렬:** 락 해제 후 스크롤을 내리면 작품 섹션의 시작 위치(`scrollY: 2440` 등 offsetTop과 완전 일치)에 자석처럼 완벽히 밀착하여 정렬되며 관성 밀림 현상이 전혀 없습니다.
+  - **뒤로가기 복원:** 일반 갤러리 카드 및 Featured 카드의 상세 페이지 진입 후 브라우저 뒤로가기 시 기존 목록의 스크롤 위치가 오차 없이 복원됩니다.
   - **뒤로가기 복원:** 일반 갤러리 카드 및 Featured 카드의 상세 페이지 진입 후 브라우저 뒤로가기(또는 상단 목록 버튼)를 실행했을 때 기존 목록의 스크롤 위치가 정확하게 복원됩니다.
   - **레이아웃:** 모바일 뷰포트에서 가로 스크롤(Horizontal overflow)이 발생하지 않는 구조적 안정성을 확인했습니다.
 

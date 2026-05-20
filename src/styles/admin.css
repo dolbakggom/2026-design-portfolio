@@ -684,8 +684,8 @@ input[type="file"] {
 }
 
 .work-editor-actions {
-  margin-top: 0;
-  padding-bottom: 4px;
+  margin-top: 6px;
+  padding-bottom: 8px;
 }
 
 .toggle-row {
@@ -1481,9 +1481,6 @@ button.block-drag-handle svg {
     display: none !important;
   }
 
-  .work-editor-actions .primary-action {
-    display: none !important;
-  }
 }
 
 @media (max-width: 660px) {
