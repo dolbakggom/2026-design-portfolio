@@ -2,6 +2,41 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-21 Public image loading performance pass
+
+### 요구사항
+- 초기 GitHub push 시점보다 사이트가 무거워진 원인을 분석합니다.
+- 현재 기능과 화면 구조는 유지하면서 개선 가능한 부분만 적용합니다.
+- Superpowers의 systematic debugging 흐름으로 추측이 아니라 산출물/DB/에셋 근거를 기반으로 판단합니다.
+
+### 분석
+- 현재 빌드 산출물 기준 public 홈에서 직접 붙는 주요 client asset은 `HomePage` JS 약 132KB, 공용 CSS 약 28KB입니다.
+- `/admin` 전용 React/Tiptap 청크(`client` 약 180KB, `BlockEditor` 약 380KB)는 `/admin` 라우트에 붙는 별도 island라 public 홈 라우트의 직접 초기 병목은 아닙니다.
+- 로컬 D1 `assets` 기준 asset 총량은 약 64.5MB, 최대 단일 이미지는 약 8.7MB PNG입니다.
+- 게시된 featured/gallery 작업물도 0.7MB~2.4MB급 원본 이미지를 `/media/...`로 그대로 사용합니다.
+- 특히 gallery thumbnail은 `<img loading="lazy">`가 아니라 CSS `background-image: var(--tile-image)` 방식이라 브라우저 네이티브 lazy loading의 도움을 받지 못하고, 초기/근접 로딩 시 불필요하게 빨리 당겨질 수 있었습니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - gallery thumbnail을 CSS background-image 구조에서 실제 `<img loading="lazy" decoding="async">` 구조로 변경했습니다.
+  - 기존 cover crop 시각은 CSS `object-fit: cover`로 유지했습니다.
+  - featured image와 profile image에도 `decoding="async"`/lazy loading을 보강했습니다.
+- `src/styles/global.css`
+  - `.work-tile-media`의 `background-image` 의존을 제거하고 내부 `<img>`가 16:9 영역을 cover하도록 스타일을 추가했습니다.
+- `src/components/WorkBlocks.astro`
+  - 상세 본문 image/gallery 블록 이미지에 `decoding="async"`를 추가했습니다.
+- `src/pages/work/[slug].astro`
+  - 상세 페이지 상단 cover 이미지에 `decoding="async"`와 `fetchpriority="high"`를 추가해 상세 진입 시 첫 cover 우선순위를 명확히 했습니다.
+
+### 남은 주의점
+- R2 원본 이미지 자체가 큰 것은 그대로입니다. 이번 변경은 “초기/불필요한 선로딩”을 줄이는 코드 레벨 개선입니다.
+- 더 큰 체감 개선이 필요하면 기존 R2 이미지를 리사이즈/재압축하거나, 업로드 시 thumbnail/featured/detail variant를 따로 생성하는 이미지 파이프라인이 필요합니다.
+
+### 검증
+- `git diff --check` 통과
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints
+- 빌드된 HomePage 서버 chunk에서 gallery thumbnail이 `loading="lazy" decoding="async"`가 붙은 `<img>`로 렌더링되는 것을 확인했습니다.
+
 ## 2026-05-21 Work intro color and admin media upload refinement
 
 ### 요구사항

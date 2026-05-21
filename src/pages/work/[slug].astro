@@ -26,7 +26,7 @@ if (!work) {
           </div>
           <div class="work-detail-cover-fixed">
             {coverImage?.url ? (
-              <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" data-cover-image />
+              <img src={coverImage.url} alt={coverImage.alt ?? work.title} crossorigin="anonymous" decoding="async" fetchpriority="high" data-cover-image />
             ) : (
               <div class="work-detail-cover-placeholder" aria-hidden="true" />
             )}

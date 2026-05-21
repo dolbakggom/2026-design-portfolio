@@ -83,7 +83,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
         <div class="identity-side">
           <figure class="profile-media" data-profile-media>
-            <img src={profile.portrait?.url ?? fallbackPortraitSrc} alt={profile.portrait?.alt ?? profile.name} />
+            <img src={profile.portrait?.url ?? fallbackPortraitSrc} alt={profile.portrait?.alt ?? profile.name} loading="lazy" decoding="async" />
             <figcaption>취미로 기타를 치고 있습니다.</figcaption>
           </figure>
 
@@ -124,6 +124,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                         alt={work.featuredThumbnail?.alt ?? work.thumbnail?.alt ?? work.title}
                         crossorigin="anonymous"
                         loading="lazy"
+                        decoding="async"
                       />
                     ) : null}
                   </div>
@@ -179,12 +180,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           {
             works.map((work) => (
               <a class="work-tile" href={`/work/${work.slug}`} data-category={work.category} aria-label={`${work.title} 자세히 보기`}>
-                <div
-                  class:list={["work-tile-media", work.thumbnail?.url && "has-image"]}
-                  style={work.thumbnail?.url ? `--tile-image: url("${work.thumbnail.url}")` : undefined}
-                  aria-label={work.thumbnail?.alt ?? work.title}
-                  role="img"
-                />
+                <div class:list={["work-tile-media", work.thumbnail?.url && "has-image"]}>
+                  {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} loading="lazy" decoding="async" /> : null}
+                </div>
                 <div>
                   <h3>{work.title}</h3>
                 </div>
