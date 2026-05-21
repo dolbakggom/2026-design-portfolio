@@ -90,10 +90,21 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           <div class="timeline-items" data-career-list>
             {
               timeline.map((item, index) => (
-                <article class:list={["timeline-card", index === 0 && "is-active"]} data-timeline-card>
+                <article
+                  class:list={["timeline-card", index === 0 && "is-active"]}
+                  data-timeline-card
+                  data-timeline-index={index}
+                  role="button"
+                  tabindex="0"
+                  aria-label={`${item.period} ${item.title} 이력으로 이동`}
+                >
                   <p>{item.period}</p>
-                  <h3>{item.title}</h3>
-                  <span>{item.organization}</span>
+                  <div class="timeline-card-details">
+                    <div class="timeline-card-details-inner">
+                      <h3>{item.title}</h3>
+                      <span>{item.organization}</span>
+                    </div>
+                  </div>
                 </article>
               ))
             }
@@ -535,6 +546,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       route: string;
       kind: "intro" | "about" | "careerEntry" | "career" | "work" | "featured" | "gallery";
       featuredIndex?: number;
+      careerProgress?: number;
     };
 
     const snapTolerance = 10;
@@ -552,6 +564,15 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - getStickyStageHeight());
     const getCareerEntryTop = () => getIdentityTop() + getIdentityProgressRange() * careerStartProgress;
     const getCareerExitTop = () => getIdentityTop() + getIdentityProgressRange() * careerEndProgress;
+    const getCareerPointProgress = (index: number) => {
+      const count = Math.max(1, timelineCards.length);
+      return gsap.utils.clamp(0, 0.999, (index + 0.5) / count);
+    };
+    const getCareerPointTop = (index: number) => {
+      const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
+      const pointProgress = startProgress + (careerEndProgress - startProgress) * getCareerPointProgress(index);
+      return getIdentityTop() + getIdentityProgressRange() * pointProgress;
+    };
     const isFreeScrollRange = () => window.scrollY >= getGalleryTop() - snapTolerance;
     const isNativeCareerRange = () => window.scrollY >= getCareerEntryTop() - snapTolerance && window.scrollY <= getCareerExitTop() + snapTolerance;
     const isCareerItemInputLocked = () => {
@@ -654,7 +675,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           gsap.set(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
         }
         setCareerListStage(target.kind === "career" || !isMobileIdentityLayout(), true);
-        setIdentityMode("career", target.kind === "careerEntry" ? 0 : 0.999);
+        setIdentityMode("career", target.kind === "careerEntry" ? 0 : target.careerProgress ?? 0.999);
       }
     };
 
@@ -785,6 +806,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         if (identity?.classList.contains("is-career-list")) {
           activeCareerWorkUnderlay.classList.add("is-career-list");
         }
+        gsap.set(activeCareerWorkUnderlay, { "--career-work-dim": 0, autoAlpha: 1 });
       }
 
       const workCover = createWorkCover();
@@ -792,9 +814,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         clearCareerWorkCover();
         return false;
       }
+      gsap.set(workCover, { yPercent: movingToWork ? 100 : 0 });
 
       lockScroll(snapLockDuration);
-      gsap.set(workCover, { yPercent: movingToWork ? 100 : 0 });
 
       snapTween = gsap.timeline({
         onComplete: () => {
@@ -815,12 +837,21 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       applySnapState(target);
       updateScrollTriggersAfterProgrammaticScroll();
 
+      if (movingToWork && activeCareerWorkUnderlay) {
+        snapTween.to(activeCareerWorkUnderlay, {
+          "--career-work-dim": 0.85,
+          duration: snapDuration,
+          ease: "power2.out",
+          overwrite: true
+        }, 0);
+      }
+
       snapTween.to(workCover, {
         yPercent: movingToWork ? 0 : 100,
         duration: snapDuration,
         ease: "power3.inOut",
         overwrite: true
-      });
+      }, 0);
 
       return true;
     };
@@ -894,6 +925,37 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
         jumpToFeaturedTarget(target);
       }, { signal: pageSignal });
+    });
+
+    const jumpToCareerPoint = (index: number) => {
+      if (!Number.isFinite(index) || index < 0 || index >= timelineCards.length) return;
+
+      snapTween?.kill();
+      snapTween = null;
+      careerItemLockedUntil = 0;
+      needsQuietPeriod = false;
+      snapToTarget(
+        {
+          y: getCareerPointTop(index),
+          route: "/career",
+          kind: "career",
+          careerProgress: getCareerPointProgress(index)
+        },
+        true
+      );
+    };
+
+    timelineCards.forEach((card, index) => {
+      card.addEventListener("click", () => jumpToCareerPoint(index), { signal: pageSignal });
+      card.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          jumpToCareerPoint(index);
+        },
+        { signal: pageSignal }
+      );
     });
 
     const scrollToIntroFromFloatingButton = () => {
