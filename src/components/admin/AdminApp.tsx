@@ -333,8 +333,11 @@ function WorkLivePreview({ work }: { work: WorkItem }) {
           <p>Live preview</p>
           <h3>{work.title || "Untitled work"}</h3>
         </div>
-        <a href={`/work/${work.slug}`} target="_blank" rel="noreferrer">
-          Open
+        <a href={`/work/${work.slug}`} target="_blank" rel="noreferrer" aria-label="Open live preview in a new tab" title="Open live preview">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M7 17L17 7" />
+            <path d="M9 7h8v8" />
+          </svg>
         </a>
       </header>
 
@@ -1306,16 +1309,38 @@ export default function AdminApp() {
                               <div className="media-preview">
                                 {media?.url ? <img src={media.url} alt={media.alt ?? selectedWork.title} /> : <span>No image</span>}
                               </div>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(event) => {
-                                  const input = event.currentTarget;
-                                  void uploadWorkAsset(field.kind, input.files?.[0]).finally(() => {
-                                    input.value = "";
-                                  });
+                              <label
+                                className="media-upload-zone"
+                                onDragOver={(event: DragEvent<HTMLLabelElement>) => {
+                                  event.preventDefault();
+                                  event.dataTransfer.dropEffect = "copy";
                                 }}
-                              />
+                                onDrop={(event: DragEvent<HTMLLabelElement>) => {
+                                  event.preventDefault();
+                                  void uploadWorkAsset(field.kind, event.dataTransfer.files?.[0]);
+                                }}
+                              >
+                                <input
+                                  className="media-upload-input"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(event) => {
+                                    const input = event.currentTarget;
+                                    void uploadWorkAsset(field.kind, input.files?.[0]).finally(() => {
+                                      input.value = "";
+                                    });
+                                  }}
+                                />
+                                <span className="media-upload-icon" aria-hidden="true">
+                                  <svg viewBox="0 0 24 24">
+                                    <path d="M12 16V5" />
+                                    <path d="M8 9l4-4 4 4" />
+                                    <path d="M5 16v2.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V16" />
+                                  </svg>
+                                </span>
+                                <span className="media-upload-text">클릭하거나 파일을 이곳으로 드래그하세요</span>
+                                <span className="media-upload-note">이미지는 업로드 후 Save를 눌러야 게시됩니다.</span>
+                              </label>
                             </section>
                           );
                         })}

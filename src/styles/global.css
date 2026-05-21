@@ -211,6 +211,15 @@ button:disabled {
   color: var(--color-white);
 }
 
+.work-intro-section {
+  background: var(--color-acid);
+  color: var(--color-ink);
+}
+
+.work-intro-section .site-logo {
+  filter: brightness(0);
+}
+
 .intro-cover-underlay {
   position: fixed;
   inset: 0;
@@ -284,9 +293,13 @@ button:disabled {
   white-space: nowrap;
 }
 
+.work-intro-section h2 {
+  color: var(--color-ink);
+}
+
 .work-intro-section h2::after {
   content: ".";
-  color: var(--color-acid);
+  color: currentColor;
 }
 
 .intro-dot {

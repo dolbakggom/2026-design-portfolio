@@ -2,6 +2,32 @@
 
 이 파일은 집/회사 환경과 Codex 세션이 달라도 다음 에이전트가 작업 맥락을 바로 이어받을 수 있도록 남기는 작업 기록입니다. 새 커밋이나 푸시를 만들기 전에는 이 파일에 변경 이유, 구현 방식, 검증 결과를 추가하세요.
 
+## 2026-05-21 Work intro color and admin media upload refinement
+
+### 요구사항
+- Work intro 섹션의 배경을 메인 accent color(`--color-acid`)로 바꾸고, 로고와 `WORK.` 타이틀은 검정색으로 바꿉니다.
+- Admin 작업물 에디터의 썸네일 파일 업로드 input을 기본 브라우저 UI가 아닌 점선 테두리 Drag & Drop 업로드 존으로 바꿉니다.
+- Admin 우측 `LIVE PREVIEW` 상단의 `Open` 텍스트 버튼을 직관적인 외부 열기 아이콘 버튼으로 바꿉니다.
+- 특히 업로드 UI가 모바일에서 깨지지 않도록 반응형 크기를 조정합니다.
+
+### 구현
+- `src/styles/global.css`
+  - `.work-intro-section` 배경을 `var(--color-acid)`로 변경했습니다.
+  - Work intro 내부 로고에는 `filter: brightness(0)`을 적용하고, 제목과 점은 `var(--color-ink)`/`currentColor`로 통일했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - `WorkLivePreview`의 `Open` 텍스트를 accessible label이 있는 아이콘 링크로 교체했습니다.
+  - 작업물 이미지 업로드 input을 `.media-upload-zone` label 내부의 숨김 input으로 바꾸고, 클릭 업로드와 파일 드롭 업로드를 모두 지원하도록 했습니다.
+- `src/styles/admin.css`
+  - 점선 테두리, 업로드 아이콘, 안내 문구, 저장 안내 문구를 포함한 업로드 존 스타일을 추가했습니다.
+  - 660px 이하 모바일에서 업로드 존 높이, 아이콘, 문구 크기를 줄여 카드 폭 안에서 안정적으로 감싸지도록 조정했습니다.
+  - Live preview 외부 열기 링크를 정사각형 아이콘 버튼으로 정리했습니다.
+
+### 검증
+- `git diff --check` 통과
+- `npm run build`
+  - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+  - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.
+
 ## 2026-05-20 Admin work editor bottom actions cleanup
 
 ### 요구사항

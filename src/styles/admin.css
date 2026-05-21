@@ -831,11 +831,78 @@ input[type="file"] {
   font-weight: 700;
 }
 
-.media-field input[type="file"] {
-  width: 100%;
-  max-width: 100%;
+.media-upload-zone {
+  position: relative;
+  min-height: 132px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  border: 1.5px dashed rgba(8, 200, 64, 0.42);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  background: #f8fff9;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+  text-transform: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.media-upload-zone:hover,
+.media-upload-zone:focus-within {
+  border-color: var(--admin-accent-border);
+  background: #effcf3;
+  box-shadow: inset 0 0 0 1px rgba(8, 200, 64, 0.1);
+}
+
+.media-field .media-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-  font-size: 0.82rem;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.media-upload-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #e6f9ed;
+  color: var(--admin-accent-border);
+}
+
+.media-upload-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.media-upload-text {
+  max-width: 220px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.media-upload-note {
+  max-width: 240px;
+  color: rgba(0, 0, 0, 0.48);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .media-edit-row img,
@@ -1114,13 +1181,14 @@ button.block-drag-handle svg {
 }
 
 .work-preview-panel > header a {
-  min-height: 32px;
+  width: 34px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border: 1px solid var(--color-ink);
   border-radius: var(--radius-sm);
-  padding: 0 10px;
-  font-size: 0.82rem;
+  padding: 0;
   font-weight: 700;
   transition:
     background 160ms ease,
@@ -1128,6 +1196,16 @@ button.block-drag-handle svg {
     box-shadow 160ms ease,
     color 160ms ease,
     transform 160ms ease;
+}
+
+.work-preview-panel > header a svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
 }
 
 .work-preview-scroll {
@@ -1505,6 +1583,26 @@ button.block-drag-handle svg {
     min-width: 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
+  }
+
+  .media-upload-zone {
+    min-height: 116px;
+    padding: 14px;
+  }
+
+  .media-upload-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .media-upload-text {
+    max-width: 100%;
+    font-size: 0.82rem;
+  }
+
+  .media-upload-note {
+    max-width: 100%;
+    font-size: 0.72rem;
   }
 
   /* Links panel editor mobile optimization (2-columns: icon | inputs stacked) */
