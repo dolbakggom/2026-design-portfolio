@@ -22,7 +22,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
 <PublicLayout title={`${profile.headline} | ${profile.name}`} description={profile.bio} htmlClass="home-scroll" bodyClass="home-body">
   <main class="site-shell" data-initial-section={initialSection}>
-    <section class="intro-section snap-panel" aria-label="Intro" data-route="/">
+    <section class="intro-section" aria-label="Intro" data-route="/">
       <div class="intro-grid">
         <img class="site-logo intro-logo" src={logoSrc} alt="" />
         <h1 class="intro-title">
@@ -35,7 +35,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     </section>
 
     <section
-      class="identity-section snap-panel"
+      class="identity-section"
       id="about"
       data-identity
       data-route="/about"
@@ -113,7 +113,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       </div>
     </section>
 
-    <section class="work-intro-section snap-panel" id="work" aria-label="Work intro" data-route="/work">
+    <section class="work-intro-section" id="work" aria-label="Work intro" data-route="/work">
       <img class="site-logo" src={logoSrc} alt="" />
       <h2>WORK</h2>
     </section>
@@ -175,12 +175,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           ) : null
         }
       </div>
-      <div class="featured-steps" aria-hidden="true">
-        {featuredWorks.map((_, index) => <div class="featured-step snap-panel" data-featured-step data-featured-index={index} data-route="/work" />)}
-      </div>
     </section>
 
-    <section class="gallery-section snap-panel" aria-label="Work gallery" data-route="/work">
+    <section class="gallery-section" aria-label="Work gallery" data-route="/work">
       <div class="gallery-canvas">
         <div class="section-heading gallery-heading">
           <div class="category-filter" role="tablist" aria-label="Work category">
@@ -208,9 +205,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
   <script>
     import gsap from "gsap";
     import { ScrollTrigger } from "gsap/ScrollTrigger";
-    import { ScrollToPlugin } from "gsap/ScrollToPlugin";
-
-    gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+    gsap.registerPlugin(ScrollTrigger);
 
     let activeHomeShell: HTMLElement | null = null;
     let cleanupHomePage = () => {};
@@ -223,7 +218,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
       if (!shell) {
         activeHomeShell = null;
-        document.documentElement.classList.remove("intro-complete", "is-free-scroll");
+        document.documentElement.classList.remove("intro-complete");
         return;
       }
 
@@ -231,76 +226,52 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       const pageController = new AbortController();
       const pageSignal = pageController.signal;
       const homeScrollTriggers: ScrollTrigger[] = [];
-      let lockedUntil = 0;
-      let lastScrollEventTime = 0;
-      let needsQuietPeriod = false;
-      let snapInputGateActive = false;
-      let snapInputGateQuietUntil = 0;
-      let snapInputGateTimeout = 0;
-      let snapTween: gsap.core.Tween | gsap.core.Timeline | null = null;
-      let snapObserver: ReturnType<typeof ScrollTrigger.observe> | null = null;
-      let snapSyncFrame = 0;
       let initialScrollFrame = 0;
       let initialScrollTimeout = 0;
-      let activeIntroUnderlay: HTMLElement | null = null;
-      let activeCareerWorkUnderlay: HTMLElement | null = null;
-      let activeWorkCover: HTMLElement | null = null;
-      const portfolioWindow = window as Window & { __portfolioScrollToTop?: () => void };
+      let featuredBlurTimeout = 0;
+      const portfolioWindow = window as Window & {
+        __portfolioScrollToTop?: () => void;
+        __portfolioLenisScrollTo?: (target: number | string | HTMLElement, options?: { immediate?: boolean; duration?: number }) => void;
+      };
       let scrollToTopHandler: (() => void) | null = null;
-      let programmaticTopScroll = false;
-      let restoreTopScrollSnap = () => {};
 
       cleanupHomePage = () => {
         if (scrollToTopHandler && portfolioWindow.__portfolioScrollToTop === scrollToTopHandler) {
           delete portfolioWindow.__portfolioScrollToTop;
         }
-        restoreTopScrollSnap();
-        programmaticTopScroll = false;
         pageController.abort();
-        window.cancelAnimationFrame(snapSyncFrame);
         window.cancelAnimationFrame(initialScrollFrame);
-        if (snapInputGateTimeout) {
-          window.clearTimeout(snapInputGateTimeout);
-        }
         if (initialScrollTimeout) {
           window.clearTimeout(initialScrollTimeout);
         }
-        snapTween?.kill();
-        if (snapInputGateTimeout) {
-          window.clearTimeout(snapInputGateTimeout);
-          snapInputGateTimeout = 0;
+        if (featuredBlurTimeout) {
+          window.clearTimeout(featuredBlurTimeout);
         }
-        snapInputGateActive = false;
-        snapInputGateQuietUntil = 0;
-        activeIntroUnderlay?.remove();
-        activeCareerWorkUnderlay?.remove();
-        activeWorkCover?.remove();
-        const coverPanel = document.querySelector<HTMLElement>(".identity-stage.is-cover-panel");
-        if (coverPanel) {
-          coverPanel.classList.remove("is-cover-panel");
-          gsap.set(coverPanel, { clearProps: "transform" });
-        }
-        snapObserver?.kill();
         homeScrollTriggers.forEach((trigger) => trigger.kill());
-        document.documentElement.classList.remove("intro-complete", "is-free-scroll");
+        document.documentElement.classList.remove("intro-complete");
         activeHomeShell = null;
         cleanupHomePage = () => {};
       };
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const userAgent = window.navigator.userAgent;
-    const isIOSWebKit = /iP(ad|hone|od)/.test(userAgent) || (/Macintosh/.test(userAgent) && window.navigator.maxTouchPoints > 1);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent);
-    const usesSafariScrollEngine = isSafari || isIOSWebKit;
     const initialSection = shell.dataset.initialSection ?? "intro";
-    let preserveWorkRoute = initialSection === "work";
     const navigationEntry = window.performance?.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     const shouldPreserveRestoredWorkScroll = initialSection === "work" && navigationEntry?.type === "back_forward";
 
-    const updateScrollTriggersAfterProgrammaticScroll = () => {
-      // scroll-behavior 및 sticky/svh 레이아웃 재계산으로 인한 스크롤 위치 보정(튕김) 현상을 방지하기 위해,
-      // 모든 브라우저에서 programmatic scroll 직후에는 ScrollTrigger.refresh() 대신 ScrollTrigger.update()만 호출합니다.
+    const updateScrollTriggers = () => {
       ScrollTrigger.update();
+    };
+
+    const scrollToPosition = (top: number, mode: "auto" | "smooth" = "smooth") => {
+      if (portfolioWindow.__portfolioLenisScrollTo) {
+        portfolioWindow.__portfolioLenisScrollTo(Math.round(top), {
+          immediate: mode === "auto",
+          duration: mode === "smooth" ? 1.05 : 0
+        });
+        return;
+      }
+
+      window.scrollTo({ top: Math.round(top), behavior: mode === "smooth" ? "smooth" : "auto" });
     };
 
     const replaceRoute = (route: string) => {
@@ -309,11 +280,6 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     };
 
     const clearHomeRoute = () => {
-      if (preserveWorkRoute) {
-        replaceRoute("/work");
-        return;
-      }
-
       const gallery = document.querySelector<HTMLElement>(".gallery-section");
       if (gallery && window.scrollY >= gallery.offsetTop - 10) {
         replaceRoute("/work");
@@ -323,57 +289,6 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       if (["/about", "/career", "/work"].includes(window.location.pathname)) {
         replaceRoute("/");
       }
-    };
-
-    const lockScroll = (duration = 1050) => {
-      lockedUntil = Math.max(lockedUntil, Date.now() + duration);
-    };
-
-    const isScrollLocked = () => Date.now() < lockedUntil || Boolean(snapTween) || needsQuietPeriod || snapInputGateActive;
-
-    const snapInputKeys = new Set(["ArrowDown", "PageDown", " ", "ArrowUp", "PageUp", "Home", "End"]);
-    const snapInputGateQuietDuration = 180;
-
-    const scheduleSnapInputGateRelease = () => {
-      if (snapInputGateTimeout) {
-        window.clearTimeout(snapInputGateTimeout);
-      }
-
-      const remaining = snapInputGateQuietUntil - Date.now();
-      if (remaining > 0) {
-        snapInputGateTimeout = window.setTimeout(scheduleSnapInputGateRelease, remaining);
-        return;
-      }
-
-      snapInputGateTimeout = 0;
-      snapInputGateActive = false;
-      requestSnapObserverSync();
-    };
-
-    const beginSnapInputGate = () => {
-      snapInputGateActive = true;
-      snapInputGateQuietUntil = 0;
-      if (snapInputGateTimeout) {
-        window.clearTimeout(snapInputGateTimeout);
-        snapInputGateTimeout = 0;
-      }
-      if (snapObserver?.isEnabled) {
-        snapObserver.disable();
-      }
-    };
-
-    const finishSnapInputGate = () => {
-      if (!snapInputGateActive) return;
-      snapInputGateQuietUntil = Math.max(snapInputGateQuietUntil, Date.now() + snapInputGateQuietDuration);
-      scheduleSnapInputGateRelease();
-    };
-
-    const blockSnapInputWhenGated = (event: Event) => {
-      if (!snapInputGateActive) return false;
-      snapInputGateQuietUntil = Date.now() + snapInputGateQuietDuration;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      return true;
     };
 
     const typeText = (target: HTMLElement, value: string, speed = 58, done?: () => void) => {
@@ -464,6 +379,8 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const featuredPanels = gsap.utils.toArray<HTMLElement>("[data-featured-panel]");
     const featuredDots = gsap.utils.toArray<HTMLElement>("[data-featured-dot]");
     const featuredStage = document.querySelector<HTMLElement>(".featured-stage");
+    const featuredSection = document.querySelector<HTMLElement>("#featured-work");
+    const gallerySection = document.querySelector<HTMLElement>(".gallery-section");
     const mobileIdentityQuery = window.matchMedia("(max-width: 1180px)");
 
     const isMobileIdentityLayout = () => mobileIdentityQuery.matches;
@@ -516,10 +433,6 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         .to(profileContact, { autoAlpha: 1, y: 0, duration: 0.62, ease: "power3.out" }, "+=0.24");
     };
 
-    let activeTimelineIndex = -1;
-    let careerItemLockedUntil = 0;
-    const careerItemLockDuration = 360;
-
     const setIdentityMode = (mode: "about" | "career", progress = 0) => {
       if (!identity) return;
       const isCareer = mode === "career";
@@ -534,10 +447,6 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
       if (timelineCards.length) {
         const activeIndex = Math.min(timelineCards.length - 1, Math.max(0, Math.floor(progress * timelineCards.length)));
-        if (isCareer && activeTimelineIndex !== -1 && activeIndex !== activeTimelineIndex) {
-          careerItemLockedUntil = Date.now() + careerItemLockDuration;
-        }
-        activeTimelineIndex = activeIndex;
         timelineCards.forEach((card, index) => card.classList.toggle("is-active", index === activeIndex));
       }
     };
@@ -549,10 +458,45 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const setActiveFeatured = (activeIndex: number) => {
       featuredPanels.forEach((panel, index) => {
         panel.classList.toggle("is-active", index === activeIndex);
+        panel.setAttribute("aria-hidden", index === activeIndex ? "false" : "true");
+        panel.querySelectorAll<HTMLAnchorElement>("a").forEach((link) => {
+          if (index === activeIndex) {
+            link.removeAttribute("tabindex");
+          } else {
+            link.setAttribute("tabindex", "-1");
+          }
+        });
       });
       featuredDots.forEach((dot, index) => {
         dot.classList.toggle("is-active", index === activeIndex);
+        dot.setAttribute("aria-pressed", index === activeIndex ? "true" : "false");
       });
+    };
+
+    const getIdentityTop = () => identity?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getWorkTop = () => document.querySelector<HTMLElement>("#work")?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getFeaturedTop = () => featuredSection?.offsetTop ?? Number.POSITIVE_INFINITY;
+    const getPanelHeight = () => document.querySelector<HTMLElement>(".intro-section")?.offsetHeight || window.innerHeight;
+    const getStickyStageHeight = () => identityStage?.offsetHeight || window.innerHeight;
+    const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - getStickyStageHeight());
+    const getCareerEntryTop = () => getIdentityTop() + getIdentityProgressRange() * careerStartProgress;
+    const getCareerPointProgress = (index: number) => {
+      const count = Math.max(1, timelineCards.length);
+      return gsap.utils.clamp(0, 0.999, (index + 0.5) / count);
+    };
+    const getCareerPointTop = (index: number) => {
+      const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
+      const pointProgress = startProgress + (careerEndProgress - startProgress) * getCareerPointProgress(index);
+      return getIdentityTop() + getIdentityProgressRange() * pointProgress;
+    };
+    const getFeaturedIndexTop = (index: number) => {
+      const count = Math.max(1, featuredPanels.length);
+      const clampedIndex = gsap.utils.clamp(0, count - 1, index);
+      return getFeaturedTop() + getPanelHeight() * clampedIndex;
+    };
+
+    const setCareerWorkDissolve = (progress: number) => {
+      identityStage?.style.setProperty("--career-work-dim", `${gsap.utils.clamp(0, 0.82, progress * 0.82)}`);
     };
 
     if (identity && !reduceMotion) {
@@ -561,6 +505,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         start: "top top",
         end: "bottom bottom",
         scrub: true,
+        invalidateOnRefresh: true,
         onEnter: playAboutIntro,
         onEnterBack: playAboutIntro,
         onUpdate: (self) => {
@@ -576,437 +521,30 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       }));
     }
 
-    if (!reduceMotion) {
-      gsap.utils.toArray<HTMLElement>(".snap-panel").forEach((panel) => {
-        homeScrollTriggers.push(ScrollTrigger.create({
-          trigger: panel,
-          start: "top center",
-          end: "bottom center",
-          onEnter: () => panel.matches(".gallery-section") ? replaceRoute("/work") : clearHomeRoute(),
-          onEnterBack: () => panel.matches(".gallery-section") ? replaceRoute("/work") : clearHomeRoute()
-        }));
-      });
-
-      gsap.utils.toArray<HTMLElement>("[data-featured-step]").forEach((step, index) => {
-        homeScrollTriggers.push(ScrollTrigger.create({
-          trigger: step,
-          start: "top center",
-          end: "bottom center",
-          onEnter: () => setActiveFeatured(index),
-          onEnterBack: () => setActiveFeatured(index)
-        }));
-      });
-    }
-
-    type SnapTarget = {
-      y: number;
-      route: string;
-      kind: "intro" | "about" | "careerEntry" | "career" | "work" | "featured" | "gallery";
-      featuredIndex?: number;
-      careerProgress?: number;
-    };
-
-    const snapTolerance = 10;
-    const snapLockDuration = 760;
-    const aboutLockDuration = 760;
-    const snapDuration = 0.74;
-
-    const getIdentityTop = () => document.querySelector<HTMLElement>("[data-identity]")?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getWorkTop = () => document.querySelector<HTMLElement>("#work")?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getFeaturedTop = () => document.querySelector<HTMLElement>("#featured-work")?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getFirstFeaturedTop = getFeaturedTop;
-    const getGalleryTop = () => document.querySelector<HTMLElement>(".gallery-section")?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getSnapPanelHeight = () => document.querySelector<HTMLElement>("[data-featured-step]")?.offsetHeight || document.querySelector<HTMLElement>(".intro-section")?.offsetHeight || window.innerHeight;
-    const getStickyStageHeight = () => document.querySelector<HTMLElement>(".identity-stage")?.offsetHeight || window.innerHeight;
-    const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - getStickyStageHeight());
-    const getCareerEntryTop = () => getIdentityTop() + getIdentityProgressRange() * careerStartProgress;
-    const getCareerExitTop = () => getIdentityTop() + getIdentityProgressRange() * careerEndProgress;
-    const getCareerPointProgress = (index: number) => {
-      const count = Math.max(1, timelineCards.length);
-      return gsap.utils.clamp(0, 0.999, (index + 0.5) / count);
-    };
-    const getCareerPointTop = (index: number) => {
-      const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
-      const pointProgress = startProgress + (careerEndProgress - startProgress) * getCareerPointProgress(index);
-      return getIdentityTop() + getIdentityProgressRange() * pointProgress;
-    };
-    const isFreeScrollRange = () => window.scrollY >= getGalleryTop() - snapTolerance;
-    const isNativeCareerRange = () => window.scrollY >= getCareerEntryTop() - snapTolerance && window.scrollY <= getCareerExitTop() + snapTolerance;
-    const isCareerItemInputLocked = () => {
-      if (snapTween) return false;
-      const currentY = window.scrollY;
-      const inIdentitySection = currentY >= getIdentityTop() - 100 && currentY <= getWorkTop() + 100;
-      return inIdentitySection && Date.now() < careerItemLockedUntil;
-    };
-    const shouldBlockCareerItemInput = () => !usesSafariScrollEngine && isCareerItemInputLocked();
-
-    const getSnapTargets = () => {
-      const intro = document.querySelector<HTMLElement>(".intro-section");
-      const identitySection = document.querySelector<HTMLElement>("[data-identity]");
-      const workSection = document.querySelector<HTMLElement>("#work");
-      const featuredSection = document.querySelector<HTMLElement>("#featured-work");
-      const gallery = document.querySelector<HTMLElement>(".gallery-section");
-      const targets: SnapTarget[] = [];
-
-      if (intro) targets.push({ y: intro.offsetTop, route: "/", kind: "intro" });
-      if (identitySection) {
-        targets.push({ y: identitySection.offsetTop, route: "/about", kind: "about" });
-        targets.push({ y: getCareerEntryTop(), route: "/career", kind: "careerEntry" });
-        targets.push({ y: getCareerExitTop(), route: "/career", kind: "career" });
-      }
-      if (workSection) targets.push({ y: workSection.offsetTop, route: "/work", kind: "work" });
-      if (featuredSection) {
-        featuredPanels.forEach((_, index) => {
-          targets.push({
-            y: featuredSection.offsetTop + getSnapPanelHeight() * index,
-            route: "/work",
-            kind: "featured",
-            featuredIndex: index
-          });
-        });
-      }
-      if (gallery) targets.push({ y: gallery.offsetTop, route: "/work", kind: "gallery" });
-
-      return targets.sort((a, b) => a.y - b.y);
-    };
-
-    const getNextSnapTarget = (targets: SnapTarget[], direction: 1 | -1) => {
-      const currentY = window.scrollY;
-      const careerTarget = targets.find((target) => target.kind === "career");
-
-      if (
-        direction < 0 &&
-        careerTarget &&
-        currentY > getWorkTop() + snapTolerance &&
-        currentY < getFirstFeaturedTop() - snapTolerance
-      ) {
-        return careerTarget;
-      }
-
-      if (direction > 0) {
-        return targets.find((target) => target.y > currentY + snapTolerance) ?? null;
-      }
-      return [...targets].reverse().find((target) => target.y < currentY - snapTolerance) ?? null;
-    };
-
-    const applySnapState = (target: SnapTarget) => {
-      if (target.kind === "gallery") {
-        replaceRoute(target.route);
-      } else {
-        clearHomeRoute();
-      }
-
-      if (target.kind === "featured") {
-        setActiveFeatured(target.featuredIndex ?? 0);
-      }
-
-      if (target.kind === "about") {
-        setIdentityMode("about", 0);
-        if (identity?.dataset.aboutPlayed === "true") {
-          if (profileLogo) {
-            gsap.set(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)" });
-          }
-          if (profileContact) {
-            gsap.set(profileContact, { autoAlpha: 1, y: 0, filter: "blur(0px)" });
-          }
-          if (profileMedia) {
-            gsap.set(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
-          }
-          setCareerListStage(false);
-        } else {
-          playAboutIntro();
-        }
-      }
-
-      if (target.kind === "careerEntry" || target.kind === "career") {
-        if (identity) {
-          identity.dataset.aboutPlayed = "true";
-        }
-        if (profileLogo) {
-          gsap.set(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)" });
-        }
-        if (profileContact) {
-          gsap.set(profileContact, { autoAlpha: 0, y: 24 });
-        }
-        if (profileMedia) {
-          gsap.set(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
-        }
-        setCareerListStage(target.kind === "career" || !isMobileIdentityLayout(), true);
-        setIdentityMode("career", target.kind === "careerEntry" ? 0 : target.careerProgress ?? 0.999);
-      }
-    };
-
-    const shouldSnapInput = () => !isFreeScrollRange() && !isNativeCareerRange();
-    let requestSnapObserverSync = () => {};
-
-    const findSnapTarget = (kind: SnapTarget["kind"]) => getSnapTargets().find((target) => target.kind === kind);
-
-    const clearIntroAboutCover = () => {
-      activeIntroUnderlay?.remove();
-      activeIntroUnderlay = null;
-
-      if (identityStage) {
-        identityStage.classList.remove("is-cover-panel");
-        gsap.set(identityStage, { clearProps: "transform" });
-      }
-    };
-
-    const cloneCoverLayer = (source: HTMLElement, className: string) => {
-      const clone = source.cloneNode(true) as HTMLElement;
-      clone.classList.add(className);
-      clone.classList.remove("snap-panel");
-      clone.setAttribute("aria-hidden", "true");
-      document.body.appendChild(clone);
-      return clone;
-    };
-
-    const createIntroUnderlay = () => {
-      const introSection = document.querySelector<HTMLElement>(".intro-section");
-      if (!introSection) return null;
-
-      activeIntroUnderlay?.remove();
-      const underlay = cloneCoverLayer(introSection, "intro-cover-underlay");
-      activeIntroUnderlay = underlay;
-      return underlay;
-    };
-
-    const snapIntroAboutCover = (target: SnapTarget) => {
-      if (reduceMotion || !identityStage) return false;
-
-      const currentY = window.scrollY;
-      const identityTop = getIdentityTop();
-      const movingToAbout = target.kind === "about" && currentY < identityTop - snapTolerance;
-      const movingToIntro =
-        target.kind === "intro" &&
-        currentY >= identityTop - snapTolerance &&
-        currentY < getCareerEntryTop() - snapTolerance;
-
-      if (!movingToAbout && !movingToIntro) return false;
-
-      clearIntroAboutCover();
-      const introUnderlay = createIntroUnderlay();
-      if (!introUnderlay) return false;
-
-      lockScroll(aboutLockDuration);
-      identityStage.classList.add("is-cover-panel");
-      gsap.set(identityStage, { yPercent: movingToAbout ? 100 : 0 });
-
-      snapTween = gsap.timeline({
-        onComplete: () => {
-          snapTween = null;
-          clearIntroAboutCover();
-          if (!movingToAbout) {
-            applySnapState(target);
-          }
-          lockedUntil = Date.now() + 240;
-          finishSnapInputGate();
-          updateScrollTriggersAfterProgrammaticScroll();
-          requestSnapObserverSync();
-        },
-        onInterrupt: () => {
-          snapTween = null;
-          clearIntroAboutCover();
-          finishSnapInputGate();
-          requestSnapObserverSync();
-        }
-      });
-
-      window.scrollTo({ top: Math.round(target.y), behavior: "auto" });
-      applySnapState(target);
-      updateScrollTriggersAfterProgrammaticScroll();
-
-      snapTween.to(identityStage, {
-        yPercent: movingToAbout ? 0 : 100,
-        duration: snapDuration,
-        ease: "power3.inOut",
-        overwrite: true
-      });
-
-      return true;
-    };
-
-    const clearCareerWorkCover = () => {
-      activeCareerWorkUnderlay?.remove();
-      activeCareerWorkUnderlay = null;
-      activeWorkCover?.remove();
-      activeWorkCover = null;
-    };
-
-    const createWorkCover = () => {
-      const workSection = document.querySelector<HTMLElement>("#work");
-      if (!workSection) return null;
-
-      activeWorkCover?.remove();
-      activeWorkCover = cloneCoverLayer(workSection, "work-cover-panel");
-      return activeWorkCover;
-    };
-
-    const snapCareerWorkCover = (target: SnapTarget) => {
-      if (reduceMotion) return false;
-
-      const currentY = window.scrollY;
-      const workTop = getWorkTop();
-      const movingToWork =
-        target.kind === "work" &&
-        currentY >= getCareerExitTop() - snapTolerance * 3 &&
-        currentY < workTop - snapTolerance;
-      const movingToCareer =
-        target.kind === "career" &&
-        currentY >= workTop - snapTolerance &&
-        currentY < getFirstFeaturedTop() - snapTolerance;
-
-      if (!movingToWork && !movingToCareer) return false;
-
-      clearCareerWorkCover();
-
-      if (movingToWork && identityStage) {
-        activeCareerWorkUnderlay = cloneCoverLayer(identityStage, "career-work-cover-underlay");
-        activeCareerWorkUnderlay.classList.add("is-career");
-        if (identity?.classList.contains("is-career-list")) {
-          activeCareerWorkUnderlay.classList.add("is-career-list");
-        }
-        gsap.set(activeCareerWorkUnderlay, { "--career-work-dim": 0, autoAlpha: 1 });
-      }
-
-      const workCover = createWorkCover();
-      if (!workCover) {
-        clearCareerWorkCover();
-        return false;
-      }
-      gsap.set(workCover, { yPercent: movingToWork ? 100 : 0 });
-
-      lockScroll(snapLockDuration);
-
-      snapTween = gsap.timeline({
-        onComplete: () => {
-          snapTween = null;
-          clearCareerWorkCover();
-          lockedUntil = Date.now() + 240;
-          finishSnapInputGate();
-          updateScrollTriggersAfterProgrammaticScroll();
-          requestSnapObserverSync();
-        },
-        onInterrupt: () => {
-          snapTween = null;
-          clearCareerWorkCover();
-          finishSnapInputGate();
-          requestSnapObserverSync();
-        }
-      });
-
-      window.scrollTo({ top: Math.round(target.y), behavior: "auto" });
-      applySnapState(target);
-      updateScrollTriggersAfterProgrammaticScroll();
-
-      if (movingToWork && activeCareerWorkUnderlay) {
-        snapTween.to(activeCareerWorkUnderlay, {
-          "--career-work-dim": 0.85,
-          duration: snapDuration,
-          ease: "power2.out",
-          overwrite: true
-        }, 0);
-      }
-
-      snapTween.to(workCover, {
-        yPercent: movingToWork ? 0 : 100,
-        duration: snapDuration,
-        ease: "power3.inOut",
-        overwrite: true
-      }, 0);
-
-      return true;
-    };
-
-    const snapToTarget = (target: SnapTarget, force = false) => {
-      if (!force && isScrollLocked()) return;
-      beginSnapInputGate();
-      needsQuietPeriod = true;
-      lastScrollEventTime = Date.now();
-      if (snapIntroAboutCover(target)) return;
-      if (snapCareerWorkCover(target)) return;
-
-      lockScroll(target.kind === "about" ? aboutLockDuration : snapLockDuration);
-      snapTween = gsap.to(window, {
-        scrollTo: { y: Math.round(target.y), autoKill: false },
-        duration: snapDuration,
-        ease: "power3.inOut",
-        overwrite: true,
-        onStart: () => {
-          if (target.kind === "featured") {
-            applySnapState(target);
-          }
-        },
-        onComplete: () => {
-          snapTween = null;
-          applySnapState(target);
-          lockedUntil = Date.now() + 240;
-          finishSnapInputGate();
-          updateScrollTriggersAfterProgrammaticScroll();
-          requestSnapObserverSync();
-        },
-        onInterrupt: () => {
-          snapTween = null;
-          finishSnapInputGate();
-          requestSnapObserverSync();
-        }
-      });
-    };
-
-    const jumpToFeaturedTarget = (target: SnapTarget) => {
-      if (target.kind !== "featured") return;
-
-      snapTween?.kill();
-      snapTween = null;
-      preserveWorkRoute = true;
-      lockedUntil = Date.now() + 360;
-
-      const completeJump = () => {
-        window.scrollTo({ top: Math.round(target.y), behavior: "auto" });
-        applySnapState(target);
-        updateScrollTriggersAfterProgrammaticScroll();
-        requestSnapObserverSync();
-
-        window.setTimeout(() => {
-          featuredStage?.classList.remove("is-dot-jumping");
-          lockedUntil = Date.now() + 120;
-        }, reduceMotion ? 0 : 160);
-      };
-
-      if (reduceMotion || !featuredStage) {
-        completeJump();
-        return;
-      }
-
-      featuredStage.classList.add("is-dot-jumping");
-      window.setTimeout(completeJump, 90);
-    };
-
     featuredDots.forEach((dot) => {
       dot.addEventListener("click", () => {
         const targetIndex = Number(dot.dataset.featuredTarget ?? 0);
-        const target = getSnapTargets().find((item) => item.kind === "featured" && item.featuredIndex === targetIndex);
-        if (!target) return;
+        featuredStage?.classList.add("is-dot-jumping");
+        scrollToPosition(getFeaturedIndexTop(targetIndex), "auto");
+        setActiveFeatured(targetIndex);
+        clearHomeRoute();
+        updateScrollTriggers();
 
-        jumpToFeaturedTarget(target);
+        if (featuredBlurTimeout) {
+          window.clearTimeout(featuredBlurTimeout);
+        }
+        featuredBlurTimeout = window.setTimeout(() => {
+          featuredStage?.classList.remove("is-dot-jumping");
+        }, reduceMotion ? 0 : 180);
       }, { signal: pageSignal });
     });
 
     const jumpToCareerPoint = (index: number) => {
       if (!Number.isFinite(index) || index < 0 || index >= timelineCards.length) return;
 
-      snapTween?.kill();
-      snapTween = null;
-      careerItemLockedUntil = 0;
-      needsQuietPeriod = false;
-      snapToTarget(
-        {
-          y: getCareerPointTop(index),
-          route: "/career",
-          kind: "career",
-          careerProgress: getCareerPointProgress(index)
-        },
-        true
-      );
+      scrollToPosition(getCareerPointTop(index), reduceMotion ? "auto" : "smooth");
+      replaceRoute("/career");
+      setIdentityMode("career", getCareerPointProgress(index));
     };
 
     timelineCards.forEach((card, index) => {
@@ -1023,356 +561,84 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     });
 
     const scrollToIntroFromFloatingButton = () => {
-      const target = findSnapTarget("intro") ?? { y: 0, route: "/", kind: "intro" as const };
-      const duration = reduceMotion ? 0 : 1.05;
-      const html = document.documentElement;
-      const body = document.body;
-      const previousHtmlSnap = html.style.scrollSnapType;
-      const previousBodySnap = body.style.scrollSnapType;
-
-      preserveWorkRoute = false;
-      programmaticTopScroll = true;
-      careerItemLockedUntil = 0;
-      lockedUntil = 0;
-      snapTween?.kill();
-      snapTween = null;
-      beginSnapInputGate();
-      snapObserver?.disable();
-      html.classList.remove("is-free-scroll");
-      html.style.scrollSnapType = "none";
-      body.style.scrollSnapType = "none";
       replaceRoute("/");
-
-      restoreTopScrollSnap = () => {
-        html.style.scrollSnapType = previousHtmlSnap;
-        body.style.scrollSnapType = previousBodySnap;
-        restoreTopScrollSnap = () => {};
-      };
-
-      const finishTopScroll = () => {
-        snapTween = null;
-        programmaticTopScroll = false;
-        restoreTopScrollSnap();
-        applySnapState(target);
-        replaceRoute("/");
-        lockedUntil = Date.now() + 180;
-        finishSnapInputGate();
-        updateScrollTriggersAfterProgrammaticScroll();
-        requestSnapObserverSync();
-      };
-
-      snapTween = gsap.to(window, {
-        scrollTo: { y: Math.round(target.y), autoKill: false },
-        duration,
-        ease: "power3.inOut",
-        overwrite: true,
-        onComplete: finishTopScroll,
-        onInterrupt: () => {
-          snapTween = null;
-          programmaticTopScroll = false;
-          restoreTopScrollSnap();
-          finishSnapInputGate();
-          requestSnapObserverSync();
-        }
-      });
+      scrollToPosition(0, reduceMotion ? "auto" : "smooth");
     };
 
     scrollToTopHandler = scrollToIntroFromFloatingButton;
     portfolioWindow.__portfolioScrollToTop = scrollToIntroFromFloatingButton;
 
-    const goToSnap = (direction: 1 | -1) => {
-      const targets = getSnapTargets();
-      if (!targets.length || programmaticTopScroll || isScrollLocked() || !shouldSnapInput()) return;
-
-      const target = getNextSnapTarget(targets, direction);
-      if (!target) return;
-
-      snapToTarget(target);
+    const syncFeaturedScrollHeight = () => {
+      if (!featuredSection) return;
+      featuredSection.style.setProperty("--featured-scroll-height", `${Math.max(1, featuredPanels.length) * getPanelHeight()}px`);
     };
 
-    const snapAcrossBoundaries = (direction: 1 | -1, event?: Event) => {
-      const currentY = window.scrollY;
-      const aboutTarget = findSnapTarget("about");
-      const careerTarget = findSnapTarget("career");
-      const workTarget = findSnapTarget("work");
+    syncFeaturedScrollHeight();
 
-      // Career -> Work (Down)
-      if (
-        direction > 0 &&
-        workTarget &&
-        currentY >= getCareerExitTop() - snapTolerance * 2 &&
-        currentY < getWorkTop() - snapTolerance
-      ) {
-        event?.preventDefault();
-        snapToTarget(workTarget);
-        return true;
-      }
+    setActiveFeatured(0);
 
-      // Work -> Career (Up)
-      if (
-        direction < 0 &&
-        careerTarget &&
-        currentY >= getWorkTop() - snapTolerance &&
-        currentY < getFirstFeaturedTop() - snapTolerance
-      ) {
-        event?.preventDefault();
-        snapToTarget(careerTarget);
-        return true;
-      }
-
-      // CareerEntry -> About (Up)
-      if (
-        direction < 0 &&
-        aboutTarget &&
-        currentY <= getCareerEntryTop() + snapTolerance * 2 &&
-        currentY > getIdentityTop() + snapTolerance
-      ) {
-        event?.preventDefault();
-        snapToTarget(aboutTarget);
-        return true;
-      }
-
-      return false;
-    };
-
-    const dispatchNativeSnapInput = (direction: 1 | -1, event?: Event) => {
-      if (programmaticTopScroll || isScrollLocked() || shouldBlockCareerItemInput()) {
-        event?.preventDefault();
-        return;
-      }
-      if (snapAcrossBoundaries(direction, event)) return;
-      if (!shouldSnapInput()) return;
-
-      event?.preventDefault();
-      goToSnap(direction);
-    };
-
-    if (!reduceMotion) {
-      if (!usesSafariScrollEngine) {
-        snapObserver = ScrollTrigger.observe({
-          target: window,
-          type: "wheel,touch",
-          wheelSpeed: -1,
-          tolerance: 28,
-          preventDefault: true,
-          onUp: () => goToSnap(1),
-          onDown: () => goToSnap(-1)
-        });
-      }
-
-      let previousScrollY = window.scrollY;
-      const syncSnapObserver = () => {
-        const currentY = window.scrollY;
-        const now = Date.now();
-        if (needsQuietPeriod && now - lastScrollEventTime > 150) {
-          needsQuietPeriod = false;
+    if (featuredSection && featuredPanels.length) {
+      homeScrollTriggers.push(ScrollTrigger.create({
+        trigger: featuredSection,
+        start: "top top",
+        end: "bottom bottom",
+        scrub: true,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => {
+          const progress = gsap.utils.clamp(0, 0.999999, self.progress);
+          const index = Math.min(featuredPanels.length - 1, Math.floor(progress * featuredPanels.length));
+          setActiveFeatured(index);
         }
-
-        if (programmaticTopScroll) {
-          document.documentElement.classList.remove("is-free-scroll");
-          if (snapObserver?.isEnabled) snapObserver.disable();
-          previousScrollY = currentY;
-          return;
-        }
-
-        if (snapInputGateActive) {
-          if (snapObserver?.isEnabled) snapObserver.disable();
-          previousScrollY = currentY;
-          return;
-        }
-
-        const movedDown = currentY > previousScrollY;
-        const freeScroll = isFreeScrollRange();
-        const guardedWorkOvershoot =
-          !snapTween &&
-          (needsQuietPeriod || now < lockedUntil || now < careerItemLockedUntil) &&
-          currentY > getWorkTop() + snapTolerance &&
-          currentY < getFirstFeaturedTop() - snapTolerance;
-        const canAutoBoundaryCorrect = !freeScroll && !snapTween && !needsQuietPeriod;
-        const canAutoBoundarySnap = canAutoBoundaryCorrect && Date.now() >= lockedUntil;
-        const crossedCareerToWork =
-          canAutoBoundaryCorrect &&
-          Date.now() >= lockedUntil &&
-          Date.now() >= careerItemLockedUntil &&
-          movedDown &&
-          previousScrollY < getWorkTop() - snapTolerance &&
-          currentY >= getCareerExitTop() - snapTolerance &&
-          currentY < getFirstFeaturedTop() - snapTolerance;
-        const shouldAutoSnapToCareer =
-          canAutoBoundarySnap &&
-          currentY < previousScrollY &&
-          previousScrollY > getWorkTop() + snapTolerance &&
-          previousScrollY < getFirstFeaturedTop() - snapTolerance &&
-          currentY <= getWorkTop() + snapTolerance;
-        const shouldAutoSnapToCareerEntry =
-          canAutoBoundarySnap &&
-          movedDown &&
-          currentY >= getCareerEntryTop() - snapTolerance &&
-          currentY < getCareerExitTop() - snapTolerance &&
-          previousScrollY < getCareerEntryTop() - snapTolerance;
-        const shouldAutoSnapToAbout =
-          canAutoBoundarySnap &&
-          currentY < previousScrollY &&
-          previousScrollY >= getCareerEntryTop() - snapTolerance &&
-          currentY < getCareerEntryTop() - snapTolerance;
-
-        document.documentElement.classList.toggle("is-free-scroll", freeScroll);
-
-        if (guardedWorkOvershoot) {
-          const workTop = Math.round(getWorkTop());
-          window.scrollTo({ top: workTop, behavior: "auto" });
-          previousScrollY = workTop;
-          updateScrollTriggersAfterProgrammaticScroll();
-          return;
-        }
-
-        if (snapTween || shouldSnapInput()) {
-          if (snapObserver && !snapObserver.isEnabled) snapObserver.enable();
-        } else if (snapObserver?.isEnabled) {
-          snapObserver.disable();
-        }
-
-        previousScrollY = currentY;
-
-        if (crossedCareerToWork) {
-          const workTarget = findSnapTarget("work");
-          if (workTarget) {
-            window.requestAnimationFrame(() => snapToTarget(workTarget, true));
-          }
-        }
-
-        if (shouldAutoSnapToCareer) {
-          const careerTarget = findSnapTarget("career");
-          if (careerTarget) {
-            window.requestAnimationFrame(() => snapToTarget(careerTarget));
-          }
-        }
-
-        if (shouldAutoSnapToCareerEntry) {
-          const entryTarget = findSnapTarget("careerEntry");
-          if (entryTarget) {
-            window.requestAnimationFrame(() => snapToTarget(entryTarget));
-          }
-        }
-
-        if (shouldAutoSnapToAbout) {
-          const aboutTarget = findSnapTarget("about");
-          if (aboutTarget) {
-            window.requestAnimationFrame(() => snapToTarget(aboutTarget));
-          }
-        }
-      };
-
-      requestSnapObserverSync = () => {
-        window.cancelAnimationFrame(snapSyncFrame);
-        snapSyncFrame = window.requestAnimationFrame(syncSnapObserver);
-      };
-
-      window.addEventListener("scroll", requestSnapObserverSync, { passive: true, signal: pageSignal });
-      window.addEventListener("resize", requestSnapObserverSync, { signal: pageSignal });
-      requestSnapObserverSync();
-
-      window.addEventListener(
-        "wheel",
-        (event) => {
-          if (blockSnapInputWhenGated(event)) return;
-          if (Math.abs(event.deltaY) < 4) return;
-          const now = Date.now();
-          if (needsQuietPeriod && now - lastScrollEventTime > 150) {
-            needsQuietPeriod = false;
-          }
-          lastScrollEventTime = now;
-          if (programmaticTopScroll) {
-            event.preventDefault();
-            return;
-          }
-          if (shouldBlockCareerItemInput()) {
-            event.preventDefault();
-            return;
-          }
-          dispatchNativeSnapInput(event.deltaY > 0 ? 1 : -1, event);
-        },
-        { passive: false, capture: true, signal: pageSignal }
-      );
-
-      let touchStartY = 0;
-      let touchHandled = false;
-      window.addEventListener(
-        "touchstart",
-        (event) => {
-          touchStartY = event.touches[0]?.clientY ?? 0;
-          touchHandled = false;
-        },
-        { passive: true, capture: true, signal: pageSignal }
-      );
-      window.addEventListener(
-        "touchmove",
-        (event) => {
-          if (blockSnapInputWhenGated(event)) return;
-          const now = Date.now();
-          if (needsQuietPeriod && now - lastScrollEventTime > 150) {
-            needsQuietPeriod = false;
-          }
-          lastScrollEventTime = now;
-          if (touchHandled) {
-            if (isScrollLocked() || shouldSnapInput()) {
-              event.preventDefault();
-            }
-            return;
-          }
-          const currentTouchY = event.touches[0]?.clientY ?? touchStartY;
-          const deltaY = touchStartY - currentTouchY;
-          if (Math.abs(deltaY) < 24) return;
-          if (programmaticTopScroll) {
-            event.preventDefault();
-            return;
-          }
-          if (shouldBlockCareerItemInput()) {
-            event.preventDefault();
-            return;
-          }
-
-          touchHandled = true;
-          dispatchNativeSnapInput(deltaY > 0 ? 1 : -1, event);
-        },
-        { passive: false, capture: true, signal: pageSignal }
-      );
-
-      window.addEventListener("keydown", (event) => {
-        if (!snapInputKeys.has(event.key)) return;
-        blockSnapInputWhenGated(event);
-      }, { capture: true, signal: pageSignal });
-
-      window.addEventListener("keydown", (event) => {
-        if (event.metaKey || event.ctrlKey || event.altKey) return;
-        if (programmaticTopScroll && snapInputKeys.has(event.key)) {
-          event.preventDefault();
-          return;
-        }
-        if (isCareerItemInputLocked() && snapInputKeys.has(event.key)) {
-          event.preventDefault();
-          return;
-        }
-        if (!shouldSnapInput()) return;
-        if (["ArrowDown", "PageDown", " "].includes(event.key)) {
-          event.preventDefault();
-          goToSnap(1);
-        }
-        if (["ArrowUp", "PageUp"].includes(event.key)) {
-          event.preventDefault();
-          goToSnap(-1);
-        }
-      }, { signal: pageSignal });
+      }));
     }
+
+    if (identityStage) {
+      homeScrollTriggers.push(ScrollTrigger.create({
+        trigger: "#work",
+        start: "top bottom",
+        end: "top top",
+        scrub: true,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => setCareerWorkDissolve(self.progress)
+      }));
+    }
+
+    if (featuredStage && gallerySection) {
+      homeScrollTriggers.push(ScrollTrigger.create({
+        trigger: gallerySection,
+        start: "top bottom",
+        end: "top top",
+        scrub: true,
+        invalidateOnRefresh: true,
+        onUpdate: (self) => {
+          featuredStage.style.setProperty("--featured-gallery-dim", `${gsap.utils.clamp(0, 0.86, self.progress * 0.86)}`);
+        }
+      }));
+    }
+
+    [
+      document.querySelector<HTMLElement>(".intro-section"),
+      identity,
+      document.querySelector<HTMLElement>("#work"),
+      featuredSection,
+      gallerySection
+    ].forEach((panel) => {
+      if (!panel) return;
+      homeScrollTriggers.push(ScrollTrigger.create({
+        trigger: panel,
+        start: "top 55%",
+        end: "bottom 45%",
+        onEnter: () => panel.matches(".gallery-section") ? replaceRoute("/work") : clearHomeRoute(),
+        onEnterBack: () => panel.matches(".gallery-section") ? replaceRoute("/work") : clearHomeRoute()
+      }));
+    });
 
     const scrollToInitialSection = () => {
       if (initialSection === "intro") return;
 
       if (shouldPreserveRestoredWorkScroll && window.scrollY > 0) {
         replaceRoute("/work");
-        document.documentElement.classList.add("is-free-scroll");
-        updateScrollTriggersAfterProgrammaticScroll();
-        requestSnapObserverSync();
+        updateScrollTriggers();
         return;
       }
 
@@ -1388,10 +654,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
               : identitySection.offsetTop
             : 0;
 
-      window.scrollTo({ top: targetTop ?? 0, behavior: "instant" as ScrollBehavior });
+      scrollToPosition(targetTop ?? 0, "auto");
       if (initialSection === "work") {
         replaceRoute("/work");
-        document.documentElement.classList.add("is-free-scroll");
       }
       if (initialSection === "about") {
         playAboutIntro();
@@ -1409,7 +674,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         setCareerListStage(!isMobileIdentityLayout(), true);
         setIdentityMode("career", isMobileIdentityLayout() ? 0 : 0.999);
       }
-      updateScrollTriggersAfterProgrammaticScroll();
+      updateScrollTriggers();
       if (initialSection === "work") {
         window.requestAnimationFrame(() => replaceRoute("/work"));
       }
@@ -1418,6 +683,16 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     initialScrollFrame = window.requestAnimationFrame(() => {
       initialScrollTimeout = window.setTimeout(scrollToInitialSection, 120);
     });
+
+    window.addEventListener("load", () => {
+      syncFeaturedScrollHeight();
+      ScrollTrigger.refresh();
+    }, { once: true, signal: pageSignal });
+    window.addEventListener("resize", () => {
+      syncFeaturedScrollHeight();
+      ScrollTrigger.refresh();
+    }, { signal: pageSignal });
+    window.setTimeout(() => ScrollTrigger.refresh(), 250);
 
     const updateFeaturedContrast = () => {
       document.querySelectorAll<HTMLElement>(".featured-work").forEach((card) => {

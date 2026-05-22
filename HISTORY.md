@@ -180,3 +180,45 @@
 - `npm run build`
   - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
   - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.
+
+## 2026-05-22 Home scroll rebuild to progress-driven sticky sections
+
+### 요구사항
+- 홈페이지의 이전 강제 스냅/입력 차단 레거시 코드를 제거하고, 현재 섹션 전환의 시각적 느낌은 유지하되 스크롤 진행률에 맞춰 동작하게 재구성합니다.
+- 사이트 전체 smooth scroll은 유지합니다.
+- intro-about-career-work는 기존처럼 sticky 체류와 덮이는 전환 느낌을 유지하되, 휠/터치 이벤트 발생 시 자동 이동하지 않게 합니다.
+- WORK featured에서 gallery로 넘어갈 때 gallery가 featured 위로 덮이는 구조와 어두운 dissolve를 유지합니다.
+- 후속 요청에 따라 work detail은 배포/커밋 기준의 기존 cover blur/fade/fixed 구조로 되돌립니다.
+- Chrome/WebKit과 모바일에서 입력을 가로채지 않는 구조를 우선합니다.
+
+### 구현
+- `docs/superpowers/plans/2026-05-22-scroll-rebuild.md`
+  - Superpowers planning 흐름으로 이번 스크롤 리빌드 범위와 제거 대상/검증 항목을 문서화했습니다.
+- `src/components/HomePage.astro`
+  - `ScrollToPlugin`, `ScrollTrigger.observe`, wheel/touch/key 입력 차단, snap target 모델, lock/gate 상태, clone cover layer 기반 전환 코드를 제거했습니다.
+  - 홈 스크롤은 실제 문서 스크롤과 sticky section을 기본으로 두고, `ScrollTrigger`는 identity/career/featured/gallery의 진행률 상태만 갱신하도록 정리했습니다.
+  - Lenis가 있을 때 career point, featured dot, top button, route alias 초기 이동이 같은 scroll controller를 쓰도록 helper를 정리했습니다.
+  - work intro 진입 구간에서 career stage의 어두운 dissolve가 scroll progress로 갱신되도록 `#work` trigger를 추가했습니다.
+  - featured 진행은 `.featured-section`의 실제 높이를 JS에서 viewport panel 수만큼 계산해 주고, `ScrollTrigger` progress로 active featured work와 dot 상태를 갱신합니다.
+  - featured dot click과 career point click은 사용자 직접 조작으로만 위치 이동하도록 남겼고, 일반 wheel/touch 입력은 더 이상 가로채지 않습니다.
+- `src/layouts/PublicLayout.astro`
+  - Public route 전역 smooth scroll을 위해 Lenis를 추가했습니다.
+  - Lenis scroll event와 GSAP `ScrollTrigger.update()`를 연결해 sticky/progress trigger가 부드러운 스크롤 중에도 동기화되도록 했습니다.
+- `src/styles/global.css`
+  - `snap-*` 이름의 panel 변수를 `--home-viewport-height`/`--home-panel-height`로 바꾸고, `.snap-panel`, clone cover, fake featured step CSS를 제거했습니다.
+  - intro/about, career/work, featured/gallery가 실제 sticky stacking으로 덮이는 구조가 되도록 section z-index와 sticky/relative layering을 정리했습니다.
+  - work intro는 sticky panel로 바꾸고, career/work 및 featured/gallery 진입 dissolve는 각각 CSS 변수 기반 overlay로 적용했습니다.
+  - Lenis 권장 CSS class(`html.lenis`, `html.lenis-smooth`)를 추가해 native `scroll-behavior`와 충돌하지 않게 했습니다.
+- `src/pages/work/[slug].astro`
+  - 직전 detail slide 실험 변경은 되돌렸고, 배포/커밋 기준의 fixed cover + fade 구조를 유지했습니다.
+
+### 남은 주의점
+- 이번 변경은 기존 “한 번 굴리면 한 섹션 자동 이동” UX를 의도적으로 제거한 리빌드입니다. 실기기에서 체류 길이와 진행 감각은 사용자가 직접 확인 후 미세 조정할 예정입니다.
+- route alias `/work`는 직접 진입 시 gallery로 이동하는 기존 동작을 유지하되, featured 구간 자체는 강제로 `/work` path를 유지하지 않도록 단순화했습니다.
+- Work detail은 이번 홈 스크롤 리빌드 범위에서 제외하고 배포 기준으로 유지합니다.
+
+### 검증
+- `git diff --check` 통과
+- `npm run build`
+  - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+  - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.

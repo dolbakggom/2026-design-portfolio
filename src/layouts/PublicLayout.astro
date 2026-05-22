@@ -15,6 +15,69 @@ const props = Astro.props as Props;
   <script is:inline slot="head">
     document.documentElement.classList.add("portfolio-fade-ready");
   </script>
+  <script>
+    import Lenis from "lenis";
+    import gsap from "gsap";
+    import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    type PortfolioWindow = Window & {
+      __portfolioLenis?: Lenis;
+      __portfolioLenisCleanup?: () => void;
+      __portfolioLenisScrollTo?: (target: number | string | HTMLElement, options?: Parameters<Lenis["scrollTo"]>[1]) => void;
+    };
+
+    const initPortfolioLenis = () => {
+      const portfolioWindow = window as PortfolioWindow;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      portfolioWindow.__portfolioLenisCleanup?.();
+
+      if (reduceMotion) {
+        delete portfolioWindow.__portfolioLenis;
+        delete portfolioWindow.__portfolioLenisScrollTo;
+        portfolioWindow.__portfolioLenisCleanup = () => {};
+        return;
+      }
+
+      const lenis = new Lenis({
+        anchors: true,
+        lerp: 0.08,
+        smoothWheel: true,
+        syncTouch: true,
+        touchMultiplier: 1.1,
+        wheelMultiplier: 1
+      });
+      const updateScrollTrigger = () => ScrollTrigger.update();
+      const raf = (time: number) => lenis.raf(time * 1000);
+
+      lenis.on("scroll", updateScrollTrigger);
+      gsap.ticker.add(raf);
+      gsap.ticker.lagSmoothing(0);
+
+      portfolioWindow.__portfolioLenis = lenis;
+      portfolioWindow.__portfolioLenisScrollTo = (target, options) => {
+        lenis.scrollTo(target, options);
+      };
+      portfolioWindow.__portfolioLenisCleanup = () => {
+        lenis.off("scroll", updateScrollTrigger);
+        gsap.ticker.remove(raf);
+        lenis.destroy();
+        delete portfolioWindow.__portfolioLenis;
+        delete portfolioWindow.__portfolioLenisScrollTo;
+        portfolioWindow.__portfolioLenisCleanup = () => {};
+      };
+
+      ScrollTrigger.refresh();
+    };
+
+    document.addEventListener("astro:before-swap", () => {
+      (window as PortfolioWindow).__portfolioLenisCleanup?.();
+    });
+    document.addEventListener("astro:page-load", initPortfolioLenis);
+    initPortfolioLenis();
+  </script>
   <slot />
   <button class="floating-top-button" type="button" data-floating-top aria-label="맨 위로 이동">↑</button>
   <script is:inline>
@@ -113,6 +176,11 @@ const props = Astro.props as Props;
       button.addEventListener("click", () => {
         if (typeof window.__portfolioScrollToTop === "function") {
           window.__portfolioScrollToTop();
+          return;
+        }
+
+        if (typeof window.__portfolioLenisScrollTo === "function") {
+          window.__portfolioLenisScrollTo(0, { duration: 1.05 });
           return;
         }
 
