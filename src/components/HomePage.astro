@@ -15,8 +15,8 @@ const slogan = profile.headline.replace(/\.$/, "");
 const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
 const phoneLink = profile.links.find((link) => link.url.startsWith("tel:") || /010[-\d]+/.test(link.label));
 const locationLink = profile.links.find((link) => link.label.includes("서울") || link.label.toLowerCase() === "location");
-const identityTravelSvh = Math.max(210, 126 + timeline.length * 18);
-const mobileIdentityTravelSvh = Math.max(330, 190 + timeline.length * 34);
+const identityTravelSvh = Math.max(210, 126 + timeline.length * 18) + 200 + 100;
+const mobileIdentityTravelSvh = Math.max(330, 190 + timeline.length * 34) + 200 + 100;
 const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.[0] ?? "2026";
 ---
 
@@ -500,14 +500,20 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     };
 
     if (identity && !reduceMotion) {
+      // playAboutIntro 시점을 페이지가 꽉 차기 전(아래에서 올라오는 도중)으로 당기기 위한 별도 트리거
+      homeScrollTriggers.push(ScrollTrigger.create({
+        trigger: identity,
+        start: "top 65%",
+        onEnter: playAboutIntro,
+        onEnterBack: playAboutIntro,
+      }));
+
       homeScrollTriggers.push(ScrollTrigger.create({
         trigger: identity,
         start: "top top",
-        end: "bottom bottom",
+        end: () => `bottom-=${window.innerHeight * 3}px bottom`,
         scrub: true,
         invalidateOnRefresh: true,
-        onEnter: playAboutIntro,
-        onEnterBack: playAboutIntro,
         onUpdate: (self) => {
           const mobileIdentity = isMobileIdentityLayout();
           const showCareer = self.progress >= careerStartProgress * 0.92;
@@ -570,7 +576,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
     const syncFeaturedScrollHeight = () => {
       if (!featuredSection) return;
-      featuredSection.style.setProperty("--featured-scroll-height", `${Math.max(1, featuredPanels.length) * getPanelHeight()}px`);
+      featuredSection.style.setProperty("--featured-scroll-height", `${(Math.max(1, featuredPanels.length) + 2) * getPanelHeight()}px`);
     };
 
     syncFeaturedScrollHeight();
@@ -581,7 +587,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       homeScrollTriggers.push(ScrollTrigger.create({
         trigger: featuredSection,
         start: "top top",
-        end: "bottom bottom",
+        end: () => `bottom-=${getPanelHeight() * 2}px bottom`,
         scrub: true,
         invalidateOnRefresh: true,
         onUpdate: (self) => {
