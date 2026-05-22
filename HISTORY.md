@@ -36,6 +36,23 @@
 
 ---
 
+## 2026-05-22 Cloudflare npm ci Lockfile Fix
+
+### 요구사항
+- Cloudflare Workers build에서 `npm clean-install` 단계가 `package.json`과 `package-lock.json` 불일치로 실패하는 문제를 해결합니다.
+- 로그상 누락된 dependency는 `@floating-ui/dom@1.7.6`이며, 앱 빌드 이전 설치 단계에서 중단되었습니다.
+
+### 구현
+- `package.json`
+  - Tiptap floating menu 계열 peer dependency로 요구되는 `@floating-ui/dom`을 명시 dependency로 추가했습니다.
+- `package-lock.json`
+  - `node_modules/@floating-ui/dom` 항목을 lockfile에 반영해 Cloudflare의 `npm ci` 기준과 맞췄습니다.
+
+### 검증
+- `npm ci --progress=false` 통과.
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+- 참고: sandbox 안의 `npm ci`는 npm 자체 오류(`Exit handler never called`)로 실패했지만, 일반 권한에서 같은 명령은 정상 통과했습니다.
+
 ## 2026-05-22 Work Detail Topbar Height Update
 
 ### 요구사항
