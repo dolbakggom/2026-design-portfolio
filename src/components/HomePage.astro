@@ -234,6 +234,9 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       let lockedUntil = 0;
       let lastScrollEventTime = 0;
       let needsQuietPeriod = false;
+      let snapInputGateActive = false;
+      let snapInputGateQuietUntil = 0;
+      let snapInputGateTimeout = 0;
       let snapTween: gsap.core.Tween | gsap.core.Timeline | null = null;
       let snapObserver: ReturnType<typeof ScrollTrigger.observe> | null = null;
       let snapSyncFrame = 0;
@@ -256,10 +259,19 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         pageController.abort();
         window.cancelAnimationFrame(snapSyncFrame);
         window.cancelAnimationFrame(initialScrollFrame);
+        if (snapInputGateTimeout) {
+          window.clearTimeout(snapInputGateTimeout);
+        }
         if (initialScrollTimeout) {
           window.clearTimeout(initialScrollTimeout);
         }
         snapTween?.kill();
+        if (snapInputGateTimeout) {
+          window.clearTimeout(snapInputGateTimeout);
+          snapInputGateTimeout = 0;
+        }
+        snapInputGateActive = false;
+        snapInputGateQuietUntil = 0;
         activeIntroUnderlay?.remove();
         activeCareerWorkUnderlay?.remove();
         activeWorkCover?.remove();
@@ -317,7 +329,52 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       lockedUntil = Math.max(lockedUntil, Date.now() + duration);
     };
 
-    const isScrollLocked = () => Date.now() < lockedUntil || Boolean(snapTween) || needsQuietPeriod;
+    const isScrollLocked = () => Date.now() < lockedUntil || Boolean(snapTween) || needsQuietPeriod || snapInputGateActive;
+
+    const snapInputKeys = new Set(["ArrowDown", "PageDown", " ", "ArrowUp", "PageUp", "Home", "End"]);
+    const snapInputGateQuietDuration = 180;
+
+    const scheduleSnapInputGateRelease = () => {
+      if (snapInputGateTimeout) {
+        window.clearTimeout(snapInputGateTimeout);
+      }
+
+      const remaining = snapInputGateQuietUntil - Date.now();
+      if (remaining > 0) {
+        snapInputGateTimeout = window.setTimeout(scheduleSnapInputGateRelease, remaining);
+        return;
+      }
+
+      snapInputGateTimeout = 0;
+      snapInputGateActive = false;
+      requestSnapObserverSync();
+    };
+
+    const beginSnapInputGate = () => {
+      snapInputGateActive = true;
+      snapInputGateQuietUntil = 0;
+      if (snapInputGateTimeout) {
+        window.clearTimeout(snapInputGateTimeout);
+        snapInputGateTimeout = 0;
+      }
+      if (snapObserver?.isEnabled) {
+        snapObserver.disable();
+      }
+    };
+
+    const finishSnapInputGate = () => {
+      if (!snapInputGateActive) return;
+      snapInputGateQuietUntil = Math.max(snapInputGateQuietUntil, Date.now() + snapInputGateQuietDuration);
+      scheduleSnapInputGateRelease();
+    };
+
+    const blockSnapInputWhenGated = (event: Event) => {
+      if (!snapInputGateActive) return false;
+      snapInputGateQuietUntil = Date.now() + snapInputGateQuietDuration;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return true;
+    };
 
     const typeText = (target: HTMLElement, value: string, speed = 58, done?: () => void) => {
       target.textContent = "";
@@ -742,12 +799,14 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
             applySnapState(target);
           }
           lockedUntil = Date.now() + 240;
+          finishSnapInputGate();
           updateScrollTriggersAfterProgrammaticScroll();
           requestSnapObserverSync();
         },
         onInterrupt: () => {
           snapTween = null;
           clearIntroAboutCover();
+          finishSnapInputGate();
           requestSnapObserverSync();
         }
       });
@@ -823,12 +882,14 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           snapTween = null;
           clearCareerWorkCover();
           lockedUntil = Date.now() + 240;
+          finishSnapInputGate();
           updateScrollTriggersAfterProgrammaticScroll();
           requestSnapObserverSync();
         },
         onInterrupt: () => {
           snapTween = null;
           clearCareerWorkCover();
+          finishSnapInputGate();
           requestSnapObserverSync();
         }
       });
@@ -858,6 +919,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
     const snapToTarget = (target: SnapTarget, force = false) => {
       if (!force && isScrollLocked()) return;
+      beginSnapInputGate();
       needsQuietPeriod = true;
       lastScrollEventTime = Date.now();
       if (snapIntroAboutCover(target)) return;
@@ -878,11 +940,13 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           snapTween = null;
           applySnapState(target);
           lockedUntil = Date.now() + 240;
+          finishSnapInputGate();
           updateScrollTriggersAfterProgrammaticScroll();
           requestSnapObserverSync();
         },
         onInterrupt: () => {
           snapTween = null;
+          finishSnapInputGate();
           requestSnapObserverSync();
         }
       });
@@ -972,6 +1036,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       lockedUntil = 0;
       snapTween?.kill();
       snapTween = null;
+      beginSnapInputGate();
       snapObserver?.disable();
       html.classList.remove("is-free-scroll");
       html.style.scrollSnapType = "none";
@@ -991,6 +1056,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         applySnapState(target);
         replaceRoute("/");
         lockedUntil = Date.now() + 180;
+        finishSnapInputGate();
         updateScrollTriggersAfterProgrammaticScroll();
         requestSnapObserverSync();
       };
@@ -1005,6 +1071,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           snapTween = null;
           programmaticTopScroll = false;
           restoreTopScrollSnap();
+          finishSnapInputGate();
           requestSnapObserverSync();
         }
       });
@@ -1108,6 +1175,12 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           return;
         }
 
+        if (snapInputGateActive) {
+          if (snapObserver?.isEnabled) snapObserver.disable();
+          previousScrollY = currentY;
+          return;
+        }
+
         const movedDown = currentY > previousScrollY;
         const freeScroll = isFreeScrollRange();
         const guardedWorkOvershoot =
@@ -1202,6 +1275,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       window.addEventListener(
         "wheel",
         (event) => {
+          if (blockSnapInputWhenGated(event)) return;
           if (Math.abs(event.deltaY) < 4) return;
           const now = Date.now();
           if (needsQuietPeriod && now - lastScrollEventTime > 150) {
@@ -1234,6 +1308,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       window.addEventListener(
         "touchmove",
         (event) => {
+          if (blockSnapInputWhenGated(event)) return;
           const now = Date.now();
           if (needsQuietPeriod && now - lastScrollEventTime > 150) {
             needsQuietPeriod = false;
@@ -1264,12 +1339,17 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       );
 
       window.addEventListener("keydown", (event) => {
+        if (!snapInputKeys.has(event.key)) return;
+        blockSnapInputWhenGated(event);
+      }, { capture: true, signal: pageSignal });
+
+      window.addEventListener("keydown", (event) => {
         if (event.metaKey || event.ctrlKey || event.altKey) return;
-        if (programmaticTopScroll && ["ArrowDown", "PageDown", " ", "ArrowUp", "PageUp"].includes(event.key)) {
+        if (programmaticTopScroll && snapInputKeys.has(event.key)) {
           event.preventDefault();
           return;
         }
-        if (isCareerItemInputLocked() && ["ArrowDown", "PageDown", " ", "ArrowUp", "PageUp"].includes(event.key)) {
+        if (isCareerItemInputLocked() && snapInputKeys.has(event.key)) {
           event.preventDefault();
           return;
         }

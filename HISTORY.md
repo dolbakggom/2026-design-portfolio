@@ -35,6 +35,27 @@
 
 ---
 
+## 2026-05-21 Home snap input gate
+
+### 요구사항
+- 홈 스냅 애니메이션이 실행되는 동안 추가 wheel/touch/key 스크롤 입력을 예약하지 않고 완전히 무시합니다.
+- 기존처럼 입력을 처리하다가 부분적으로 막고 보정하는 구조가 화면 흔들림을 만들 수 있으므로, GSAP 스냅 중에는 입력이 상태 머신으로 내려가지 않게 합니다.
+- gallery 일반 스크롤, detail/admin 일반 페이지 동작은 건드리지 않습니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `snapInputGateActive` 중심의 중앙 입력 gate를 추가했습니다.
+  - `snapToTarget()` 시작 시 gate를 켜고, `wheel`, `touchmove`, `keydown` 이벤트를 capture 단계에서 `preventDefault()`/`stopImmediatePropagation()`으로 차단합니다.
+  - gate가 켜져 있는 동안 `ScrollTrigger.observe`도 비활성화해 GSAP Observer와 native fallback이 같은 입력을 중복 처리하지 않게 했습니다.
+  - GSAP 스냅 완료 후 `180ms` quiet window가 끝나야 gate가 풀리며, quiet window 동안 들어오는 추가 입력은 모두 버리고 release 시점만 늦춥니다.
+  - top 버튼의 programmatic scroll도 같은 gate를 사용해 이동 중 추가 입력을 무시합니다.
+
+### 검증
+- `git diff --check` 통과
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints
+- 참고: sandbox 내부 첫 빌드는 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했고, 승인된 환경에서 같은 명령을 재실행해 통과했습니다.
+- 진행 중: Superpowers requesting-code-review 기준 코드 리뷰
+
 ## 2026-05-21 History archive workflow portability cleanup
 
 ### 요구사항
