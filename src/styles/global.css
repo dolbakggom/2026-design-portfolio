@@ -16,15 +16,15 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.12);
-  --home-viewport-height: 100svh;
+  --home-viewport-height: 100vh;
   --home-min-panel-height: 620px;
   --home-panel-height: max(var(--home-viewport-height), var(--home-min-panel-height));
 }
 
-@supports (height: 100dvh) {
+@supports (height: 100lvh) {
   @media (max-width: 1180px) {
     html.home-scroll {
-      --home-viewport-height: 100dvh;
+      --home-viewport-height: 100lvh;
       --home-min-panel-height: 0px;
     }
   }
@@ -1738,8 +1738,8 @@ button:disabled {
   }
 
   .work-meta div:first-child {
-    border-top: 1px solid var(--color-line);
-    padding-top: 14px;
+    border-top: 0;
+    padding-top: 0;
   }
 
   .work-detail,

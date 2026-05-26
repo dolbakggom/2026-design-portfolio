@@ -393,9 +393,11 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const mobileIdentityQuery = window.matchMedia("(max-width: 1180px)");
 
     const isMobileIdentityLayout = () => mobileIdentityQuery.matches;
-    const getVisualViewportHeight = () => Math.round(window.visualViewport?.height ?? window.innerHeight);
+    const supportsLargeViewportHeight = typeof CSS !== "undefined" && CSS.supports?.("height", "100lvh") === true;
+    const shouldUseViewportHeightFallback = () => isMobileIdentityLayout() && !supportsLargeViewportHeight;
+    const getFallbackViewportHeight = () => Math.round(window.innerHeight);
     const syncHomeViewportHeight = () => {
-      if (!isMobileIdentityLayout()) {
+      if (!shouldUseViewportHeightFallback()) {
         if (lastSyncedViewportHeight !== 0) {
           document.documentElement.style.removeProperty("--home-viewport-height");
           lastSyncedViewportHeight = 0;
@@ -404,7 +406,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         return false;
       }
 
-      const nextHeight = Math.max(1, getVisualViewportHeight());
+      const nextHeight = Math.max(1, getFallbackViewportHeight());
       if (Math.abs(nextHeight - lastSyncedViewportHeight) < 1) return false;
 
       lastSyncedViewportHeight = nextHeight;

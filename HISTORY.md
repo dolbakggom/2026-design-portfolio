@@ -36,6 +36,35 @@
 
 ---
 
+## 2026-05-26 Mobile Home Viewport Fallback Refinement
+
+### 요구사항
+- 모바일 홈 full-size viewport 대응에서 CSS `100lvh`와 JS inline viewport 값이 서로 덮어쓰는 구조를 정리합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 브라우저가 `100lvh`를 지원하면 CSS large viewport unit을 그대로 사용하고, JS는 `--home-viewport-height` inline 값을 주입하지 않도록 변경했습니다.
+  - `100lvh` 미지원 환경에서만 `window.innerHeight`를 fallback px 값으로 `--home-viewport-height`에 주입합니다.
+  - 기존 Lenis/featured height/ScrollTrigger refresh 동기화 흐름은 유지했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+
+## 2026-05-26 Mobile Safari Full-size Viewport Height Adjustment
+
+### 요구사항
+- 모바일 Safari에서 하단 주소창이 떠 있을 때 뷰포트 높이가 줄어들며 찌그러지는 현상을 막고, 주소창 뒤쪽 영역까지 꽉 차는 풀스크린(Full-size) 레이아웃으로 렌더링되도록 수정합니다. (상단 영역은 필요시 잘려도 무방함)
+
+### 구현
+- `src/components/HomePage.astro`
+  - `getVisualViewportHeight` 함수가 `window.visualViewport?.height` (주소창 제외 가용 영역) 대신 `window.innerHeight` (주소창을 포함한 전체 뷰포트 영역)를 반환하게 변경했습니다.
+- `src/styles/global.css`
+  - 모바일 뷰포트 높이를 결정하는 `--home-viewport-height` 변수를 주소창 높이에 맞춰 실시간으로 줄어드는 `100svh`/`100dvh` 대신 주소창을 가리며 꽉 채우는 `100vh` 및 `100lvh` (Large Viewport)를 적용하도록 수정했습니다.
+
+### 검증
+- `npm run build` 및 `astro check` 완료 (0 errors / 0 warnings / 0 hints)
+
 ## 2026-05-26 Mobile Home Dynamic Viewport Height
 
 ### 요구사항
