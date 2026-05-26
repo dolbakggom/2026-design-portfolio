@@ -36,6 +36,27 @@
 
 ---
 
+## 2026-05-26 Mobile Home Dynamic Viewport Height
+
+### 요구사항
+- 모바일 detail 페이지처럼 메인 홈도 주소창/상단바 변화 후 실제 보이는 viewport 높이를 꽉 채우도록 조정합니다.
+- 모바일 featured/detail 폰트 하한값도 함께 낮춰 작은 화면에서 과하게 커 보이지 않게 합니다.
+
+### 구현
+- `src/styles/global.css`
+  - 홈 패널 높이 계산을 `--home-min-panel-height`와 `--home-viewport-height`로 분리했습니다.
+  - 모바일 홈(`html.home-scroll`, `max-width: 1180px`)에서는 고정 최소 높이 `620px`을 풀고 `100dvh` 또는 JS가 주입한 실제 viewport px 값을 따르게 했습니다.
+  - Featured category/title/meta/more와 work detail kicker/title/meta 폰트 하한값을 모바일 기준으로 낮췄습니다.
+- `src/components/HomePage.astro`
+  - `window.visualViewport.height`를 `--home-viewport-height` CSS 변수로 동기화합니다.
+  - `visualViewport.resize/scroll`, `resize`, `orientationchange`에서 Lenis 크기와 featured scroll height를 갱신합니다.
+  - ScrollTrigger는 즉시 `update()`하고, 실제 `refresh()`는 180ms debounce로 한 번만 실행해 모바일 주소창 변화 중 스크롤 튐을 줄입니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+- 실기기 모바일 Safari/Chrome의 주소창 접힘/펼침 체감 검증은 사용자 확인 예정입니다.
+
 ## 2026-05-22 Cloudflare npm ci Lockfile Fix
 
 ### 요구사항

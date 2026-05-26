@@ -229,7 +229,11 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       let initialScrollFrame = 0;
       let initialScrollTimeout = 0;
       let featuredBlurTimeout = 0;
+      let viewportSyncFrame = 0;
+      let viewportRefreshTimeout = 0;
+      let lastSyncedViewportHeight = 0;
       const portfolioWindow = window as Window & {
+        __portfolioLenis?: { resize?: () => void };
         __portfolioScrollToTop?: () => void;
         __portfolioLenisScrollTo?: (target: number | string | HTMLElement, options?: { immediate?: boolean; duration?: number }) => void;
       };
@@ -247,6 +251,11 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         if (featuredBlurTimeout) {
           window.clearTimeout(featuredBlurTimeout);
         }
+        window.cancelAnimationFrame(viewportSyncFrame);
+        if (viewportRefreshTimeout) {
+          window.clearTimeout(viewportRefreshTimeout);
+        }
+        document.documentElement.style.removeProperty("--home-viewport-height");
         homeScrollTriggers.forEach((trigger) => trigger.kill());
         document.documentElement.classList.remove("intro-complete");
         activeHomeShell = null;
@@ -384,6 +393,26 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     const mobileIdentityQuery = window.matchMedia("(max-width: 1180px)");
 
     const isMobileIdentityLayout = () => mobileIdentityQuery.matches;
+    const getVisualViewportHeight = () => Math.round(window.visualViewport?.height ?? window.innerHeight);
+    const syncHomeViewportHeight = () => {
+      if (!isMobileIdentityLayout()) {
+        if (lastSyncedViewportHeight !== 0) {
+          document.documentElement.style.removeProperty("--home-viewport-height");
+          lastSyncedViewportHeight = 0;
+          return true;
+        }
+        return false;
+      }
+
+      const nextHeight = Math.max(1, getVisualViewportHeight());
+      if (Math.abs(nextHeight - lastSyncedViewportHeight) < 1) return false;
+
+      lastSyncedViewportHeight = nextHeight;
+      document.documentElement.style.setProperty("--home-viewport-height", `${nextHeight}px`);
+      return true;
+    };
+
+    syncHomeViewportHeight();
 
     const setCareerListStage = (visible: boolean, immediate = false) => {
       identity?.classList.toggle("is-career-list", visible);
@@ -579,6 +608,30 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       featuredSection.style.setProperty("--featured-scroll-height", `${(Math.max(1, featuredPanels.length) + 2) * getPanelHeight()}px`);
     };
 
+    const refreshHomeScrollLayout = (force = false) => {
+      const viewportChanged = syncHomeViewportHeight();
+      if (!force && !viewportChanged) return;
+
+      syncFeaturedScrollHeight();
+      portfolioWindow.__portfolioLenis?.resize?.();
+      ScrollTrigger.update();
+
+      if (viewportRefreshTimeout) {
+        window.clearTimeout(viewportRefreshTimeout);
+      }
+      viewportRefreshTimeout = window.setTimeout(() => {
+        syncHomeViewportHeight();
+        syncFeaturedScrollHeight();
+        portfolioWindow.__portfolioLenis?.resize?.();
+        ScrollTrigger.refresh();
+      }, 180);
+    };
+
+    const queueHomeScrollLayoutRefresh = (force = false) => {
+      window.cancelAnimationFrame(viewportSyncFrame);
+      viewportSyncFrame = window.requestAnimationFrame(() => refreshHomeScrollLayout(force));
+    };
+
     syncFeaturedScrollHeight();
 
     setActiveFeatured(0);
@@ -691,14 +744,17 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     });
 
     window.addEventListener("load", () => {
-      syncFeaturedScrollHeight();
-      ScrollTrigger.refresh();
+      refreshHomeScrollLayout(true);
     }, { once: true, signal: pageSignal });
     window.addEventListener("resize", () => {
-      syncFeaturedScrollHeight();
-      ScrollTrigger.refresh();
+      queueHomeScrollLayoutRefresh(true);
     }, { signal: pageSignal });
-    window.setTimeout(() => ScrollTrigger.refresh(), 250);
+    window.visualViewport?.addEventListener("resize", () => queueHomeScrollLayoutRefresh(), { signal: pageSignal });
+    window.visualViewport?.addEventListener("scroll", () => queueHomeScrollLayoutRefresh(), { signal: pageSignal });
+    window.addEventListener("orientationchange", () => {
+      window.setTimeout(() => refreshHomeScrollLayout(true), 260);
+    }, { signal: pageSignal });
+    window.setTimeout(() => refreshHomeScrollLayout(true), 250);
 
     const updateFeaturedContrast = () => {
       document.querySelectorAll<HTMLElement>(".featured-work").forEach((card) => {
