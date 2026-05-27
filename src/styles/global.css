@@ -1,6 +1,28 @@
 @charset "UTF-8";
 
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-Bold.woff2") format("woff2");
+}
 
 :root {
   color-scheme: light;
@@ -572,8 +594,15 @@ button:disabled {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  border: 0;
   border-radius: 2px;
+  background: transparent;
+  padding: 0;
+  color: inherit;
   cursor: pointer;
+  font: inherit;
+  text-align: left;
+  appearance: none;
 }
 
 .timeline-card:focus-visible {

@@ -18,6 +18,7 @@ const locationLink = profile.links.find((link) => link.label.includes("서울") 
 const identityTravelSvh = Math.max(210, 126 + timeline.length * 18) + 200 + 100;
 const mobileIdentityTravelSvh = Math.max(330, 190 + timeline.length * 34) + 200 + 100;
 const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.[0] ?? "2026";
+const filterId = (category: string) => `work-filter-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "all"}`;
 ---
 
 <PublicLayout title={`${profile.headline} | ${profile.name}`} description={profile.bio} htmlClass="home-scroll" bodyClass="home-body">
@@ -90,12 +91,11 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
           <div class="timeline-items" data-career-list>
             {
               timeline.map((item, index) => (
-                <article
+                <button
+                  type="button"
                   class:list={["timeline-card", index === 0 && "is-active"]}
                   data-timeline-card
                   data-timeline-index={index}
-                  role="button"
-                  tabindex="0"
                   aria-label={`${item.period} ${item.title} 이력으로 이동`}
                 >
                   <p>{item.period}</p>
@@ -105,7 +105,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
                       <span>{item.organization}</span>
                     </div>
                   </div>
-                </article>
+                </button>
               ))
             }
           </div>
@@ -181,15 +181,29 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
       <div class="gallery-canvas">
         <div class="section-heading gallery-heading">
           <div class="category-filter" role="tablist" aria-label="Work category">
-            {categories.map((category) => <button type="button" class:list={[category === "ALL" && "is-active"]} data-filter={category}>{category}</button>)}
+            {
+              categories.map((category) => (
+                <button
+                  type="button"
+                  role="tab"
+                  id={filterId(category)}
+                  class:list={[category === "ALL" && "is-active"]}
+                  data-filter={category}
+                  aria-selected={category === "ALL" ? "true" : "false"}
+                  aria-controls="work-gallery-grid"
+                >
+                  {category}
+                </button>
+              ))
+            }
           </div>
         </div>
-        <div class="work-grid">
+        <div class="work-grid" id="work-gallery-grid" role="tabpanel" aria-labelledby={filterId("ALL")}>
           {
             works.map((work) => (
               <a class="work-tile" href={`/work/${work.slug}`} data-category={work.category} aria-label={`${work.title} 자세히 보기`}>
                 <div class:list={["work-tile-media", work.thumbnail?.url && "has-image"]}>
-                  {work.thumbnail?.url ? <img src={work.thumbnail.url} alt={work.thumbnail.alt ?? work.title} loading="lazy" decoding="async" /> : null}
+                  {work.thumbnail?.url ? <img src={work.thumbnail.url} alt="" loading="lazy" decoding="async" /> : null}
                 </div>
                 <div>
                   <h3>{work.title}</h3>
@@ -586,15 +600,6 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
 
     timelineCards.forEach((card, index) => {
       card.addEventListener("click", () => jumpToCareerPoint(index), { signal: pageSignal });
-      card.addEventListener(
-        "keydown",
-        (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          jumpToCareerPoint(index);
-        },
-        { signal: pageSignal }
-      );
     });
 
     const scrollToIntroFromFloatingButton = () => {
@@ -811,6 +816,7 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
     updateFeaturedContrast();
 
     const filterButtons = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
+    const galleryPanel = document.querySelector<HTMLElement>("#work-gallery-grid");
     const tiles = Array.from(document.querySelectorAll<HTMLElement>("[data-category]"));
 
     const animateGalleryFilter = (filter: string) => {
@@ -891,7 +897,14 @@ const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.
         const filter = button.dataset.filter ?? "ALL";
         if (button.classList.contains("is-active")) return;
 
-        filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+        filterButtons.forEach((item) => {
+          const isSelected = item === button;
+          item.classList.toggle("is-active", isSelected);
+          item.setAttribute("aria-selected", isSelected ? "true" : "false");
+        });
+        if (button.id) {
+          galleryPanel?.setAttribute("aria-labelledby", button.id);
+        }
         animateGalleryFilter(filter);
       }, { signal: pageSignal });
     });

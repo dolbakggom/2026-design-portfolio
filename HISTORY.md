@@ -36,6 +36,29 @@
 
 ---
 
+## 2026-05-27 PageSpeed First Pass
+
+### 요구사항
+- Chrome에서 확인한 PageSpeed Insights 모바일 리포트 기준으로 명확한 성능/접근성 문제를 1차 개선합니다.
+- 사용자가 직접 푸시 후 PageSpeed를 다시 실행할 예정이므로, 기능/스크롤 구조 변경 없이 안전한 항목부터 처리합니다.
+
+### 구현
+- `src/styles/global.css`
+  - 렌더링 차단 요청으로 잡힌 외부 Pretendard CSS `@import`를 제거했습니다.
+  - Pretendard 400/500/700 weight만 first-party CSS의 `@font-face`로 직접 선언하고 `font-display: swap`을 적용했습니다.
+  - timeline card가 native button으로 바뀌어도 기존 시각 스타일을 유지하도록 기본 button border/background/padding/appearance를 초기화했습니다.
+- `src/components/HomePage.astro`
+  - Gallery category filter를 `tablist` 구조에 맞게 `role="tab"`, `aria-selected`, `aria-controls`, `tabpanel`로 정리했습니다.
+  - Career timeline item을 `article role="button"` 대신 native `button`으로 변경하고 custom keydown handler를 제거했습니다.
+  - Gallery card thumbnail은 인접 제목/링크 label과 중복 읽힘을 줄이기 위해 decorative image(`alt=""`)로 변경했습니다.
+- `docs/superpowers/plans/2026-05-27-pagespeed-first-pass.md`
+  - 이번 최적화 계획과 검증 범위를 문서화했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+- 남은 follow-up: 배포 후 PageSpeed 재측정으로 FCP/LCP 변화 확인. 이후에도 점수가 낮으면 ScrollTrigger 청크 지연 로딩, intro typing LCP 지연, Cloudflare RUM beacon/caching을 별도 pass로 검토합니다.
+
 ## 2026-05-26 Mobile Home Viewport Fallback Refinement
 
 ### 요구사항
