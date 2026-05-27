@@ -36,6 +36,45 @@
 
 ---
 
+## 2026-05-27 PageSpeed LCP Font and Public HTML Cache Pass
+
+### 요구사항
+- PageSpeed 모바일 보고서 기준 남은 성능 병목을 줄입니다.
+- 전체 Pretendard 정적 폰트 3개 다운로드, 인트로 로고 LCP 이미지 요청, public HTML 비캐시 문제를 우선 처리합니다.
+
+### 구현
+- `src/styles/pretendard-dynamic-subset.css`
+  - Pretendard 공식 variable dynamic subset CSS를 프로젝트 CSS로 추가하고, font URL을 jsDelivr 절대 경로로 변환했습니다.
+  - 프로젝트 weight 규칙에 맞춰 `@font-face` 지원 범위도 `400 700`으로 좁혔습니다.
+- `src/styles/global.css`
+  - 기존 Regular/Medium/Bold 전체 woff2 직접 선언을 제거하고 dynamic subset CSS import로 변경했습니다.
+  - 카테고리 필터 비활성 opacity는 Gemini가 조정한 `0.48` 상태를 유지했습니다.
+- `src/components/HomePage.astro`
+  - 인트로, about, work intro의 장식용 로고 `<img>`를 inline SVG로 바꿔 외부 이미지 요청을 제거했습니다.
+  - 인트로 로고 애니메이션은 opacity 숨김 대신 blur/scale 중심으로 유지해 LCP 노출 지연을 줄였습니다.
+  - Gemini가 수정한 featured link `aria-label` 개선을 유지했습니다.
+- `src/layouts/BaseLayout.astro`
+  - dynamic subset font 요청을 위해 `https://cdn.jsdelivr.net` preconnect를 추가했습니다.
+- `src/middleware.ts`
+  - `/`, `/about`, `/career`, `/work`, `/work/:slug` public GET HTML만 Cloudflare Cache API 대상이 되도록 middleware를 추가했습니다.
+  - `/admin`, `/api/*`, `/media/*`, query string 요청은 캐시 대상에서 제외했습니다.
+  - edge TTL은 10분, stale-while-revalidate는 24시간으로 시작했습니다.
+- `astro.config.mjs`
+  - dynamic subset CSS까지 public stylesheet가 inline될 수 있도록 Vite inline asset limit을 `128 * 1024`로 조정했습니다.
+- `docs/superpowers/plans/2026-05-27-pagespeed-lcp-cache.md`
+  - Superpowers 기반 실행 계획을 추가했습니다.
+
+### 검증
+- sandbox 내부 `npm run build`는 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+- 승인된 환경에서 `npm run build` 재실행 통과, `astro check` 0 errors / 0 warnings / 0 hints. 폰트 범위 조정 후에도 같은 명령을 다시 실행해 통과했습니다.
+- `git diff --check` 통과.
+- `find dist -type f -name '*.css' -maxdepth 5` 결과 CSS asset이 생성되지 않아 dynamic subset CSS까지 inline bundle에 포함된 것을 확인했습니다.
+- `rg -n "x-portfolio-cache|cloudflare-cdn-cache-control|cdn-cache-control|cache-control" dist/server src/middleware.ts`로 middleware cache header가 서버 번들에 포함된 것을 확인했습니다.
+
+### 남은 확인
+- 배포 후 PageSpeed 재측정에서 font transfer, LCP request discovery, TTFB/HTML cache 항목 변화를 확인해야 합니다.
+- CMS 저장 직후 public 페이지 반영은 최대 10분 edge cache TTL 영향을 받을 수 있습니다. 즉시 반영이 필요하면 admin save 후 Cloudflare purge를 별도 작업으로 추가합니다.
+
 ## 2026-05-27 CSS Render Blocking Inline Threshold
 
 ### 요구사항
@@ -51,6 +90,22 @@
 - `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
 - `find dist -type f -name '*.css'` 결과 CSS asset이 생성되지 않아 public/admin CSS가 인라인된 것을 확인했습니다.
 - `rg "BaseLayout.*css|rel=\"stylesheet\"" dist`에서 public CSS 외부 stylesheet 링크가 사라진 것을 확인했습니다. React runtime 내부 문자열은 bundle 코드로 남을 수 있습니다.
+
+## 2026-05-27 PageSpeed Audit and Accessibility Fix
+
+### 요구사항
+- Google PageSpeed Insights (모바일) 분석 결과에 따라 지적된 LCP 이미지 지연, 텍스트-배경 명도 대비(contrast ratio), 스크린 리더용 레이블 미스매치(label mismatch) 결함을 개선합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 인트로 섹션의 메인 로고 이미지(`.site-logo.intro-logo`)에 `fetchpriority="high"` 속성을 추가하여 최우선 순위로 빠르게 로딩되도록 최적화했습니다. (LCP 단축)
+  - Selected Work 목록의 "더 알아보기" 링크(`a.featured-more`)에서 `aria-label` 값에 가시적인 텍스트인 `"더 알아보기"`를 명시적으로 포함하여 `label-content-name-mismatch` 경고를 완벽히 해결했습니다.
+- `src/styles/global.css`
+  - 카테고리 필터 비활성 버튼의 opacity를 기존 `0.32`에서 `0.48`로 조정해 텍스트 가독성을 높이고, 배경 대비 명도 대비율을 Lighthouse 합격 기준인 `3:1` 이상으로 확보했습니다. (Accessibility 스코어 향상)
+
+### 검증
+- `npm run build` 및 `astro check` 완료 (0 errors / 0 warnings / 0 hints)
+- 임시 분석용 로컬 lighthouse report 리소스 정리 완료
 
 ## 2026-05-27 Home Scroll Performance Pass
 

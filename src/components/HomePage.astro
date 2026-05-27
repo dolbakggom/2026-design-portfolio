@@ -9,7 +9,7 @@ interface Props {
 const { initialSection = "intro" } = Astro.props;
 const { profile, timeline, featuredWorks, works } = await getHomeContent();
 const categories = ["ALL", "UI/UX", "BI/BX"];
-const logoSrc = "/assets/figma/hampenta-logo.svg";
+const logoPath = "M22.0732 0.000976562H27.4131V49.124L44.1484 39.4609V16.8125H49.4883V42.5039L49.4873 42.5479L27.4141 55.291L27.4131 55.2891H22.0732V6.16602L5.33984 15.8271V38.4883H0V12.7432L22.0723 0L22.0732 0.000976562Z";
 const fallbackPortraitSrc = "/assets/figma/profile-guitar.png";
 const slogan = profile.headline.replace(/\.$/, "");
 const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
@@ -25,7 +25,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
   <main class="site-shell" data-initial-section={initialSection}>
     <section class="intro-section" aria-label="Intro" data-route="/">
       <div class="intro-grid">
-        <img class="site-logo intro-logo" src={logoSrc} alt="" />
+        <svg class="site-logo intro-logo" viewBox="0 0 50 56" aria-hidden="true" focusable="false">
+          <path d={logoPath} fill="currentColor" />
+        </svg>
         <h1 class="intro-title">
           <span data-intro-typewriter={slogan}>{slogan}</span><span class="intro-dot" aria-hidden="true">.</span>
         </h1>
@@ -44,7 +46,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     >
       <div class="identity-stage">
         <div class="identity-copy">
-          <img class="profile-logo" src={logoSrc} alt="" />
+          <svg class="profile-logo" viewBox="0 0 50 56" aria-hidden="true" focusable="false">
+            <path d={logoPath} fill="currentColor" />
+          </svg>
           <div class="identity-copy-stack">
             <div class="profile-intro identity-copy-panel is-active" data-type-copy="about" set:html={profile.intro} />
             <div class="timeline-heading identity-copy-panel" data-type-copy="career">
@@ -114,7 +118,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     </section>
 
     <section class="work-intro-section" id="work" aria-label="Work intro" data-route="/work">
-      <img class="site-logo" src={logoSrc} alt="" />
+      <svg class="site-logo" viewBox="0 0 50 56" aria-hidden="true" focusable="false">
+        <path d={logoPath} fill="currentColor" />
+      </svg>
       <h2>WORK</h2>
     </section>
 
@@ -147,7 +153,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
                       {work.client ? <span>{work.client}</span> : null}
                       <span>{work.role || "Figma + Adobe Illustrator"}</span>
                     </p>
-                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기`}><span>더 알아보기</span></a>
+                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기 - 더 알아보기`}><span>더 알아보기</span></a>
                   </div>
                 </div>
               </article>
@@ -390,8 +396,8 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     if (introTypeTarget && !reduceMotion) {
       const phrase = introTypeTarget.dataset.introTypewriter ?? introTypeTarget.textContent ?? "";
       introTypeTarget.textContent = "";
-      gsap.set(introLogo, { autoAlpha: 0, filter: "blur(18px)", scale: 0.94 });
-      gsap.to(introLogo, { autoAlpha: 1, filter: "blur(0px)", scale: 1, duration: 1.45, ease: "power3.out" });
+      gsap.set(introLogo, { filter: "blur(18px)", scale: 0.94 });
+      gsap.to(introLogo, { filter: "blur(0px)", scale: 1, duration: 1.45, ease: "power3.out" });
       gsap.delayedCall(1, () => {
         typeText(introTypeTarget, phrase, 64, () => {
           document.documentElement.classList.add("intro-complete");

@@ -35,7 +35,7 @@ export default defineConfig({
   },
   vite: {
     build: {
-      assetsInlineLimit: 32 * 1024
+      assetsInlineLimit: 128 * 1024
     },
     cacheDir: isDevCommand ? "node_modules/.vite-portfolio-dev" : "node_modules/.vite-portfolio-build",
     optimizeDeps: {

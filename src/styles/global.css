@@ -1,28 +1,6 @@
 @charset "UTF-8";
 
-@font-face {
-  font-family: "Pretendard";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-Regular.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Pretendard";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-Medium.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Pretendard";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/static/woff2/Pretendard-Bold.woff2") format("woff2");
-}
+@import "./pretendard-dynamic-subset.css";
 
 :root {
   color-scheme: light;
@@ -263,6 +241,7 @@ button:disabled {
   width: 86px;
   height: 86px;
   object-fit: contain;
+  color: currentColor;
 }
 
 .intro-grid .site-logo,
@@ -271,10 +250,6 @@ button:disabled {
   left: 50%;
   top: calc(50% - 32px);
   transform: translate(-50%, -50%);
-}
-
-.intro-logo {
-  opacity: 0;
 }
 
 .intro-title,
@@ -1111,7 +1086,7 @@ button:disabled {
   font-size: clamp(36px, calc(var(--gallery-width) * 0.027083), 52px);
   font-weight: 700;
   line-height: 1;
-  opacity: 0.32;
+  opacity: 0.48;
   transition: opacity 0.3s;
 }
 
