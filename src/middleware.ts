@@ -4,8 +4,8 @@ const EDGE_TTL_SECONDS = 600;
 const STALE_WHILE_REVALIDATE_SECONDS = 86_400;
 const PUBLIC_HOME_ROUTES = new Set(["/", "/about", "/career", "/work"]);
 
-type CloudflareRuntime = {
-  ctx?: ExecutionContext;
+type CloudflareLocals = {
+  cfContext?: ExecutionContext;
 };
 
 const normalizePathname = (pathname: string) => {
@@ -83,11 +83,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (!isCacheableHtmlResponse(response)) return response;
 
   const cacheableResponse = withPublicCacheHeaders(response, "MISS");
-  const runtime = (context.locals as { runtime?: CloudflareRuntime }).runtime;
+  const cfContext = (context.locals as CloudflareLocals).cfContext;
   const cacheWrite = cache.put(cacheKey, cacheableResponse.clone()).catch(() => undefined);
 
-  if (runtime?.ctx) {
-    runtime.ctx.waitUntil(cacheWrite);
+  if (cfContext) {
+    cfContext.waitUntil(cacheWrite);
   } else {
     void cacheWrite;
   }

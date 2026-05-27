@@ -75,6 +75,22 @@
 - 배포 후 PageSpeed 재측정에서 font transfer, LCP request discovery, TTFB/HTML cache 항목 변화를 확인해야 합니다.
 - CMS 저장 직후 public 페이지 반영은 최대 10분 edge cache TTL 영향을 받을 수 있습니다. 즉시 반영이 필요하면 admin save 후 Cloudflare purge를 별도 작업으로 추가합니다.
 
+## 2026-05-27 Astro v6 Middleware Context Fix
+
+### 요구사항
+- dev 서버에서 public HTML cache middleware가 `Astro.locals.runtime.ctx has been removed in Astro v6` 오류를 발생시키는 문제를 수정합니다.
+
+### 구현
+- `src/middleware.ts`
+  - Astro v6에서 제거된 `context.locals.runtime.ctx` 접근을 완전히 제거했습니다.
+  - Cloudflare background cache write는 `context.locals.cfContext.waitUntil(...)`를 사용하도록 변경했습니다.
+
+### 검증
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+- `git diff --check` 통과.
+- `rg -n "runtime\.ctx|locals\.runtime" src` 결과 없음.
+- 임시 dev 서버 `http://127.0.0.1:4327/`에서 `GET /` 요청이 200 OK로 응답하고 `x-portfolio-cache: MISS`, `cloudflare-cdn-cache-control` 헤더가 붙는 것을 확인했습니다.
+
 ## 2026-05-27 CSS Render Blocking Inline Threshold
 
 ### 요구사항
