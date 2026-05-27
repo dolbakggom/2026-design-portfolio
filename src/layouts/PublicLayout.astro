@@ -163,14 +163,28 @@ const props = Astro.props as Props;
       const controller = new AbortController();
       window.__floatingTopController = controller;
       const button = document.querySelector("[data-floating-top]");
+      let isSyncQueued = false;
+      let isVisible = false;
 
       if (!button) return;
 
       const syncButton = () => {
+        isSyncQueued = false;
         const root = document.documentElement;
         const canScroll = root.scrollHeight > window.innerHeight * 1.25;
         const nearBottom = window.scrollY + window.innerHeight >= root.scrollHeight - Math.max(220, window.innerHeight * 0.18);
-        button.classList.toggle("is-visible", canScroll && nearBottom);
+        const nextVisible = canScroll && nearBottom;
+
+        if (nextVisible === isVisible) return;
+
+        isVisible = nextVisible;
+        button.classList.toggle("is-visible", nextVisible);
+      };
+
+      const queueButtonSync = () => {
+        if (isSyncQueued) return;
+        isSyncQueued = true;
+        window.requestAnimationFrame(syncButton);
       };
 
       button.addEventListener("click", () => {
@@ -186,10 +200,11 @@ const props = Astro.props as Props;
 
         window.scrollTo({ top: 0, behavior: "smooth" });
       }, { signal: controller.signal });
-      window.addEventListener("scroll", syncButton, { passive: true, signal: controller.signal });
-      window.addEventListener("resize", syncButton, { signal: controller.signal });
+      window.addEventListener("scroll", queueButtonSync, { passive: true, signal: controller.signal });
+      window.addEventListener("resize", queueButtonSync, { signal: controller.signal });
+      window.addEventListener("load", queueButtonSync, { once: true, signal: controller.signal });
       document.addEventListener("astro:before-swap", () => controller.abort(), { once: true, signal: controller.signal });
-      syncButton();
+      window.requestAnimationFrame(() => window.requestAnimationFrame(queueButtonSync));
     })();
   </script>
 </BaseLayout>

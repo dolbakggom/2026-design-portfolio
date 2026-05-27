@@ -246,10 +246,15 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       let viewportSyncFrame = 0;
       let viewportRefreshTimeout = 0;
       let lastSyncedViewportHeight = 0;
+      let currentIdentityMode: "about" | "career" | null = null;
+      let currentCareerListVisible: boolean | null = null;
+      let activeTimelineIndex = -1;
+      let activeFeaturedIndex = -1;
+      let identityProgressTrigger: ScrollTrigger | null = null;
       const portfolioWindow = window as Window & {
         __portfolioLenis?: { resize?: () => void };
         __portfolioScrollToTop?: () => void;
-        __portfolioLenisScrollTo?: (target: number | string | HTMLElement, options?: { immediate?: boolean; duration?: number }) => void;
+        __portfolioLenisScrollTo?: (target: number | string | HTMLElement, options?: { immediate?: boolean; duration?: number; onComplete?: () => void }) => void;
       };
       let scrollToTopHandler: (() => void) | null = null;
 
@@ -285,16 +290,22 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       ScrollTrigger.update();
     };
 
-    const scrollToPosition = (top: number, mode: "auto" | "smooth" = "smooth") => {
+    const scrollToPosition = (top: number, mode: "auto" | "smooth" = "smooth", onComplete?: () => void) => {
       if (portfolioWindow.__portfolioLenisScrollTo) {
         portfolioWindow.__portfolioLenisScrollTo(Math.round(top), {
           immediate: mode === "auto",
-          duration: mode === "smooth" ? 1.05 : 0
+          duration: mode === "smooth" ? 1.05 : 0,
+          onComplete
         });
         return;
       }
 
       window.scrollTo({ top: Math.round(top), behavior: mode === "smooth" ? "smooth" : "auto" });
+      if (mode === "auto") {
+        onComplete?.();
+        return;
+      }
+      window.setTimeout(() => onComplete?.(), 1060);
     };
 
     const replaceRoute = (route: string) => {
@@ -431,6 +442,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     syncHomeViewportHeight();
 
     const setCareerListStage = (visible: boolean, immediate = false) => {
+      if (!immediate && currentCareerListVisible === visible) return;
+
+      currentCareerListVisible = visible;
       identity?.classList.toggle("is-career-list", visible);
       if (!careerList) return;
 
@@ -478,22 +492,33 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         .to(profileContact, { autoAlpha: 1, y: 0, duration: 0.62, ease: "power3.out" }, "+=0.24");
     };
 
+    const setActiveTimeline = (index: number) => {
+      const nextIndex = timelineCards.length
+        ? Math.min(timelineCards.length - 1, Math.max(0, index))
+        : -1;
+
+      if (nextIndex === activeTimelineIndex) return;
+
+      activeTimelineIndex = nextIndex;
+      timelineCards.forEach((card, cardIndex) => card.classList.toggle("is-active", cardIndex === nextIndex));
+    };
+
     const setIdentityMode = (mode: "about" | "career", progress = 0) => {
       if (!identity) return;
       const isCareer = mode === "career";
-      identity.classList.toggle("is-career", isCareer);
-      if (!isCareer) {
-        identity.classList.remove("is-career-list");
+      if (currentIdentityMode !== mode) {
+        currentIdentityMode = mode;
+        identity.classList.toggle("is-career", isCareer);
+        if (!isCareer) {
+          identity.classList.remove("is-career-list");
+        }
       }
 
       if (isCareer && careerCopy) {
         typeElement(careerCopy, 24);
       }
 
-      if (timelineCards.length) {
-        const activeIndex = Math.min(timelineCards.length - 1, Math.max(0, Math.floor(progress * timelineCards.length)));
-        timelineCards.forEach((card, index) => card.classList.toggle("is-active", index === activeIndex));
-      }
+      setActiveTimeline(Math.floor(progress * timelineCards.length));
     };
 
     const careerStartProgress = 0.38;
@@ -501,11 +526,18 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     const careerListStartProgress = careerStartProgress + (careerEndProgress - careerStartProgress) * 0.34;
 
     const setActiveFeatured = (activeIndex: number) => {
+      const nextIndex = featuredPanels.length
+        ? Math.min(featuredPanels.length - 1, Math.max(0, activeIndex))
+        : -1;
+
+      if (nextIndex === activeFeaturedIndex) return;
+
+      activeFeaturedIndex = nextIndex;
       featuredPanels.forEach((panel, index) => {
-        panel.classList.toggle("is-active", index === activeIndex);
-        panel.setAttribute("aria-hidden", index === activeIndex ? "false" : "true");
+        panel.classList.toggle("is-active", index === nextIndex);
+        panel.setAttribute("aria-hidden", index === nextIndex ? "false" : "true");
         panel.querySelectorAll<HTMLAnchorElement>("a").forEach((link) => {
-          if (index === activeIndex) {
+          if (index === nextIndex) {
             link.removeAttribute("tabindex");
           } else {
             link.setAttribute("tabindex", "-1");
@@ -513,8 +545,8 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         });
       });
       featuredDots.forEach((dot, index) => {
-        dot.classList.toggle("is-active", index === activeIndex);
-        dot.setAttribute("aria-pressed", index === activeIndex ? "true" : "false");
+        dot.classList.toggle("is-active", index === nextIndex);
+        dot.setAttribute("aria-pressed", index === nextIndex ? "true" : "false");
       });
     };
 
@@ -524,7 +556,16 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     const getPanelHeight = () => document.querySelector<HTMLElement>(".intro-section")?.offsetHeight || window.innerHeight;
     const getStickyStageHeight = () => identityStage?.offsetHeight || window.innerHeight;
     const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - getStickyStageHeight());
-    const getCareerEntryTop = () => getIdentityTop() + getIdentityProgressRange() * careerStartProgress;
+    const getIdentityScrollForProgress = (progress: number) => {
+      const clampedProgress = gsap.utils.clamp(0, 1, progress);
+
+      if (identityProgressTrigger) {
+        return identityProgressTrigger.start + (identityProgressTrigger.end - identityProgressTrigger.start) * clampedProgress;
+      }
+
+      return getIdentityTop() + getIdentityProgressRange() * clampedProgress;
+    };
+    const getCareerEntryTop = () => getIdentityScrollForProgress(careerStartProgress);
     const getCareerPointProgress = (index: number) => {
       const count = Math.max(1, timelineCards.length);
       return gsap.utils.clamp(0, 0.999, (index + 0.5) / count);
@@ -532,7 +573,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     const getCareerPointTop = (index: number) => {
       const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
       const pointProgress = startProgress + (careerEndProgress - startProgress) * getCareerPointProgress(index);
-      return getIdentityTop() + getIdentityProgressRange() * pointProgress;
+      return getIdentityScrollForProgress(pointProgress);
     };
     const getFeaturedIndexTop = (index: number) => {
       const count = Math.max(1, featuredPanels.length);
@@ -553,7 +594,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         onEnterBack: playAboutIntro,
       }));
 
-      homeScrollTriggers.push(ScrollTrigger.create({
+      identityProgressTrigger = ScrollTrigger.create({
         trigger: identity,
         start: "top top",
         end: () => `bottom-=${window.innerHeight * 3}px bottom`,
@@ -569,7 +610,8 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           setIdentityMode(showCareer ? "career" : "about", timelineProgress);
           setCareerListStage(showCareerList);
         }
-      }));
+      });
+      homeScrollTriggers.push(identityProgressTrigger);
     }
 
     featuredDots.forEach((dot) => {
@@ -593,9 +635,16 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     const jumpToCareerPoint = (index: number) => {
       if (!Number.isFinite(index) || index < 0 || index >= timelineCards.length) return;
 
-      scrollToPosition(getCareerPointTop(index), reduceMotion ? "auto" : "smooth");
+      const pointProgress = getCareerPointProgress(index);
+      const showCareerList = true;
+      setIdentityMode("career", pointProgress);
+      setCareerListStage(showCareerList);
+      scrollToPosition(getCareerPointTop(index), reduceMotion ? "auto" : "smooth", () => {
+        setIdentityMode("career", pointProgress);
+        setCareerListStage(showCareerList, true);
+        updateScrollTriggers();
+      });
       replaceRoute("/career");
-      setIdentityMode("career", getCareerPointProgress(index));
     };
 
     timelineCards.forEach((card, index) => {
@@ -841,19 +890,21 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         clone.classList.add("gallery-filter-clone");
         Object.assign(clone.style, {
           position: "fixed",
-          left: `${rect.left}px`,
-          top: `${rect.top}px`,
+          left: "0",
+          top: "0",
           width: `${rect.width}px`,
           height: `${rect.height}px`,
           margin: "0",
           zIndex: "20",
-          pointerEvents: "none"
+          pointerEvents: "none",
+          willChange: "transform, opacity"
         });
         document.body.appendChild(clone);
+        gsap.set(clone, { x: rect.left, y: rect.top, force3D: true });
         gsap.to(clone, {
           autoAlpha: 0,
           scale: 0.96,
-          y: 10,
+          y: rect.top + 10,
           duration: 0.32,
           ease: "power2.out",
           onComplete: () => clone.remove()

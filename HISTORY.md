@@ -36,6 +36,39 @@
 
 ---
 
+## 2026-05-27 Home Scroll Performance Pass
+
+### 요구사항
+- Chrome PageSpeed 리포트에서 남은 forced reflow/ScrollTrigger 관련 문제를 확인하고 홈 스크롤 로직을 더 안정적으로 최적화합니다.
+- Career point 클릭 시 해당 point 위치로 정확히 이동하지 않고 버벅이는 문제를 수정합니다.
+
+### 원인
+- PageSpeed 모바일 리포트 기준 폰트 CSS 차단은 줄었지만 `ScrollTrigger` JS, 초기 inline 측정, forced reflow가 남아 있었습니다.
+- 홈 스크롤 `onUpdate`에서 identity mode, career list, timeline active, featured active class/tween을 매 프레임 반복 실행하고 있었습니다.
+- Career point 클릭 target 계산이 실제 ScrollTrigger `start/end` 범위가 아니라 별도 추정 range를 사용해서, 세 번째 point 클릭 후 다섯 번째 point가 active 되는 식의 위치 오차가 발생했습니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - identity mode, career list visibility, active timeline index, active featured index를 캐싱해 같은 상태에서는 DOM class/tween을 다시 쓰지 않도록 변경했습니다.
+  - main identity ScrollTrigger를 `identityProgressTrigger`로 보관하고 career point scroll target을 실제 `start/end` 기준으로 계산하게 바꿨습니다.
+  - `scrollToPosition`에 `onComplete`를 추가해 Lenis 이동 완료 후 career point 상태와 ScrollTrigger를 한 번 더 동기화합니다.
+  - Gallery filter clone은 `left/top` 배치 대신 `x/y` transform으로 배치/퇴장하도록 변경했습니다.
+- `src/layouts/PublicLayout.astro`
+  - floating top button visibility 측정을 즉시 실행하지 않고 `requestAnimationFrame`으로 지연/스로틀하며, 표시 상태가 바뀔 때만 class를 토글합니다.
+- `src/styles/global.css`
+  - timeline point marker의 `left/width/height` 전환을 transform scale 전환으로 바꿨습니다.
+  - 실제 transform/opacity 애니메이션이 걸리는 요소에 한정해 `will-change`를 추가했습니다.
+- `docs/superpowers/plans/2026-05-27-home-scroll-performance.md`
+  - Superpowers 기반 실행 계획을 추가했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+- Chrome local `http://127.0.0.1:4323/`에서 career 세 번째 point 클릭 후 active index가 `2`로 유지됨을 확인했습니다.
+- Chrome local에서 마지막 career point 클릭 후 active index가 `4`로 유지됨을 확인했습니다.
+- Chrome local에서 about 방향으로 되돌릴 때 career list opacity/visibility가 정상적으로 숨겨지는지 확인했습니다.
+- 남은 follow-up: 사용자가 배포 후 PageSpeed를 다시 실행해 forced reflow 및 ScrollTrigger unused JS 항목 변화를 확인합니다. ScrollTrigger 청크 자체가 계속 지적되면 home script lazy timing 또는 intro LCP 지연을 별도 pass로 검토합니다.
+
 ## 2026-05-27 PageSpeed First Pass
 
 ### 요구사항
