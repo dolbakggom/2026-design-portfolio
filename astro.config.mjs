@@ -30,7 +30,13 @@ export default defineConfig({
     }
   }),
   integrations: [react()],
+  build: {
+    inlineStylesheets: "auto"
+  },
   vite: {
+    build: {
+      assetsInlineLimit: 32 * 1024
+    },
     cacheDir: isDevCommand ? "node_modules/.vite-portfolio-dev" : "node_modules/.vite-portfolio-build",
     optimizeDeps: {
       include: optimizerIncludes,

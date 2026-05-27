@@ -36,6 +36,22 @@
 
 ---
 
+## 2026-05-27 CSS Render Blocking Inline Threshold
+
+### 요구사항
+- PageSpeed 모바일 리포트에서 `/_astro/BaseLayout...css` 7.4KiB 파일이 렌더링 차단 요청으로 잡히는 문제를 줄입니다.
+- 권장안인 Astro `inlineStylesheets: "auto"` 유지 + Vite inline asset 한도 상향 방식을 적용합니다.
+
+### 구현
+- `astro.config.mjs`
+  - `build.inlineStylesheets: "auto"`를 명시했습니다.
+  - `vite.build.assetsInlineLimit`를 `32 * 1024`로 설정해 gzip 전송 크기 7.4KiB, 원본 크기 약 28.6KiB인 public CSS가 인라인 대상에 들어가도록 했습니다.
+
+### 검증
+- `npm run build` 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+- `find dist -type f -name '*.css'` 결과 CSS asset이 생성되지 않아 public/admin CSS가 인라인된 것을 확인했습니다.
+- `rg "BaseLayout.*css|rel=\"stylesheet\"" dist`에서 public CSS 외부 stylesheet 링크가 사라진 것을 확인했습니다. React runtime 내부 문자열은 bundle 코드로 남을 수 있습니다.
+
 ## 2026-05-27 Home Scroll Performance Pass
 
 ### 요구사항
