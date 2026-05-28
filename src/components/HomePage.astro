@@ -248,14 +248,12 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       const pageController = new AbortController();
       const pageSignal = pageController.signal;
       const homeScrollTriggers: ScrollTrigger[] = [];
-      const homeScrollTweens: gsap.core.Tween[] = [];
+      const homeScrollAnimations: gsap.core.Animation[] = [];
       let initialScrollFrame = 0;
       let initialScrollTimeout = 0;
       let featuredBlurTimeout = 0;
       let viewportSyncFrame = 0;
       let viewportRefreshTimeout = 0;
-      let timelineFocusFrame = 0;
-      let timelineFocusTimeout = 0;
       let timelineScrollFrame = 0;
       let lastSyncedViewportHeight = 0;
       let currentIdentityMode: "about" | "career" | null = null;
@@ -269,8 +267,10 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       let cachedFeaturedTop = Number.POSITIVE_INFINITY;
       let cachedPanelHeight = window.innerHeight;
       let cachedStickyStageHeight = window.innerHeight;
+      let cachedTimelineMaxOffset = 0;
       let routeDebounceTimeout = 0;
       let pendingRoute: string | null = null;
+      const typewriterTimers: number[] = [];
       const portfolioWindow = window as Window & {
         __portfolioLenis?: { resize?: () => void };
         __portfolioScrollToTop?: () => void;
@@ -294,18 +294,15 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         if (viewportRefreshTimeout) {
           window.clearTimeout(viewportRefreshTimeout);
         }
-        window.cancelAnimationFrame(timelineFocusFrame);
         window.cancelAnimationFrame(timelineScrollFrame);
-        if (timelineFocusTimeout) {
-          window.clearTimeout(timelineFocusTimeout);
-        }
         if (routeDebounceTimeout) {
           window.clearTimeout(routeDebounceTimeout);
         }
+        typewriterTimers.forEach((timer) => window.clearTimeout(timer));
         document.documentElement.style.removeProperty("--home-viewport-height");
         ScrollTrigger.removeEventListener("refreshInit", updateScrollGeometryCache);
         ScrollTrigger.removeEventListener("refresh", updateScrollGeometryCache);
-        homeScrollTweens.forEach((tween) => tween.kill());
+        homeScrollAnimations.forEach((animation) => animation.kill());
         homeScrollTriggers.forEach((trigger) => trigger.kill());
         document.documentElement.classList.remove("intro-complete");
         activeHomeShell = null;
@@ -388,59 +385,74 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       target.textContent = "";
       const chars = value.split("");
       chars.forEach((char, index) => {
-        window.setTimeout(() => {
+        const timer = window.setTimeout(() => {
           target.textContent += char;
           if (index === chars.length - 1) done?.();
         }, speed * index);
+        typewriterTimers.push(timer);
       });
     };
 
     const textCopies = new Map<HTMLElement, { node: Text; text: string }[]>();
 
-    const prepareTypeElement = (element: HTMLElement) => {
-      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-      const nodes: { node: Text; text: string }[] = [];
-      let current = walker.nextNode();
+    const prepareTypeElement = (element: HTMLElement | null) => {
+      if (!element || textCopies.has(element)) return;
 
-      while (current) {
-        if (current.textContent?.trim()) {
-          nodes.push({ node: current as Text, text: current.textContent });
-        }
-        current = walker.nextNode();
+      const copies: { node: Text; text: string }[] = [];
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => node.textContent?.trim()
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_REJECT
+      });
+
+      let node = walker.nextNode();
+      while (node) {
+        const textNode = node as Text;
+        copies.push({ node: textNode, text: textNode.textContent ?? "" });
+        node = walker.nextNode();
       }
 
-      textCopies.set(element, nodes);
-      nodes.forEach(({ node }) => {
-        node.textContent = "";
+      textCopies.set(element, copies);
+      copies.forEach(({ node: textNode }) => {
+        textNode.textContent = "";
       });
+      element.dataset.typed = "false";
     };
 
-    const typeElement = (element: HTMLElement, speed = 18) => {
-      const nodes = textCopies.get(element);
-      if (!nodes || element.dataset.typed === "true") return;
+    const fillTypeElement = (element: HTMLElement | null) => {
+      if (!element) return;
+      const copies = textCopies.get(element);
+      if (!copies) return;
+
+      copies.forEach(({ node: textNode, text }) => {
+        textNode.textContent = text;
+      });
+      element.dataset.typed = "true";
+    };
+
+    const typeElement = (element: HTMLElement | null, speed = 24) => {
+      if (!element || element.dataset.typed === "true") return;
+
+      const copies = textCopies.get(element);
+      if (!copies) return;
+
+      if (speed <= 0) {
+        fillTypeElement(element);
+        return;
+      }
 
       element.dataset.typed = "true";
-      let nodeIndex = 0;
-      let charIndex = 0;
-
-      const step = () => {
-        const current = nodes[nodeIndex];
-        if (!current) return;
-
-        current.node.textContent = current.text.slice(0, charIndex + 1);
-        charIndex += 1;
-
-        if (charIndex >= current.text.length) {
-          nodeIndex += 1;
-          charIndex = 0;
-        }
-
-        if (nodeIndex < nodes.length) {
-          window.setTimeout(step, speed);
-        }
-      };
-
-      step();
+      let cursor = 0;
+      copies.forEach(({ node: textNode, text }) => {
+        textNode.textContent = "";
+        text.split("").forEach((char) => {
+          const timer = window.setTimeout(() => {
+            textNode.textContent += char;
+          }, cursor * speed);
+          typewriterTimers.push(timer);
+          cursor += 1;
+        });
+      });
     };
 
     const introLogo = document.querySelector<HTMLElement>(".intro-logo");
@@ -486,6 +498,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       cachedFeaturedTop = featuredSection?.offsetTop ?? Number.POSITIVE_INFINITY;
       cachedPanelHeight = introSection?.offsetHeight || window.innerHeight;
       cachedStickyStageHeight = identityStage?.offsetHeight || window.innerHeight;
+      cachedTimelineMaxOffset = Math.max(0, (timelineTrack?.scrollHeight ?? 0) - (careerList?.clientHeight ?? 0));
     };
     const supportsLargeViewportHeight = typeof CSS !== "undefined" && CSS.supports?.("height", "100lvh") === true;
     const shouldUseViewportHeightFallback = () => isMobileIdentityLayout() && !supportsLargeViewportHeight;
@@ -513,53 +526,61 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     ScrollTrigger.addEventListener("refreshInit", updateScrollGeometryCache);
     ScrollTrigger.addEventListener("refresh", updateScrollGeometryCache);
 
+    let identitySwapTimeline: gsap.core.Timeline | null = null;
+    let careerListTween: gsap.core.Tween | null = null;
+
+    const animateCareerListStage = (visible: boolean, immediate = false) => {
+      if (!careerList || reduceMotion) return;
+
+      careerListTween?.kill();
+      careerListTween = gsap.to(careerList, {
+        autoAlpha: visible ? 1 : 0,
+        x: visible ? 0 : 32,
+        yPercent: -50,
+        filter: visible ? "blur(0px)" : "blur(10px)",
+        duration: immediate ? 0 : visible ? 0.46 : 0.3,
+        ease: "power3.out",
+        overwrite: "auto"
+      });
+      homeScrollAnimations.push(careerListTween);
+    };
+
     const setCareerListStage = (visible: boolean, immediate = false) => {
       if (!immediate && currentCareerListVisible === visible) return;
 
       currentCareerListVisible = visible;
       identity?.classList.toggle("is-career-list", visible);
+      animateCareerListStage(visible, immediate);
     };
 
     if (!reduceMotion) {
-      [aboutCopy, careerCopy].forEach((element) => {
-        if (element) prepareTypeElement(element);
-      });
-
-      gsap.set([profileLogo, profileContact, profileMedia], { autoAlpha: 0 });
-      gsap.set(profileLogo, { y: 18, filter: "brightness(0) blur(12px)" });
-      gsap.set(profileContact, { y: 24 });
-      gsap.set(profileMedia, { "--profile-media-enter-blur": "18px", clipPath: "inset(0% 0% 0% 0%)", scale: 1.04, filter: "blur(18px)" });
+      prepareTypeElement(aboutCopy);
+      prepareTypeElement(careerCopy);
+      gsap.set(profileLogo, { autoAlpha: 0, y: 18, filter: "brightness(0) blur(12px)" });
+      gsap.set(profileContact, { autoAlpha: 0, y: 24, filter: "blur(8px)" });
+      gsap.set(profileMedia, { "--profile-media-enter-blur": "18px", autoAlpha: 0, clipPath: "inset(0% 0% 0% 0%)", scale: 1.04, filter: "blur(18px)" });
+      gsap.set(aboutCopy, { autoAlpha: 0, y: 18, filter: "blur(8px)" });
+      gsap.set(careerCopy, { autoAlpha: 0, y: 24, filter: "blur(8px)" });
+      gsap.set(careerList, { autoAlpha: 0, x: 32, yPercent: -50, filter: "blur(10px)" });
       setCareerListStage(false, true);
+      currentIdentityMode = "about";
+    } else {
+      currentIdentityMode = "about";
     }
 
     const playAboutIntro = () => {
-      if (!identity || !profileLogo || !profileContact || !profileMedia || !aboutCopy) return;
+      if (!identity || !aboutCopy || reduceMotion) return;
       if (identity.dataset.aboutPlayed === "true") return;
-      if (reduceMotion) return;
 
       identity.dataset.aboutPlayed = "true";
-      const timeline = gsap.timeline();
-      timeline
-        .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.72, ease: "power3.out" })
-        .add(() => typeElement(aboutCopy, 24), "-=0.06")
-        .to(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: 1.16, ease: "power3.out" }, "<")
-        .to(profileContact, { autoAlpha: 1, y: 0, duration: 0.62, ease: "power3.out" }, "+=0.24");
-    };
-
-    const syncTimelineFocus = (index = activeTimelineIndex) => {
-      if (!careerList || !timelineTrack || index < 0) return;
-      const card = timelineCards[index];
-      if (!card) return;
-
-      const maxOffset = Math.max(0, timelineTrack.scrollHeight - careerList.clientHeight);
-      const cardCenter = card.offsetTop + card.offsetHeight / 2;
-      const nextOffset = Math.min(maxOffset, Math.max(0, cardCenter - careerList.clientHeight / 2));
-      careerList.style.setProperty("--timeline-focus-offset", `${nextOffset.toFixed(2)}px`);
-    };
-
-    const queueTimelineFocus = (index = activeTimelineIndex) => {
-      window.cancelAnimationFrame(timelineFocusFrame);
-      timelineFocusFrame = window.requestAnimationFrame(() => syncTimelineFocus(index));
+      const introTimeline = gsap.timeline({ defaults: { ease: "power3.out", overwrite: "auto" } });
+      introTimeline
+        .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.72 }, 0)
+        .add(() => typeElement(aboutCopy, 24), 0.14)
+        .to(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: 1.16 }, 0.04)
+        .to(profileContact, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.62 }, 0.42)
+        .to(aboutCopy, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.48 }, 0.16);
+      homeScrollAnimations.push(introTimeline);
     };
 
     const setActiveTimeline = (index: number) => {
@@ -580,13 +601,6 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           card.removeAttribute("aria-current");
         }
       });
-
-      queueTimelineFocus(nextIndex);
-
-      if (timelineFocusTimeout) {
-        window.clearTimeout(timelineFocusTimeout);
-      }
-      timelineFocusTimeout = window.setTimeout(() => queueTimelineFocus(nextIndex), 280);
     };
 
     const setIdentityMode = (mode: "about" | "career") => {
@@ -597,11 +611,58 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         identity.classList.toggle("is-career", isCareer);
         if (!isCareer) {
           identity.classList.remove("is-career-list");
+          identity.dataset.aboutPlayed = "true";
         }
-      }
+        if (reduceMotion) return;
 
-      if (isCareer && careerCopy) {
-        typeElement(careerCopy, 24);
+        identitySwapTimeline?.kill();
+        gsap.killTweensOf([aboutCopy, careerCopy, profileLogo, profileContact, profileMedia]);
+        identitySwapTimeline = gsap.timeline({ defaults: { ease: "power3.out", overwrite: "auto" } });
+
+        if (isCareer) {
+          identitySwapTimeline
+            .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.38 }, 0)
+            .to(aboutCopy, { autoAlpha: 0, y: -24, filter: "blur(8px)", duration: 0.38 }, 0)
+            .to(profileContact, { autoAlpha: 0, y: 20, filter: "blur(8px)", duration: 0.32 }, 0)
+            .to(profileMedia, {
+              "--profile-media-enter-blur": "1px",
+              autoAlpha: 0.16,
+              scale: 1.04,
+              filter: "grayscale(1) contrast(1.1) blur(2px)",
+              duration: 0.48
+            }, 0)
+            .fromTo(careerCopy,
+              { autoAlpha: 0, y: 24, filter: "blur(8px)" },
+              {
+                autoAlpha: 1,
+                y: 0,
+                filter: "blur(0px)",
+                duration: 0.42,
+                onStart: () => typeElement(careerCopy, 24)
+              },
+              0.12
+            );
+        } else {
+          identitySwapTimeline
+            .to(careerCopy, { autoAlpha: 0, y: 24, filter: "blur(8px)", duration: 0.32 }, 0)
+            .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.38 }, 0)
+            .to(profileMedia, {
+              "--profile-media-enter-blur": "0px",
+              autoAlpha: 1,
+              scale: 1,
+              filter: "blur(0px)",
+              duration: 0.48
+            }, 0)
+            .to(profileContact, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.38 }, 0.08)
+            .to(aboutCopy, {
+              autoAlpha: 1,
+              y: 0,
+              filter: "blur(0px)",
+              duration: 0.38,
+              onStart: () => typeElement(aboutCopy, 24)
+            }, 0.1);
+        }
+        homeScrollAnimations.push(identitySwapTimeline);
       }
     };
 
@@ -649,7 +710,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
       return getIdentityTop() + getIdentityProgressRange() * clampedProgress;
     };
-    const getCareerEntryTop = () => getIdentityScrollForProgress(careerStartProgress);
+    const getCareerEntryTop = () => getCareerTimelineScrollForProgress(isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress);
     const getCareerTimelineScrollForProgress = (progress: number) => {
       const clampedProgress = gsap.utils.clamp(0, 1, progress);
       const totalHeight = Math.max(1, getWorkTop() - getIdentityTop());
@@ -661,21 +722,56 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     };
     const getCareerPointProgress = (index: number) => {
       const count = Math.max(1, timelineCards.length);
-      return gsap.utils.clamp(0, 0.999, (index + 0.5) / count);
+      if (count <= 1) return 0;
+      return gsap.utils.clamp(0, 1, index / (count - 1));
     };
     const getCareerPointTop = (index: number) => {
       const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
       const pointProgress = startProgress + (careerEndProgress - startProgress) * getCareerPointProgress(index);
       return getCareerTimelineScrollForProgress(pointProgress);
     };
-    const syncCareerTimelineFromScroll = () => {
-      if (!timelineCards.length || !currentCareerListVisible) return;
-
+    const syncCareerTimelineProgress = (identityProgress?: number) => {
+      if (reduceMotion || !timelineCards.length || !timelineTrack || !careerList) return;
       const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
-      const startTop = getCareerTimelineScrollForProgress(startProgress);
-      const endTop = getCareerTimelineScrollForProgress(careerEndProgress);
-      const progress = gsap.utils.clamp(0, 0.999999, (window.scrollY - startTop) / Math.max(1, endTop - startTop));
-      setActiveTimeline(Math.floor(progress * timelineCards.length));
+      const rawProgress = typeof identityProgress === "number"
+        ? (identityProgress - startProgress) / Math.max(0.001, careerEndProgress - startProgress)
+        : (() => {
+          const startTop = getCareerTimelineScrollForProgress(startProgress);
+          const endTop = getCareerTimelineScrollForProgress(careerEndProgress);
+          return (window.scrollY - startTop) / Math.max(1, endTop - startTop);
+        })();
+      const progress = gsap.utils.clamp(0, 1, rawProgress);
+      const count = timelineCards.length;
+      const progressSlots = Math.max(1, count - 1);
+      const focusRange = 1 / progressSlots * 1.15;
+      let bestIndex = 0;
+      let bestWeight = -1;
+
+      careerList.style.setProperty("--timeline-focus-offset", `${(cachedTimelineMaxOffset * progress).toFixed(2)}px`);
+
+      timelineCards.forEach((card, index) => {
+        const cardProgress = count <= 1 ? 0 : index / progressSlots;
+        const diff = Math.abs(progress - cardProgress);
+        const focusWeight = gsap.utils.clamp(0, 1, 1 - diff / focusRange);
+        const opacity = 0.2 + 0.8 * focusWeight;
+        const scale = 0.97 + 0.03 * focusWeight;
+        const detailOffset = (1 - focusWeight) * 8;
+
+        if (focusWeight > bestWeight) {
+          bestWeight = focusWeight;
+          bestIndex = index;
+        }
+
+        card.style.setProperty("--timeline-card-opacity", opacity.toFixed(3));
+        card.style.setProperty("--timeline-card-scale", scale.toFixed(3));
+        card.style.setProperty("--timeline-detail-opacity", focusWeight.toFixed(3));
+        card.style.setProperty("--timeline-detail-y", `${detailOffset.toFixed(2)}px`);
+      });
+
+      setActiveTimeline(bestIndex);
+    };
+    const syncCareerTimelineFromScroll = () => {
+      syncCareerTimelineProgress();
     };
     const queueCareerTimelineFromScroll = () => {
       window.cancelAnimationFrame(timelineScrollFrame);
@@ -688,12 +784,11 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     };
 
     if (identity && !reduceMotion) {
-      // playAboutIntro 시점을 페이지가 꽉 차기 전(아래에서 올라오는 도중)으로 당기기 위한 별도 트리거
       homeScrollTriggers.push(ScrollTrigger.create({
         trigger: identity,
         start: "top 65%",
         onEnter: playAboutIntro,
-        onEnterBack: playAboutIntro,
+        onEnterBack: playAboutIntro
       }));
 
       identityProgressTrigger = ScrollTrigger.create({
@@ -708,9 +803,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           const showCareerList = showCareer && (!mobileIdentity || self.progress >= careerListStartProgress);
           setIdentityMode(showCareer ? "career" : "about");
           setCareerListStage(showCareerList);
-          if (showCareerList) {
-            queueCareerTimelineFromScroll();
-          }
+          syncCareerTimelineProgress(self.progress);
         }
       });
       homeScrollTriggers.push(identityProgressTrigger);
@@ -750,7 +843,6 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     timelineCards.forEach((card, index) => {
       card.addEventListener("click", () => jumpToCareerPoint(index), { signal: pageSignal });
     });
-    window.addEventListener("scroll", queueCareerTimelineFromScroll, { passive: true, signal: pageSignal });
 
     const scrollToIntroFromFloatingButton = () => {
       scrollToPosition(0, reduceMotion ? "auto" : "smooth");
@@ -772,7 +864,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
       syncFeaturedScrollHeight();
       updateScrollGeometryCache();
-      queueTimelineFocus();
+      queueCareerTimelineFromScroll();
       portfolioWindow.__portfolioLenis?.resize?.();
       ScrollTrigger.update();
 
@@ -783,7 +875,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         syncHomeViewportHeight();
         syncFeaturedScrollHeight();
         updateScrollGeometryCache();
-        queueTimelineFocus();
+        queueCareerTimelineFromScroll();
         portfolioWindow.__portfolioLenis?.resize?.();
         ScrollTrigger.refresh();
       }, 180);
@@ -797,6 +889,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     syncFeaturedScrollHeight();
 
     setActiveTimeline(0);
+    syncCareerTimelineProgress(isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress);
     setActiveFeatured(0);
 
     if (featuredSection && featuredPanels.length) {
@@ -815,7 +908,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     }
 
     if (identityStage) {
-      homeScrollTweens.push(gsap.fromTo(
+      homeScrollAnimations.push(gsap.fromTo(
         identityStage,
         { "--career-work-dim": 0 },
         {
@@ -833,7 +926,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     }
 
     if (featuredStage && gallerySection) {
-      homeScrollTweens.push(gsap.fromTo(
+      homeScrollAnimations.push(gsap.fromTo(
         featuredStage,
         { "--featured-gallery-dim": 0 },
         {
@@ -883,26 +976,17 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           : identitySection
             ? initialSection === "career"
               ? getCareerEntryTop()
-              : identitySection.offsetTop
+              : getIdentityScrollForProgress(0.24)
             : 0;
 
       scrollToPosition(targetTop ?? 0, "auto");
-      if (initialSection === "work") {
-        replaceRoute("/work", { immediate: true });
-      }
       if (initialSection === "about") {
         playAboutIntro();
       }
+      if (initialSection === "work") {
+        replaceRoute("/work", { immediate: true });
+      }
       if (initialSection === "career") {
-        if (identity) {
-          identity.dataset.aboutPlayed = "true";
-        }
-        if (profileLogo) {
-          gsap.set(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)" });
-        }
-        if (profileMedia) {
-          gsap.set(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, clipPath: "inset(0% 0% 0% 0%)", scale: 1, filter: "blur(0px)" });
-        }
         setCareerListStage(!isMobileIdentityLayout(), true);
         setIdentityMode("career");
         setActiveTimeline(0);

@@ -45,6 +45,7 @@
 - 스크롤 경계에서 `history.replaceState`가 단시간에 반복 호출되어 Safari 히스토리 쿼터 예외가 발생할 수 있는 리스크를 줄입니다.
 - About 프로필 이미지는 첫 진입 경로에서 빠르게 노출될 수 있으므로 lazy 로딩을 제거합니다.
 - 첫 인트로 JS 초기화 간극에서 About/Career 요소가 잠깐 보이며 로고가 번쩍이는 FOUC를 방지합니다.
+- About/Career 전환과 career point 이동을 스냅/비동기 타이핑 중심에서 Apple-style scroll scrubbing 방식으로 바꿔, 스크롤 위치에 맞춰 양방향으로 재생되게 합니다.
 
 ### 구현
 - `src/components/HomePage.astro`
@@ -55,8 +56,13 @@
   - `career-work` 디졸브와 `featured-gallery` 디졸브의 `onUpdate` 직접 `style.setProperty(...)` 호출을 GSAP `fromTo(..., { scrollTrigger })` scrub tween으로 전환했습니다.
   - 스크롤 트리거에서 발생하는 route 변경은 150ms 디바운스로 묶고, 명시적 클릭/초기 섹션 진입은 즉시 처리할 수 있는 옵션을 추가했습니다. `replaceState` 예외는 `try/catch`로 흡수해 브라우저 쿼터 상황에서도 스크립트가 중단되지 않도록 했습니다.
   - `.profile-media img`의 `loading="lazy"`를 제거해 `/about` 직접 진입 또는 intro 이후 첫 노출 시 브라우저가 프로필 이미지를 미루지 않도록 했습니다.
+  - About/Career 본문 타이핑용 `prepareTypeElement`/`typeElement`/`playAboutIntro` 흐름을 제거하고, `identityScrubTimeline`을 `ScrollTrigger` progress에 직접 연결했습니다.
+  - About 문단, 프로필 로고/연락처/미디어, Career copy, timeline list가 스크롤 진행률에 따라 reveal/cross-fade 되도록 단일 scrub 타임라인으로 통합했습니다.
+  - Career timeline은 active index 스냅 대신 `--timeline-focus-offset`, `--timeline-card-opacity`, `--timeline-card-scale`, `--timeline-detail-opacity`를 scroll progress에서 보간해 트랙과 카드가 연속적으로 움직이도록 바꿨습니다.
+  - Timeline offset 계산은 scroll 중 layout read를 피하도록 cached max offset을 사용합니다.
 - `src/styles/global.css`
   - `html:not(.intro-complete) .site-shell[data-initial-section="intro"]` 범위에서 `.profile-logo`, `.profile-contact`, `.profile-media`, `.profile-intro`를 숨기고 transition을 끄도록 해, 첫 `/` 진입 인트로가 완료되기 전 About 스테이지 요소가 먼저 페인트되지 않도록 했습니다.
+  - `.timeline-track`의 transform transition을 제거하고, `.timeline-card` 및 detail text는 JS가 갱신하는 CSS 변수 기반 opacity/scale/offset으로 렌더링되도록 정리했습니다.
 - `src/styles/global.css`
   - `.gallery-section` 의 `min-height`를 기존 고정 `200svh`에서 오버랩 마진 높이와 완벽히 동기화되도록 `calc(2 * var(--home-panel-height))` 로 변경했습니다.
   - 이로 인해 모바일에서 `home-panel-height`가 `100lvh`로 매핑되더라도 오버랩 마진 오프셋과 갤러리 섹션의 최소 높이가 기하학적으로 완벽히 대칭을 이루어, 콘텐츠 개수가 매우 적은 상황(필터 적용 등)에서도 최하단에 검은색 배경이 절대 비치지 않도록 방어했습니다.
@@ -66,6 +72,7 @@
 - `npm run build` 및 `astro check` 완료 (0 errors / 0 warnings / 0 hints)
 - geometry cache / GSAP scrub tween 전환 후에도 `npm run build`, `git diff --check`, 로컬 브라우저 timeline 진행 확인을 다시 수행했습니다.
 - route debounce / 프로필 이미지 eager 로딩 반영 후 `npm run build`, `git diff --check`를 재실행했고, 로컬 브라우저에서 `.profile-media img`의 `loading` 속성이 제거된 것과 `/work` 스크롤 진입 시 console error가 없는 것을 확인했습니다.
+- About/Career scroll scrubbing 반영 후에도 `npm run build`, `git diff --check`, 로컬 브라우저 스크롤 상태 확인을 다시 수행했습니다.
 
 ## 2026-05-27 Career Timeline Focus Window Pass
 
@@ -408,3 +415,32 @@
 - `npm run build`
   - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
   - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.
+
+## 2026-05-28 About/Career Hybrid Scroll Animation Update
+
+### 요구사항
+- 우측 Career 타임라인은 자석처럼 미끄러지는 1:1 스크러빙을 유지합니다.
+- About 소개글 등장, About/Career 카피 전환, 프로필 미디어/연락처 등장 등은 스크롤 속도에 직접 묶지 않고 자연스럽게 한 번 재생되는 이벤트 애니메이션으로 처리합니다.
+- 기존 all-scrub 방식에서 텍스트와 미디어가 스크롤 진행률을 그대로 따라가며 어색하게 움직이던 느낌을 줄입니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `textCopies`, `prepareTypeElement`, `typeElement`, `fillTypeElement`를 복원해 About/Career 카피 타이핑 효과를 다시 이벤트 기반으로 처리했습니다.
+  - `identityScrubTimeline`과 `identityScrubTimeline.progress(self.progress)` 바인딩을 제거했습니다.
+  - `playAboutIntro()`를 별도 `ScrollTrigger`(`start: "top 65%"`)로 분리해 About 섹션이 올라오는 도중 한 번만 프로필 로고, 미디어, 연락처, About 카피 타이핑을 재생하도록 했습니다.
+  - `setIdentityMode()`를 GSAP one-shot timeline 방식으로 바꿔 About -> Career, Career -> About 전환 시 카피/연락처/프로필 미디어가 cross-fade, slide, blur로 자연스럽게 교체되도록 했습니다.
+  - `syncCareerTimelineProgress()`는 유지해 타임라인 트랙 위치, 카드 opacity/scale/details가 계속 scroll progress와 1:1로 보간되도록 했습니다.
+  - 모바일의 Career copy -> Career list 2단계 구조를 유지하기 위해 `setCareerListStage()`에서 timeline list 노출만 별도 이벤트 tween으로 제어했습니다.
+- `src/styles/global.css`
+  - 첫 인트로 완료 전 career copy도 FOUC guard 대상에 포함했습니다.
+  - GSAP가 직접 제어하는 identity copy/contact/media/timeline list의 CSS transition을 홈 스크롤 범위에서 꺼서 inline tween과 CSS transition이 동시에 걸리지 않게 했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build`
+  - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+  - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.
+- 로컬 dev 서버 `http://127.0.0.1:4321/` 정상 기동 확인.
+
+### 남은 주의점
+- 현재 세션에는 Playwright 패키지가 없어 브라우저 자동 DOM 검증은 수행하지 못했습니다. 사용자가 실제 Chrome/Safari에서 About 등장 시점, Career 전환 경계, 모바일 Career list 진입감을 확인한 뒤 타이밍을 미세 조정하면 됩니다.
