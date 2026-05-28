@@ -305,6 +305,17 @@ button:disabled {
   transform: translate(-50%, 0);
 }
 
+html:not(.intro-complete) .site-shell[data-initial-section="intro"] .profile-logo,
+html:not(.intro-complete) .site-shell[data-initial-section="intro"] .profile-contact,
+html:not(.intro-complete) .site-shell[data-initial-section="intro"] .profile-media,
+html:not(.intro-complete) .site-shell[data-initial-section="intro"] .profile-intro {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  filter: blur(12px) !important;
+  transition: none !important;
+  pointer-events: none !important;
+}
+
 .intro-scroll-cue p {
   position: relative;
   margin: 0;

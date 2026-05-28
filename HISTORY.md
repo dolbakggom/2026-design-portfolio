@@ -44,6 +44,7 @@
 - Gemini의 GSAP 성능 리뷰를 검토해, 스크롤 중 반복되는 geometry read와 `onUpdate` 직접 style write를 줄입니다.
 - 스크롤 경계에서 `history.replaceState`가 단시간에 반복 호출되어 Safari 히스토리 쿼터 예외가 발생할 수 있는 리스크를 줄입니다.
 - About 프로필 이미지는 첫 진입 경로에서 빠르게 노출될 수 있으므로 lazy 로딩을 제거합니다.
+- 첫 인트로 JS 초기화 간극에서 About/Career 요소가 잠깐 보이며 로고가 번쩍이는 FOUC를 방지합니다.
 
 ### 구현
 - `src/components/HomePage.astro`
@@ -54,6 +55,8 @@
   - `career-work` 디졸브와 `featured-gallery` 디졸브의 `onUpdate` 직접 `style.setProperty(...)` 호출을 GSAP `fromTo(..., { scrollTrigger })` scrub tween으로 전환했습니다.
   - 스크롤 트리거에서 발생하는 route 변경은 150ms 디바운스로 묶고, 명시적 클릭/초기 섹션 진입은 즉시 처리할 수 있는 옵션을 추가했습니다. `replaceState` 예외는 `try/catch`로 흡수해 브라우저 쿼터 상황에서도 스크립트가 중단되지 않도록 했습니다.
   - `.profile-media img`의 `loading="lazy"`를 제거해 `/about` 직접 진입 또는 intro 이후 첫 노출 시 브라우저가 프로필 이미지를 미루지 않도록 했습니다.
+- `src/styles/global.css`
+  - `html:not(.intro-complete) .site-shell[data-initial-section="intro"]` 범위에서 `.profile-logo`, `.profile-contact`, `.profile-media`, `.profile-intro`를 숨기고 transition을 끄도록 해, 첫 `/` 진입 인트로가 완료되기 전 About 스테이지 요소가 먼저 페인트되지 않도록 했습니다.
 - `src/styles/global.css`
   - `.gallery-section` 의 `min-height`를 기존 고정 `200svh`에서 오버랩 마진 높이와 완벽히 동기화되도록 `calc(2 * var(--home-panel-height))` 로 변경했습니다.
   - 이로 인해 모바일에서 `home-panel-height`가 `100lvh`로 매핑되더라도 오버랩 마진 오프셋과 갤러리 섹션의 최소 높이가 기하학적으로 완벽히 대칭을 이루어, 콘텐츠 개수가 매우 적은 상황(필터 적용 등)에서도 최하단에 검은색 배경이 절대 비치지 않도록 방어했습니다.
