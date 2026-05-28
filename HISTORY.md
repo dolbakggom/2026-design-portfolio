@@ -41,11 +41,19 @@
 ### 요구사항
 - 커리어 타임라인 포인트 수가 늘어남에 따라 물리 스크롤 계산 범위를 넓혔으나, 마지막 8번째 포인트에 도달하기도 전에 다음 `#work` (Work Intro) 섹션이 아래에서 위로 덮고 올라와 마지막 이력 항목이 가려져 보이지 않는 문제를 해결합니다.
 - 모바일 화면에서 페이지 최하단으로 스크롤했을 때, `.gallery-section` 의 끝부분이 뚝 끊기고 뒤쪽 Featured 섹션의 검은색 배경이 노출되는 틈새 비침 현상을 제거합니다.
+- Gemini의 GSAP 성능 리뷰를 검토해, 스크롤 중 반복되는 geometry read와 `onUpdate` 직접 style write를 줄입니다.
+- 스크롤 경계에서 `history.replaceState`가 단시간에 반복 호출되어 Safari 히스토리 쿼터 예외가 발생할 수 있는 리스크를 줄입니다.
+- About 프로필 이미지는 첫 진입 경로에서 빠르게 노출될 수 있으므로 lazy 로딩을 제거합니다.
 
 ### 구현
 - `src/components/HomePage.astro`
   - `getCareerTimelineScrollForProgress` 함수에서 타임라인 진행률 계산을 위한 최대 스크롤 한계선(`maxTimelineTravel`)을 `#work`가 뷰포트 하단에서 올라오기 시작하는 임계점보다 안전하게 이전으로 끝나도록 수정했습니다.
   - 구체적으로, 전체 높이(`totalHeight`)에서 CSS 패널 높이(`getPanelHeight()`)의 1.3배를 뺀 영역까지만 타임라인이 스크롤 진행률 100%에 도달하도록 계산 범위를 제한했습니다.
+  - `identity`, `#work`, `#featured-work`, panel height, sticky stage height의 geometry 값을 캐싱하고 `resize`, `visualViewport`, `ScrollTrigger.refreshInit/refresh` 흐름에서만 갱신하도록 정리했습니다.
+  - Featured 섹션 높이 CSS 변수 갱신 이후에도 geometry cache를 다시 갱신해, 캐시 값이 레이아웃 변경 전 높이에 머무르지 않도록 보정했습니다.
+  - `career-work` 디졸브와 `featured-gallery` 디졸브의 `onUpdate` 직접 `style.setProperty(...)` 호출을 GSAP `fromTo(..., { scrollTrigger })` scrub tween으로 전환했습니다.
+  - 스크롤 트리거에서 발생하는 route 변경은 150ms 디바운스로 묶고, 명시적 클릭/초기 섹션 진입은 즉시 처리할 수 있는 옵션을 추가했습니다. `replaceState` 예외는 `try/catch`로 흡수해 브라우저 쿼터 상황에서도 스크립트가 중단되지 않도록 했습니다.
+  - `.profile-media img`의 `loading="lazy"`를 제거해 `/about` 직접 진입 또는 intro 이후 첫 노출 시 브라우저가 프로필 이미지를 미루지 않도록 했습니다.
 - `src/styles/global.css`
   - `.gallery-section` 의 `min-height`를 기존 고정 `200svh`에서 오버랩 마진 높이와 완벽히 동기화되도록 `calc(2 * var(--home-panel-height))` 로 변경했습니다.
   - 이로 인해 모바일에서 `home-panel-height`가 `100lvh`로 매핑되더라도 오버랩 마진 오프셋과 갤러리 섹션의 최소 높이가 기하학적으로 완벽히 대칭을 이루어, 콘텐츠 개수가 매우 적은 상황(필터 적용 등)에서도 최하단에 검은색 배경이 절대 비치지 않도록 방어했습니다.
@@ -53,6 +61,8 @@
 
 ### 검증
 - `npm run build` 및 `astro check` 완료 (0 errors / 0 warnings / 0 hints)
+- geometry cache / GSAP scrub tween 전환 후에도 `npm run build`, `git diff --check`, 로컬 브라우저 timeline 진행 확인을 다시 수행했습니다.
+- route debounce / 프로필 이미지 eager 로딩 반영 후 `npm run build`, `git diff --check`를 재실행했고, 로컬 브라우저에서 `.profile-media img`의 `loading` 속성이 제거된 것과 `/work` 스크롤 진입 시 console error가 없는 것을 확인했습니다.
 
 ## 2026-05-27 Career Timeline Focus Window Pass
 

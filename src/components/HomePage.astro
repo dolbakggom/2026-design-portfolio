@@ -88,7 +88,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
         <div class="identity-side">
           <figure class="profile-media" data-profile-media>
-            <img src={profile.portrait?.url ?? fallbackPortraitSrc} alt={profile.portrait?.alt ?? profile.name} loading="lazy" decoding="async" />
+            <img src={profile.portrait?.url ?? fallbackPortraitSrc} alt={profile.portrait?.alt ?? profile.name} decoding="async" />
             <figcaption>취미로 기타를 치고 있습니다.</figcaption>
           </figure>
 
@@ -248,6 +248,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       const pageController = new AbortController();
       const pageSignal = pageController.signal;
       const homeScrollTriggers: ScrollTrigger[] = [];
+      const homeScrollTweens: gsap.core.Tween[] = [];
       let initialScrollFrame = 0;
       let initialScrollTimeout = 0;
       let featuredBlurTimeout = 0;
@@ -262,6 +263,14 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       let activeTimelineIndex = -1;
       let activeFeaturedIndex = -1;
       let identityProgressTrigger: ScrollTrigger | null = null;
+      let updateScrollGeometryCache = () => {};
+      let cachedIdentityTop = Number.POSITIVE_INFINITY;
+      let cachedWorkTop = Number.POSITIVE_INFINITY;
+      let cachedFeaturedTop = Number.POSITIVE_INFINITY;
+      let cachedPanelHeight = window.innerHeight;
+      let cachedStickyStageHeight = window.innerHeight;
+      let routeDebounceTimeout = 0;
+      let pendingRoute: string | null = null;
       const portfolioWindow = window as Window & {
         __portfolioLenis?: { resize?: () => void };
         __portfolioScrollToTop?: () => void;
@@ -290,7 +299,13 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         if (timelineFocusTimeout) {
           window.clearTimeout(timelineFocusTimeout);
         }
+        if (routeDebounceTimeout) {
+          window.clearTimeout(routeDebounceTimeout);
+        }
         document.documentElement.style.removeProperty("--home-viewport-height");
+        ScrollTrigger.removeEventListener("refreshInit", updateScrollGeometryCache);
+        ScrollTrigger.removeEventListener("refresh", updateScrollGeometryCache);
+        homeScrollTweens.forEach((tween) => tween.kill());
         homeScrollTriggers.forEach((trigger) => trigger.kill());
         document.documentElement.classList.remove("intro-complete");
         activeHomeShell = null;
@@ -324,9 +339,37 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       window.setTimeout(() => onComplete?.(), 1060);
     };
 
-    const replaceRoute = (route: string) => {
-      if (window.location.pathname === route) return;
-      window.history.replaceState(null, "", route);
+    const commitPendingRoute = () => {
+      routeDebounceTimeout = 0;
+      const nextRoute = pendingRoute;
+      pendingRoute = null;
+      if (!nextRoute || window.location.pathname === nextRoute) return;
+
+      try {
+        window.history.replaceState(null, "", nextRoute);
+      } catch (error) {
+        console.warn("Skipped route update after browser history throttling.", error);
+      }
+    };
+
+    const replaceRoute = (route: string, options: { immediate?: boolean } = {}) => {
+      if (routeDebounceTimeout) {
+        window.clearTimeout(routeDebounceTimeout);
+        routeDebounceTimeout = 0;
+      }
+
+      if (window.location.pathname === route) {
+        pendingRoute = null;
+        return;
+      }
+
+      pendingRoute = route;
+      if (options.immediate) {
+        commitPendingRoute();
+        return;
+      }
+
+      routeDebounceTimeout = window.setTimeout(commitPendingRoute, 150);
     };
 
     const clearHomeRoute = () => {
@@ -336,7 +379,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         return;
       }
 
-      if (["/about", "/career", "/work"].includes(window.location.pathname)) {
+      if (pendingRoute || ["/about", "/career", "/work"].includes(window.location.pathname)) {
         replaceRoute("/");
       }
     };
@@ -419,7 +462,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
     const aboutCopy = document.querySelector<HTMLElement>('[data-type-copy="about"]');
     const careerCopy = document.querySelector<HTMLElement>('[data-type-copy="career"]');
+    const introSection = document.querySelector<HTMLElement>(".intro-section");
     const identity = document.querySelector<HTMLElement>("[data-identity]");
+    const workSection = document.querySelector<HTMLElement>("#work");
     const profileLogo = document.querySelector<HTMLElement>(".profile-logo");
     const profileContact = document.querySelector<HTMLElement>("[data-profile-contact]");
     const profileMedia = document.querySelector<HTMLElement>("[data-profile-media]");
@@ -435,6 +480,13 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     const mobileIdentityQuery = window.matchMedia("(max-width: 1180px)");
 
     const isMobileIdentityLayout = () => mobileIdentityQuery.matches;
+    updateScrollGeometryCache = () => {
+      cachedIdentityTop = identity?.offsetTop ?? Number.POSITIVE_INFINITY;
+      cachedWorkTop = workSection?.offsetTop ?? Number.POSITIVE_INFINITY;
+      cachedFeaturedTop = featuredSection?.offsetTop ?? Number.POSITIVE_INFINITY;
+      cachedPanelHeight = introSection?.offsetHeight || window.innerHeight;
+      cachedStickyStageHeight = identityStage?.offsetHeight || window.innerHeight;
+    };
     const supportsLargeViewportHeight = typeof CSS !== "undefined" && CSS.supports?.("height", "100lvh") === true;
     const shouldUseViewportHeightFallback = () => isMobileIdentityLayout() && !supportsLargeViewportHeight;
     const getFallbackViewportHeight = () => Math.round(window.innerHeight);
@@ -457,6 +509,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     };
 
     syncHomeViewportHeight();
+    updateScrollGeometryCache();
+    ScrollTrigger.addEventListener("refreshInit", updateScrollGeometryCache);
+    ScrollTrigger.addEventListener("refresh", updateScrollGeometryCache);
 
     const setCareerListStage = (visible: boolean, immediate = false) => {
       if (!immediate && currentCareerListVisible === visible) return;
@@ -579,11 +634,11 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       });
     };
 
-    const getIdentityTop = () => identity?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getWorkTop = () => document.querySelector<HTMLElement>("#work")?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getFeaturedTop = () => featuredSection?.offsetTop ?? Number.POSITIVE_INFINITY;
-    const getPanelHeight = () => document.querySelector<HTMLElement>(".intro-section")?.offsetHeight || window.innerHeight;
-    const getStickyStageHeight = () => identityStage?.offsetHeight || window.innerHeight;
+    const getIdentityTop = () => cachedIdentityTop;
+    const getWorkTop = () => cachedWorkTop;
+    const getFeaturedTop = () => cachedFeaturedTop;
+    const getPanelHeight = () => cachedPanelHeight;
+    const getStickyStageHeight = () => cachedStickyStageHeight;
     const getIdentityProgressRange = () => Math.max(1, getWorkTop() - getIdentityTop() - getStickyStageHeight());
     const getIdentityScrollForProgress = (progress: number) => {
       const clampedProgress = gsap.utils.clamp(0, 1, progress);
@@ -630,10 +685,6 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       const count = Math.max(1, featuredPanels.length);
       const clampedIndex = gsap.utils.clamp(0, count - 1, index);
       return getFeaturedTop() + getPanelHeight() * clampedIndex;
-    };
-
-    const setCareerWorkDissolve = (progress: number) => {
-      identityStage?.style.setProperty("--career-work-dim", `${gsap.utils.clamp(0, 0.82, progress * 0.82)}`);
     };
 
     if (identity && !reduceMotion) {
@@ -693,7 +744,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         setActiveTimeline(index);
         updateScrollTriggers();
       });
-      replaceRoute("/career");
+      replaceRoute("/career", { immediate: true });
     };
 
     timelineCards.forEach((card, index) => {
@@ -702,8 +753,8 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     window.addEventListener("scroll", queueCareerTimelineFromScroll, { passive: true, signal: pageSignal });
 
     const scrollToIntroFromFloatingButton = () => {
-      replaceRoute("/");
       scrollToPosition(0, reduceMotion ? "auto" : "smooth");
+      replaceRoute("/", { immediate: true });
     };
 
     scrollToTopHandler = scrollToIntroFromFloatingButton;
@@ -716,9 +767,11 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
     const refreshHomeScrollLayout = (force = false) => {
       const viewportChanged = syncHomeViewportHeight();
+      updateScrollGeometryCache();
       if (!force && !viewportChanged) return;
 
       syncFeaturedScrollHeight();
+      updateScrollGeometryCache();
       queueTimelineFocus();
       portfolioWindow.__portfolioLenis?.resize?.();
       ScrollTrigger.update();
@@ -729,6 +782,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       viewportRefreshTimeout = window.setTimeout(() => {
         syncHomeViewportHeight();
         syncFeaturedScrollHeight();
+        updateScrollGeometryCache();
         queueTimelineFocus();
         portfolioWindow.__portfolioLenis?.resize?.();
         ScrollTrigger.refresh();
@@ -761,33 +815,45 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     }
 
     if (identityStage) {
-      homeScrollTriggers.push(ScrollTrigger.create({
-        trigger: "#work",
-        start: "top bottom",
-        end: "top top",
-        scrub: true,
-        invalidateOnRefresh: true,
-        onUpdate: (self) => setCareerWorkDissolve(self.progress)
-      }));
+      homeScrollTweens.push(gsap.fromTo(
+        identityStage,
+        { "--career-work-dim": 0 },
+        {
+          "--career-work-dim": 0.82,
+          ease: "none",
+          scrollTrigger: {
+            trigger: "#work",
+            start: "top bottom",
+            end: "top top",
+            scrub: true,
+            invalidateOnRefresh: true
+          }
+        }
+      ));
     }
 
     if (featuredStage && gallerySection) {
-      homeScrollTriggers.push(ScrollTrigger.create({
-        trigger: gallerySection,
-        start: "top bottom",
-        end: "top top",
-        scrub: true,
-        invalidateOnRefresh: true,
-        onUpdate: (self) => {
-          featuredStage.style.setProperty("--featured-gallery-dim", `${gsap.utils.clamp(0, 0.86, self.progress * 0.86)}`);
+      homeScrollTweens.push(gsap.fromTo(
+        featuredStage,
+        { "--featured-gallery-dim": 0 },
+        {
+          "--featured-gallery-dim": 0.86,
+          ease: "none",
+          scrollTrigger: {
+            trigger: gallerySection,
+            start: "top bottom",
+            end: "top top",
+            scrub: true,
+            invalidateOnRefresh: true
+          }
         }
-      }));
+      ));
     }
 
     [
-      document.querySelector<HTMLElement>(".intro-section"),
+      introSection,
       identity,
-      document.querySelector<HTMLElement>("#work"),
+      workSection,
       featuredSection,
       gallerySection
     ].forEach((panel) => {
@@ -805,14 +871,12 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       if (initialSection === "intro") return;
 
       if (shouldPreserveRestoredWorkScroll && window.scrollY > 0) {
-        replaceRoute("/work");
+        replaceRoute("/work", { immediate: true });
         updateScrollTriggers();
         return;
       }
 
       const identitySection = document.querySelector<HTMLElement>("[data-identity]");
-      const workSection = document.querySelector<HTMLElement>("#work");
-      const gallerySection = document.querySelector<HTMLElement>(".gallery-section");
       const targetTop =
         initialSection === "work"
           ? gallerySection?.offsetTop ?? workSection?.offsetTop
@@ -824,7 +888,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
       scrollToPosition(targetTop ?? 0, "auto");
       if (initialSection === "work") {
-        replaceRoute("/work");
+        replaceRoute("/work", { immediate: true });
       }
       if (initialSection === "about") {
         playAboutIntro();
@@ -845,7 +909,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       }
       updateScrollTriggers();
       if (initialSection === "work") {
-        window.requestAnimationFrame(() => replaceRoute("/work"));
+        window.requestAnimationFrame(() => replaceRoute("/work", { immediate: true }));
       }
     };
 
