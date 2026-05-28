@@ -36,6 +36,63 @@
 
 ---
 
+## 2026-05-28 Career Timeline and Mobile Gallery Polish
+
+### 요구사항
+- 커리어 타임라인 포인트 수가 늘어남에 따라 물리 스크롤 계산 범위를 넓혔으나, 마지막 8번째 포인트에 도달하기도 전에 다음 `#work` (Work Intro) 섹션이 아래에서 위로 덮고 올라와 마지막 이력 항목이 가려져 보이지 않는 문제를 해결합니다.
+- 모바일 화면에서 페이지 최하단으로 스크롤했을 때, `.gallery-section` 의 끝부분이 뚝 끊기고 뒤쪽 Featured 섹션의 검은색 배경이 노출되는 틈새 비침 현상을 제거합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `getCareerTimelineScrollForProgress` 함수에서 타임라인 진행률 계산을 위한 최대 스크롤 한계선(`maxTimelineTravel`)을 `#work`가 뷰포트 하단에서 올라오기 시작하는 임계점보다 안전하게 이전으로 끝나도록 수정했습니다.
+  - 구체적으로, 전체 높이(`totalHeight`)에서 CSS 패널 높이(`getPanelHeight()`)의 1.3배를 뺀 영역까지만 타임라인이 스크롤 진행률 100%에 도달하도록 계산 범위를 제한했습니다.
+- `src/styles/global.css`
+  - `.gallery-section` 의 `min-height`를 기존 고정 `200svh`에서 오버랩 마진 높이와 완벽히 동기화되도록 `calc(2 * var(--home-panel-height))` 로 변경했습니다.
+  - 이로 인해 모바일에서 `home-panel-height`가 `100lvh`로 매핑되더라도 오버랩 마진 오프셋과 갤러리 섹션의 최소 높이가 기하학적으로 완벽히 대칭을 이루어, 콘텐츠 개수가 매우 적은 상황(필터 적용 등)에서도 최하단에 검은색 배경이 절대 비치지 않도록 방어했습니다.
+  - `prefers-reduced-motion`에서는 `.timeline-track`의 transform을 제거하지 않고 transition만 끄도록 조정해, 모션 감소 환경에서도 focus window 위치 보정은 유지되게 했습니다.
+
+### 검증
+- `npm run build` 및 `astro check` 완료 (0 errors / 0 warnings / 0 hints)
+
+## 2026-05-27 Career Timeline Focus Window Pass
+
+### 요구사항
+- `career point` 개수가 늘어나면서 우측 timeline 목록이 위아래로 잘리는 문제를 개선합니다.
+- 우선 스크롤 위치에 따라 point를 강제로 넘기는 GSAP 로직은 제거하고, Lenis smooth scroll은 전체 페이지 스크롤 보정 역할만 남깁니다.
+- 이후 섹션별 스크롤 로직을 다시 설계할 수 있도록 career point 동작을 순수 DOM/CSS 중심으로 단순화합니다.
+- 배포 사이트에 채운 D1/R2 콘텐츠를 로컬 개발 환경에도 동기화해 실제 8개 career point 기준으로 확인할 수 있게 합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - `timeline-items` 안에 `timeline-track` wrapper를 추가해 바깥 영역은 고정된 focus window, 안쪽 항목 묶음만 이동하는 구조로 변경했습니다.
+  - career point 클릭 시 GSAP 강제 snap이 아니라 기존 Lenis `scrollTo` 경로를 통해 해당 point 위치로 이동하도록 복구했습니다.
+  - 스크롤 중에는 현재 스크롤 위치를 읽어 `setActiveTimeline(...)`과 focus window offset만 갱신하도록 했습니다.
+  - timeline 진행 구간은 기존 ScrollTrigger 내부 range가 아니라 `identity 시작 → work 시작` 실제 물리 스크롤 길이를 기준으로 계산해 8개 point가 너무 빨리 끝까지 넘어가지 않도록 했습니다.
+  - resize/viewport refresh 시 현재 활성 point 기준으로 focus offset을 다시 계산합니다.
+- `src/styles/global.css`
+  - timeline 목록을 `mask-image`가 적용된 고정 높이 focus window로 바꾸고, 위아래 항목이 부드럽게 사라지도록 처리했습니다.
+  - 활성 point 주변 항목만 더 선명하게 보이도록 `data-focus-distance` 기반 opacity를 추가했습니다.
+  - 모바일 timeline도 같은 focus window 구조를 사용하도록 정리했습니다.
+- `scripts/export-d1-via-execute.mjs`
+  - Cloudflare D1 export API가 `Authentication error [code: 10000]`로 실패하는 상황을 우회하기 위해 `wrangler d1 execute --remote --json`으로 각 테이블을 읽고 local import SQL을 생성하는 스크립트를 추가했습니다.
+- `scripts/sync-r2-assets.mjs`
+  - D1 dump의 `assets.r2_key` 기준으로 원격 R2 오브젝트를 로컬 R2에 동기화하는 재사용 스크립트를 추가했습니다.
+- D1/R2 local sync
+  - `d1-backups/local-before-sync-2026-05-27.sql`로 동기화 전 로컬 D1 백업을 생성했습니다.
+  - `d1-backups/remote-prod-2026-05-27.sql`로 원격 D1 데이터를 수동 dump했습니다.
+  - 해당 dump를 로컬 D1에 적용했고, R2 30개 오브젝트를 `r2-backups/remote-prod-2026-05-27/`에 내려받아 로컬 R2에도 업로드했습니다.
+
+### 검증
+- sandbox 내부 `npm run build`는 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+- 승인된 환경에서 `npm run build` 재실행 통과, `astro check` 0 errors / 0 warnings / 0 hints.
+- `git diff --check` 통과.
+- local D1 row count 확인: `assets 30`, `works 7`, `timeline_items 8`, `work_blocks 0`.
+- dev 서버 `http://127.0.0.1:4328/`에서 8개 career point 기준으로 스크롤 시 active point가 `2001.02 → 2023.09 ~ 2026.07`까지 단계적으로 바뀌고 `--timeline-focus-offset`이 갱신되는 것을 확인했습니다.
+
+### 남은 확인
+- 실 브라우저에서 career point 진행 속도와 focus window 이동 감도가 원하는지 확인이 필요합니다.
+- 이번 변경은 career point 활성/포커스 로직만 단순화한 것이며, intro/about/career/work 섹션 전환 ScrollTrigger 전체 제거는 다음 플랜에서 진행합니다.
+
 ## 2026-05-27 PageSpeed LCP Font and Public HTML Cache Pass
 
 ### 요구사항
