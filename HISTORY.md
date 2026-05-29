@@ -36,6 +36,101 @@
 
 ---
 
+## 2026-05-29 Career Timing and Work Reveal Clamp
+
+### 요구사항
+- About에서 Career로 넘어가기 전 체류 시간을 절반 수준으로 줄입니다.
+- Career point 마지막 항목이 끝나기 전에 Work 섹션이 먼저 올라오는 문제를 막습니다.
+- 마지막 Career point 이후 Work가 넘어오기 전 체류는 point 하나 넘어가는 양의 약 두 배 정도만 남깁니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - About hold 시작 기준을 `0.18`에서 `0.09`로 줄이고, Career 전환 완료 기준을 `0.38`에서 `0.29`로 앞당겼습니다.
+  - Career point 전용 scroll range를 `#work`가 뷰포트 아래에서 올라오기 시작하는 시점(`workTop - panelHeight`) 기준으로 역산하도록 바꿨습니다.
+  - 마지막 Career point가 먼저 완료되고, 그 뒤에 point step 두 칸 정도의 여유를 둔 뒤 Work가 올라오도록 `availableBeforeWork * ((count - 1) / (count + 1))` 수식으로 timeline travel을 계산합니다.
+  - Career point 클릭 이동도 같은 물리 range를 사용하도록 맞춰 스크롤 진행과 클릭 위치가 어긋나지 않게 했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- sandbox 내부 `npm run build`는 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+- 승인된 환경에서 `npm run build` 재실행 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.
+
+## 2026-05-29 Career Timeline Trigger and Profile Filter Fix
+
+### 요구사항
+- 데스크톱 profile image 필터를 모바일 career 상태와 같은 값으로 맞춥니다.
+- About에서 Career로 넘어갈 때 profile image가 번쩍이는 현상을 다시 방지합니다.
+- Career point 스크롤이 세 번째 항목 이후 멈추는 문제를 확실하게 수정합니다.
+
+### 원인
+- Career point 진행 계산은 물리 스크롤 기준으로 바꿨지만, 실제 갱신 호출은 About/Career 전환용 ScrollTrigger 안에 남아 있었습니다.
+- 해당 전환 트리거는 identity section 전체보다 짧게 끝나므로, 트리거 종료 이후에는 timeline render가 호출되지 않아 세 번째 항목 부근에서 멈출 수 있었습니다.
+- Profile image는 GSAP inline `filter` 문자열과 `.is-career` CSS 필터가 동시에 관여해 전환 경계에서 순간적으로 밝아지는 프레임이 생길 수 있었습니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Career point 전용 ScrollTrigger를 별도로 추가했습니다. Start/end는 `getCareerTimelineScrollForProgress(...)`가 계산하는 실제 Career timeline 물리 구간을 사용합니다.
+  - About/Career 전환용 ScrollTrigger에서는 Career point render 호출을 제거해 두 스크럽 책임을 분리했습니다.
+  - Timeline card progress는 각 카드가 focus window 중앙에 오는 실제 offset 기준으로 캐시하도록 조정했습니다.
+  - Profile image는 `filter` 문자열 tween 대신 CSS custom property(`--profile-media-grayscale`, `--profile-media-contrast`, `--profile-media-brightness`, `--profile-media-enter-blur`)를 스크럽합니다.
+- `src/styles/global.css`
+  - 데스크톱 profile image도 모바일 career 상태와 같은 `grayscale(0.45) contrast(1.12) brightness(0.62) blur(3px)` 결과가 되도록 CSS 변수 기반 filter로 변경했습니다.
+  - 검은 dim pseudo-layer는 끄고, 이미지 밝기/대비/블러 필터 중심으로 처리해 About/Career 경계의 번쩍임 리스크를 줄였습니다.
+  - 모바일 career blur도 같은 변수 기준으로 맞춰 데스크톱과 결과값이 어긋나지 않도록 했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- sandbox 내부 `npm run build`는 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+- 승인된 환경에서 `npm run build` 재실행 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.
+
+## 2026-05-29 Career Dissolve and Work Transition Follow-up
+
+### 요구사항
+- Career point 디졸브값을 현재 배포된 값 기준으로 되돌립니다. 모바일도 같은 기준을 따릅니다.
+- About 텍스트가 나올 때 프로필 이미지가 늦게 뜨지 않고 처음부터 보이게 합니다.
+- Career에서 Work로 넘어갈 때 체류시간을 줄였는데도 오래 걸리는 원인을 분석하고 수정합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 프로필 이미지를 About intro tween으로 뒤늦게 reveal하지 않고, 초기 상태부터 `autoAlpha: 1`, `filter: blur(0px)`, `scale: 1`로 보이도록 바꿨습니다.
+  - Career 전환 중 프로필 이미지 dim/blur는 배포 기준의 어두운 디졸브에 가깝도록 `--profile-career-dim: 0.84`, `grayscale(1) contrast(1.1) blur(2px)`, `scale: 1.04`로 조정했습니다.
+  - Career point focus dissolve 곡선을 배포 기준인 `1 / (count - 1) * 1.15` range 계산으로 되돌렸습니다. 카드별 실제 위치 기반 progress 캐시는 유지해 스크럽 위치 오차는 다시 만들지 않았습니다.
+  - Career timeline 진행을 `ScrollTrigger self.progress`가 아니라 `getCareerTimelineScrollForProgress(...)` 기반 물리 스크롤 범위로 계산하게 바꿨습니다. 기존에는 `maxTimelineTravel`을 줄여도 일반 스크롤 중에는 반영되지 않아 Work 진입 전 체류가 길게 느껴졌습니다.
+- `src/styles/global.css`
+  - 모바일 career 상태의 프로필 이미지 필터를 배포 기준인 `grayscale(0.45) contrast(1.12) brightness(0.62)`로 되돌렸습니다.
+  - 모바일에서는 데스크톱용 검은 dim pseudo-layer를 끄고, 기존 모바일 필터/그라데이션 기준으로 보이도록 했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- sandbox 내부 `npm run build`는 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+- 승인된 환경에서 `npm run build` 재실행 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.
+
+## 2026-05-29 Career Point Scrub Alignment
+
+### 요구사항
+- Career point에 들어간 스크러빙이 한 박자 늦게 반응하는 느낌을 줄입니다.
+- 스크롤 진행에 맞춰 항목들이 바로 변경되되, 각 항목 내용을 읽을 수 있도록 약간의 체류감을 둡니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Career timeline의 활성 항목 계산을 기존 `index / (count - 1)` 균등 분할 기준에서 실제 카드 중심 위치 기반 progress 캐시로 변경했습니다.
+  - 카드별 progress는 scroll 중 매 프레임 계산하지 않고 `updateScrollGeometryCache()`에서만 계산해, 스크롤 중 layout read가 늘어나지 않도록 했습니다.
+  - 항목 포커스 weight에 짧은 dwell plateau를 추가해 해당 항목이 즉시 반응하면서도 너무 빠르게 사라지지 않도록 조정했습니다.
+  - Career point 클릭 이동도 동일한 카드별 progress 캐시를 사용해, 클릭 위치와 스크럽 포커스 위치가 어긋나지 않게 맞췄습니다.
+
+### 검증
+- `git diff --check` 통과.
+- sandbox 내부 `npm run build`는 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+- 승인된 환경에서 `npm run build` 재실행 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.
+
 ## 2026-05-28 Career Timeline and Mobile Gallery Polish
 
 ### 요구사항
@@ -444,3 +539,66 @@
 
 ### 남은 주의점
 - 현재 세션에는 Playwright 패키지가 없어 브라우저 자동 DOM 검증은 수행하지 못했습니다. 사용자가 실제 Chrome/Safari에서 About 등장 시점, Career 전환 경계, 모바일 Career list 진입감을 확인한 뒤 타이밍을 미세 조정하면 됩니다.
+
+## 2026-05-28 About/Career Transition Timing Tuning
+
+### 요구사항
+- About에서 Career로 넘어가는 이벤트 애니메이션이 너무 늦게 시작되어 흐름이 끊겨 보이므로 더 자연스럽게 앞당깁니다.
+- Career point가 끝난 뒤 Work로 넘어가기 전 일부러 오래 머무는 느낌을 줄입니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Career 모드 진입 기준을 `careerStartProgress`보다 앞쪽으로 분리하고, 복귀 기준은 더 낮게 둔 hysteresis 방식으로 바꿨습니다. 경계 부근에서 위아래로 스크롤할 때 About/Career 전환이 반복적으로 튀는 것을 줄이기 위한 처리입니다.
+  - Career timeline 종료 progress를 `0.92`에서 `0.97`로 늦춰 마지막 포인트가 Work 진입 직전까지 더 자연스럽게 이어지도록 했습니다.
+  - 클릭/직접 이동 계산에 쓰는 timeline travel 여유를 `1.3 panel`에서 `0.9 panel`로 줄여 마지막 포인트 이후 남는 체류 구간을 완화했습니다.
+  - 모바일 Career list 진입 기준도 새 종료 progress에 맞춰 조금 앞당겨졌습니다.
+
+### 검증
+- `git diff --check` 통과.
+
+## 2026-05-28 About/Career Scrubbed Transition Update
+
+### 요구사항
+- About에서 Career로 넘어가는 부분도 스크롤 진행률에 맞춘 scrubbing 전환으로 바꿉니다.
+- About 마지막에는 아주 짧게 체류하는 구간을 둔 뒤 Career로 넘어가게 합니다.
+- Career 카피, 프로필 이미지 dim/blur, 연락처 퇴장, 타임라인 리스트 등장까지 Career 전체가 하나의 스크럽 흐름으로 이어지게 합니다.
+- About 첫 등장 타이핑은 기존처럼 1회성 이벤트 애니메이션으로 유지합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 기존 `setIdentityMode()` 내부의 one-shot About/Career 전환 tween을 제거했습니다.
+  - `identityTransitionTimeline`을 새로 만들고, `aboutHoldEndProgress = 0.24`부터 `careerStartProgress = 0.38`까지의 진행률에 수동 연결했습니다.
+  - 전환 scrub timeline 안에서 About copy/contact/profile media가 빠지고, Career copy/list가 들어오도록 구성했습니다.
+  - Career copy는 타이핑과 scrub이 충돌하지 않도록 미리 채워둔 뒤 opacity/blur/translate로만 전환합니다.
+  - About 타이핑 도중 사용자가 빠르게 Career 전환 구간으로 진입할 경우, 남은 타이핑 timer가 중복 문자를 만들지 않도록 type run id를 추가하고 `fillTypeElement(aboutCopy)`로 안전하게 마무리합니다.
+  - Career point 자체의 1:1 스크러빙(`syncCareerTimelineProgress`)은 그대로 유지했습니다.
+- `src/styles/global.css`
+  - `.identity-section.is-career .profile-contact`, `.identity-section.is-career .profile-media`의 `opacity: !important`를 제거해 GSAP scrub timeline의 inline opacity가 정상 반영되도록 했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build` 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.
+- 로컬에서는 기존 dev server가 `http://127.0.0.1:4321/`에서 이미 실행 중인 상태를 확인했습니다.
+
+## 2026-05-28 About/Career Scrub Timing and Profile Dim Tuning
+
+### 요구사항
+- About 마지막 체류 시간을 더 줄입니다.
+- Career로 넘어갈 때 프로필 이미지가 흰색 오버레이처럼 덮이는 느낌을 제거하고, 기존처럼 검은 dim과 blur 중심으로 처리합니다.
+- 프로필 이미지 디졸브가 너무 어둡게 보이지 않도록 dim 값을 낮춥니다.
+- Career 마지막 포인트 이후 Work로 넘어가기 전 체류 시간을 약 2/3 줄입니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - About 체류 종료 기준을 `0.24`에서 `0.18`로 앞당겨 Career scrub 전환이 더 빨리 시작되도록 했습니다.
+  - 프로필 이미지 전환에서 `autoAlpha: 0.16` 페이드아웃을 제거하고, 이미지 자체는 `autoAlpha: 1`로 유지한 상태에서 `--profile-career-dim` 검은 overlay와 blur만 스크럽하도록 바꿨습니다.
+  - Career 마지막 포인트 이후 남는 물리 여유를 `0.9 panel`에서 `0.3 panel`로 줄였습니다.
+- `src/styles/global.css`
+  - `.profile-media::before`를 추가해 `--profile-career-dim` 기반 검은 overlay를 이미지 위에 얹도록 했습니다.
+  - `.profile-media img`, `::before`, `::after`, `figcaption`의 레이어 순서를 명확히 정리했습니다.
+  - 모바일 career 상태의 프로필 이미지 필터를 기존보다 덜 어둡게 조정했습니다.
+
+### 검증
+- `git diff --check` 통과.

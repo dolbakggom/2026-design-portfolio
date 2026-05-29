@@ -469,7 +469,7 @@ html:not(.intro-complete) .site-shell[data-initial-section="intro"] [data-type-c
 }
 
 .identity-section.is-career .profile-contact {
-  opacity: 0 !important;
+  opacity: 0;
   transform: translateY(28px);
   filter: blur(8px);
   pointer-events: none;
@@ -509,11 +509,20 @@ html:not(.intro-complete) .site-shell[data-initial-section="intro"] [data-type-c
 
 .profile-media {
   --profile-media-enter-blur: 0px;
+  --profile-career-dim: 0;
+  --profile-media-brightness: 1;
+  --profile-media-contrast: 1;
+  --profile-media-grayscale: 0;
   position: absolute;
   inset: 0;
   margin: 0;
   overflow: hidden;
   background: var(--color-ink);
+  filter:
+    grayscale(var(--profile-media-grayscale))
+    contrast(var(--profile-media-contrast))
+    brightness(var(--profile-media-brightness))
+    blur(var(--profile-media-enter-blur));
   transition:
     opacity 520ms ease,
     transform 520ms ease,
@@ -522,19 +531,38 @@ html:not(.intro-complete) .site-shell[data-initial-section="intro"] [data-type-c
 }
 
 .identity-section.is-career .profile-media {
-  opacity: 0.16 !important;
+  --profile-media-brightness: 0.62;
+  --profile-media-contrast: 1.12;
+  --profile-media-enter-blur: 3px;
+  --profile-media-grayscale: 0.45;
+  opacity: 1;
   transform: scale(1.04);
-  filter: grayscale(1) contrast(1.1) blur(2px);
+}
+
+.profile-media::before,
+.profile-media::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.profile-media::before {
+  display: none;
+  inset: 0;
+  z-index: 1;
+  background: rgba(0, 0, 0, var(--profile-career-dim));
 }
 
 .profile-media::after {
-  position: absolute;
   inset: 55% 0 0;
-  content: "";
+  z-index: 2;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.78));
 }
 
 .profile-media img {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   min-height: var(--home-panel-height);
@@ -545,7 +573,7 @@ html:not(.intro-complete) .site-shell[data-initial-section="intro"] [data-type-c
   position: absolute;
   right: 36px;
   bottom: 36px;
-  z-index: 1;
+  z-index: 3;
   margin: 0;
   color: rgba(255, 255, 255, 0.5);
   font-size: 20px;
@@ -1665,7 +1693,11 @@ html.home-scroll .timeline-items {
   .identity-section.is-career .profile-media {
     opacity: 1 !important;
     transform: none !important;
-    filter: grayscale(0.45) contrast(1.12) brightness(0.62) blur(calc(1px + var(--profile-media-enter-blur))) !important;
+    filter: grayscale(0.45) contrast(1.12) brightness(0.62) blur(var(--profile-media-enter-blur)) !important;
+  }
+
+  .profile-media::before {
+    display: none;
   }
 
   .profile-media::after {

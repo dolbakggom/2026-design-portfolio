@@ -268,6 +268,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       let cachedPanelHeight = window.innerHeight;
       let cachedStickyStageHeight = window.innerHeight;
       let cachedTimelineMaxOffset = 0;
+      let cachedTimelineCardProgresses: number[] = [];
       let routeDebounceTimeout = 0;
       let pendingRoute: string | null = null;
       const typewriterTimers: number[] = [];
@@ -394,6 +395,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     };
 
     const textCopies = new Map<HTMLElement, { node: Text; text: string }[]>();
+    let typeRunCounter = 0;
 
     const prepareTypeElement = (element: HTMLElement | null) => {
       if (!element || textCopies.has(element)) return;
@@ -427,6 +429,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       copies.forEach(({ node: textNode, text }) => {
         textNode.textContent = text;
       });
+      element.dataset.typeRun = String(++typeRunCounter);
       element.dataset.typed = "true";
     };
 
@@ -442,12 +445,15 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       }
 
       element.dataset.typed = "true";
+      const runId = String(++typeRunCounter);
+      element.dataset.typeRun = runId;
       let cursor = 0;
       copies.forEach(({ node: textNode, text }) => {
         textNode.textContent = "";
-        text.split("").forEach((char) => {
+        text.split("").forEach((_, charIndex) => {
           const timer = window.setTimeout(() => {
-            textNode.textContent += char;
+            if (element.dataset.typeRun !== runId) return;
+            textNode.textContent = text.slice(0, charIndex + 1);
           }, cursor * speed);
           typewriterTimers.push(timer);
           cursor += 1;
@@ -499,6 +505,20 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       cachedPanelHeight = introSection?.offsetHeight || window.innerHeight;
       cachedStickyStageHeight = identityStage?.offsetHeight || window.innerHeight;
       cachedTimelineMaxOffset = Math.max(0, (timelineTrack?.scrollHeight ?? 0) - (careerList?.clientHeight ?? 0));
+      const cardCount = timelineCards.length;
+      const viewportCenter = (careerList?.clientHeight ?? 0) / 2;
+      const maxOffset = Math.max(1, cachedTimelineMaxOffset);
+
+      cachedTimelineCardProgresses = timelineCards.map((card, index) => {
+        if (cardCount <= 1) return 0;
+        if (!careerList || cachedTimelineMaxOffset <= 0) {
+          return index / Math.max(1, cardCount - 1);
+        }
+
+        const cardCenter = card.offsetTop + card.offsetHeight / 2;
+        const centeredOffset = gsap.utils.clamp(0, cachedTimelineMaxOffset, cardCenter - viewportCenter);
+        return gsap.utils.clamp(0, 1, centeredOffset / maxOffset);
+      });
     };
     const supportsLargeViewportHeight = typeof CSS !== "undefined" && CSS.supports?.("height", "100lvh") === true;
     const shouldUseViewportHeightFallback = () => isMobileIdentityLayout() && !supportsLargeViewportHeight;
@@ -526,43 +546,81 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     ScrollTrigger.addEventListener("refreshInit", updateScrollGeometryCache);
     ScrollTrigger.addEventListener("refresh", updateScrollGeometryCache);
 
-    let identitySwapTimeline: gsap.core.Timeline | null = null;
-    let careerListTween: gsap.core.Tween | null = null;
-
-    const animateCareerListStage = (visible: boolean, immediate = false) => {
-      if (!careerList || reduceMotion) return;
-
-      careerListTween?.kill();
-      careerListTween = gsap.to(careerList, {
-        autoAlpha: visible ? 1 : 0,
-        x: visible ? 0 : 32,
-        yPercent: -50,
-        filter: visible ? "blur(0px)" : "blur(10px)",
-        duration: immediate ? 0 : visible ? 0.46 : 0.3,
-        ease: "power3.out",
-        overwrite: "auto"
-      });
-      homeScrollAnimations.push(careerListTween);
-    };
-
     const setCareerListStage = (visible: boolean, immediate = false) => {
       if (!immediate && currentCareerListVisible === visible) return;
 
       currentCareerListVisible = visible;
       identity?.classList.toggle("is-career-list", visible);
-      animateCareerListStage(visible, immediate);
     };
+
+    let aboutIntroTimeline: gsap.core.Timeline | null = null;
+    let identityTransitionTimeline: gsap.core.Timeline | null = null;
 
     if (!reduceMotion) {
       prepareTypeElement(aboutCopy);
       prepareTypeElement(careerCopy);
+      fillTypeElement(careerCopy);
       gsap.set(profileLogo, { autoAlpha: 0, y: 18, filter: "brightness(0) blur(12px)" });
       gsap.set(profileContact, { autoAlpha: 0, y: 24, filter: "blur(8px)" });
-      gsap.set(profileMedia, { "--profile-media-enter-blur": "18px", autoAlpha: 0, clipPath: "inset(0% 0% 0% 0%)", scale: 1.04, filter: "blur(18px)" });
+      gsap.set(profileMedia, {
+        "--profile-career-dim": 0,
+        "--profile-media-brightness": 1,
+        "--profile-media-contrast": 1,
+        "--profile-media-enter-blur": "0px",
+        "--profile-media-grayscale": 0,
+        autoAlpha: 1,
+        clipPath: "inset(0% 0% 0% 0%)",
+        scale: 1
+      });
       gsap.set(aboutCopy, { autoAlpha: 0, y: 18, filter: "blur(8px)" });
       gsap.set(careerCopy, { autoAlpha: 0, y: 24, filter: "blur(8px)" });
       gsap.set(careerList, { autoAlpha: 0, x: 32, yPercent: -50, filter: "blur(10px)" });
       setCareerListStage(false, true);
+      identityTransitionTimeline = gsap.timeline({ paused: true, defaults: { ease: "none", overwrite: "auto" } });
+      identityTransitionTimeline
+        .fromTo(aboutCopy,
+          { autoAlpha: 1, y: 0, filter: "blur(0px)" },
+          { autoAlpha: 0, y: -24, filter: "blur(8px)", duration: 0.58 },
+          0
+        )
+        .fromTo(profileContact,
+          { autoAlpha: 1, y: 0, filter: "blur(0px)" },
+          { autoAlpha: 0, y: 20, filter: "blur(8px)", duration: 0.5 },
+          0
+        )
+        .fromTo(profileMedia,
+          {
+            "--profile-career-dim": 0,
+            "--profile-media-brightness": 1,
+            "--profile-media-contrast": 1,
+            "--profile-media-enter-blur": "0px",
+            "--profile-media-grayscale": 0,
+            autoAlpha: 1,
+            scale: 1
+          },
+          {
+            "--profile-career-dim": 0,
+            "--profile-media-brightness": 0.62,
+            "--profile-media-contrast": 1.12,
+            "--profile-media-enter-blur": "3px",
+            "--profile-media-grayscale": 0.45,
+            autoAlpha: 1,
+            scale: 1.04,
+            duration: 0.72
+          },
+          0
+        )
+        .fromTo(careerCopy,
+          { autoAlpha: 0, y: 24, filter: "blur(8px)" },
+          { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.58 },
+          0.18
+        )
+        .fromTo(careerList,
+          { autoAlpha: 0, x: 32, yPercent: -50, filter: "blur(10px)" },
+          { autoAlpha: 1, x: 0, yPercent: -50, filter: "blur(0px)", duration: 0.46 },
+          0.54
+        );
+      homeScrollAnimations.push(identityTransitionTimeline);
       currentIdentityMode = "about";
     } else {
       currentIdentityMode = "about";
@@ -573,14 +631,14 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       if (identity.dataset.aboutPlayed === "true") return;
 
       identity.dataset.aboutPlayed = "true";
-      const introTimeline = gsap.timeline({ defaults: { ease: "power3.out", overwrite: "auto" } });
-      introTimeline
+      aboutIntroTimeline?.kill();
+      aboutIntroTimeline = gsap.timeline({ defaults: { ease: "power3.out", overwrite: "auto" } });
+      aboutIntroTimeline
         .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.72 }, 0)
         .add(() => typeElement(aboutCopy, 24), 0.14)
-        .to(profileMedia, { "--profile-media-enter-blur": "0px", autoAlpha: 1, scale: 1, filter: "blur(0px)", duration: 1.16 }, 0.04)
         .to(profileContact, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.62 }, 0.42)
         .to(aboutCopy, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.48 }, 0.16);
-      homeScrollAnimations.push(introTimeline);
+      homeScrollAnimations.push(aboutIntroTimeline);
     };
 
     const setActiveTimeline = (index: number) => {
@@ -613,62 +671,20 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           identity.classList.remove("is-career-list");
           identity.dataset.aboutPlayed = "true";
         }
-        if (reduceMotion) return;
-
-        identitySwapTimeline?.kill();
-        gsap.killTweensOf([aboutCopy, careerCopy, profileLogo, profileContact, profileMedia]);
-        identitySwapTimeline = gsap.timeline({ defaults: { ease: "power3.out", overwrite: "auto" } });
-
-        if (isCareer) {
-          identitySwapTimeline
-            .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.38 }, 0)
-            .to(aboutCopy, { autoAlpha: 0, y: -24, filter: "blur(8px)", duration: 0.38 }, 0)
-            .to(profileContact, { autoAlpha: 0, y: 20, filter: "blur(8px)", duration: 0.32 }, 0)
-            .to(profileMedia, {
-              "--profile-media-enter-blur": "1px",
-              autoAlpha: 0.16,
-              scale: 1.04,
-              filter: "grayscale(1) contrast(1.1) blur(2px)",
-              duration: 0.48
-            }, 0)
-            .fromTo(careerCopy,
-              { autoAlpha: 0, y: 24, filter: "blur(8px)" },
-              {
-                autoAlpha: 1,
-                y: 0,
-                filter: "blur(0px)",
-                duration: 0.42,
-                onStart: () => typeElement(careerCopy, 24)
-              },
-              0.12
-            );
-        } else {
-          identitySwapTimeline
-            .to(careerCopy, { autoAlpha: 0, y: 24, filter: "blur(8px)", duration: 0.32 }, 0)
-            .to(profileLogo, { autoAlpha: 1, y: 0, filter: "brightness(0) blur(0px)", duration: 0.38 }, 0)
-            .to(profileMedia, {
-              "--profile-media-enter-blur": "0px",
-              autoAlpha: 1,
-              scale: 1,
-              filter: "blur(0px)",
-              duration: 0.48
-            }, 0)
-            .to(profileContact, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.38 }, 0.08)
-            .to(aboutCopy, {
-              autoAlpha: 1,
-              y: 0,
-              filter: "blur(0px)",
-              duration: 0.38,
-              onStart: () => typeElement(aboutCopy, 24)
-            }, 0.1);
-        }
-        homeScrollAnimations.push(identitySwapTimeline);
       }
     };
 
-    const careerStartProgress = 0.38;
-    const careerEndProgress = 0.92;
-    const careerListStartProgress = careerStartProgress + (careerEndProgress - careerStartProgress) * 0.34;
+    const aboutHoldEndProgress = 0.09;
+    const careerStartProgress = 0.29;
+    const careerEndProgress = 0.97;
+    const careerListStartProgress = careerStartProgress + (careerEndProgress - careerStartProgress) * 0.14;
+    const getCareerTransitionProgress = (identityProgress: number) => (
+      gsap.utils.clamp(
+        0,
+        1,
+        (identityProgress - aboutHoldEndProgress) / Math.max(0.001, careerStartProgress - aboutHoldEndProgress)
+      )
+    );
 
     const setActiveFeatured = (activeIndex: number) => {
       const nextIndex = featuredPanels.length
@@ -715,50 +731,59 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       const clampedProgress = gsap.utils.clamp(0, 1, progress);
       const totalHeight = Math.max(1, getWorkTop() - getIdentityTop());
       const panelHeight = getPanelHeight();
-      // #work가 화면 아래에서 올라와 덮기 시작하기 전에 타임라인이 완료되도록
-      // CSS 패널 높이 기준 1.3배 여유를 둡니다.
-      const maxTimelineTravel = Math.max(1, totalHeight - panelHeight * 1.3);
+      const maxTimelineTravel = Math.max(1, totalHeight - panelHeight * 0.3);
       return getIdentityTop() + maxTimelineTravel * clampedProgress;
     };
+    const getCareerTimelineStartProgress = () => isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
+    const getCareerTimelineStartTop = () => getCareerTimelineScrollForProgress(getCareerTimelineStartProgress());
+    const getWorkRevealTop = () => getWorkTop() - getPanelHeight();
+    const getCareerTimelineTravel = () => {
+      const count = Math.max(1, timelineCards.length);
+      const startTop = getCareerTimelineStartTop();
+      const availableBeforeWork = Math.max(1, getWorkRevealTop() - startTop);
+
+      if (count <= 1) return availableBeforeWork;
+
+      // Leave two item-step distances after the final Career point before Work starts to cover it.
+      return Math.max(1, availableBeforeWork * ((count - 1) / (count + 1)));
+    };
+    const getCareerTimelineEndTop = () => getCareerTimelineStartTop() + getCareerTimelineTravel();
     const getCareerPointProgress = (index: number) => {
       const count = Math.max(1, timelineCards.length);
       if (count <= 1) return 0;
-      return gsap.utils.clamp(0, 1, index / (count - 1));
+      const clampedIndex = Math.min(count - 1, Math.max(0, index));
+      return cachedTimelineCardProgresses[clampedIndex] ?? gsap.utils.clamp(0, 1, clampedIndex / (count - 1));
+    };
+    const getCareerPointFocusWeight = (progress: number, cardProgress: number, count: number) => {
+      if (count <= 1) return 1;
+      const focusRange = 1 / Math.max(1, count - 1) * 1.15;
+      return gsap.utils.clamp(0, 1, 1 - Math.abs(progress - cardProgress) / focusRange);
     };
     const getCareerPointTop = (index: number) => {
-      const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
-      const pointProgress = startProgress + (careerEndProgress - startProgress) * getCareerPointProgress(index);
-      return getCareerTimelineScrollForProgress(pointProgress);
+      return getCareerTimelineStartTop() + getCareerTimelineTravel() * getCareerPointProgress(index);
     };
-    const syncCareerTimelineProgress = (identityProgress?: number) => {
+    const renderCareerTimelineProgress = (timelineProgress: number) => {
       if (reduceMotion || !timelineCards.length || !timelineTrack || !careerList) return;
-      const startProgress = isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
-      const rawProgress = typeof identityProgress === "number"
-        ? (identityProgress - startProgress) / Math.max(0.001, careerEndProgress - startProgress)
-        : (() => {
-          const startTop = getCareerTimelineScrollForProgress(startProgress);
-          const endTop = getCareerTimelineScrollForProgress(careerEndProgress);
-          return (window.scrollY - startTop) / Math.max(1, endTop - startTop);
-        })();
-      const progress = gsap.utils.clamp(0, 1, rawProgress);
+      const progress = gsap.utils.clamp(0, 1, timelineProgress);
       const count = timelineCards.length;
       const progressSlots = Math.max(1, count - 1);
-      const focusRange = 1 / progressSlots * 1.15;
       let bestIndex = 0;
       let bestWeight = -1;
+      let bestDiff = Number.POSITIVE_INFINITY;
 
       careerList.style.setProperty("--timeline-focus-offset", `${(cachedTimelineMaxOffset * progress).toFixed(2)}px`);
 
       timelineCards.forEach((card, index) => {
-        const cardProgress = count <= 1 ? 0 : index / progressSlots;
+        const cardProgress = cachedTimelineCardProgresses[index] ?? (count <= 1 ? 0 : index / progressSlots);
         const diff = Math.abs(progress - cardProgress);
-        const focusWeight = gsap.utils.clamp(0, 1, 1 - diff / focusRange);
+        const focusWeight = getCareerPointFocusWeight(progress, cardProgress, count);
         const opacity = 0.2 + 0.8 * focusWeight;
         const scale = 0.97 + 0.03 * focusWeight;
         const detailOffset = (1 - focusWeight) * 8;
 
-        if (focusWeight > bestWeight) {
+        if (focusWeight > bestWeight || (focusWeight === bestWeight && diff < bestDiff)) {
           bestWeight = focusWeight;
+          bestDiff = diff;
           bestIndex = index;
         }
 
@@ -769,6 +794,13 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       });
 
       setActiveTimeline(bestIndex);
+    };
+    const syncCareerTimelineProgress = () => {
+      const startTop = getCareerTimelineStartTop();
+      const endTop = getCareerTimelineEndTop();
+      const rawProgress = (window.scrollY - startTop) / Math.max(1, endTop - startTop);
+
+      renderCareerTimelineProgress(rawProgress);
     };
     const syncCareerTimelineFromScroll = () => {
       syncCareerTimelineProgress();
@@ -799,14 +831,33 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           const mobileIdentity = isMobileIdentityLayout();
-          const showCareer = self.progress >= careerStartProgress * 0.92;
+          const careerTransitionProgress = getCareerTransitionProgress(self.progress);
+          if (careerTransitionProgress > 0.001) {
+            fillTypeElement(aboutCopy);
+            aboutIntroTimeline?.kill();
+            aboutIntroTimeline = null;
+          }
+          identityTransitionTimeline?.progress(careerTransitionProgress);
+          const showCareer = careerTransitionProgress >= 0.5;
           const showCareerList = showCareer && (!mobileIdentity || self.progress >= careerListStartProgress);
           setIdentityMode(showCareer ? "career" : "about");
           setCareerListStage(showCareerList);
-          syncCareerTimelineProgress(self.progress);
         }
       });
       homeScrollTriggers.push(identityProgressTrigger);
+
+      if (timelineCards.length) {
+        homeScrollTriggers.push(ScrollTrigger.create({
+          trigger: identity,
+          start: () => getCareerTimelineStartTop(),
+          end: () => getCareerTimelineEndTop(),
+          scrub: true,
+          invalidateOnRefresh: true,
+          onUpdate: (self) => renderCareerTimelineProgress(self.progress),
+          onLeave: () => renderCareerTimelineProgress(1),
+          onLeaveBack: () => renderCareerTimelineProgress(0)
+        }));
+      }
     }
 
     featuredDots.forEach((dot) => {
@@ -835,6 +886,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       setActiveTimeline(index);
       scrollToPosition(getCareerPointTop(index), reduceMotion ? "auto" : "smooth", () => {
         setActiveTimeline(index);
+        syncCareerTimelineProgress();
         updateScrollTriggers();
       });
       replaceRoute("/career", { immediate: true });
@@ -889,7 +941,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     syncFeaturedScrollHeight();
 
     setActiveTimeline(0);
-    syncCareerTimelineProgress(isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress);
+    syncCareerTimelineProgress();
     setActiveFeatured(0);
 
     if (featuredSection && featuredPanels.length) {
