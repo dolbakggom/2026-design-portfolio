@@ -10,7 +10,7 @@ const work = slug ? await getWorkBySlug(slug) : null;
 const coverImage = work?.featuredThumbnail?.url ? work.featuredThumbnail : work?.thumbnail?.url ? work.thumbnail : null;
 const yearDateTime = work?.year?.match(/\d{4}/)?.[0] ?? "2026";
 const workDescription = work?.summary?.trim() || "Beyond the Answer. 작업물 상세 페이지입니다.";
-const workOgImage = coverImage?.url ?? "/og-image.svg";
+const workOgImage = coverImage?.url ?? "/og-image.png";
 const workOgImageAlt = coverImage?.alt ?? work?.title ?? "Beyond the Answer. portfolio preview";
 
 if (!work) {

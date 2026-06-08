@@ -622,8 +622,9 @@
   - 존재하지 않는 작업물은 `noindex`를 적용합니다.
 - `src/pages/admin.astro`
   - 관리자 페이지에 `noindex, nofollow`를 적용했습니다.
-- `public/og-image.svg`
-  - 기본 공유 이미지로 사용할 1200x630 SVG OG 이미지를 추가했습니다.
+- `public/og-image.svg`, `public/og-image.png`
+  - 인트로 화면과 같은 검정 배경, 중앙 로고, `Beyond the Answer` 타이틀, 초록 점 구성의 1200x630 OG 이미지를 만들었습니다.
+  - 공유 플랫폼 호환성을 위해 기본 메타 이미지는 PNG를 사용하고, SVG는 원본 소스로 남겼습니다.
 
 ### 검증
 - `git diff --check` 통과.
@@ -632,4 +633,4 @@
   - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.
 
 ### 남은 주의점
-- 기본 OG 이미지는 SVG입니다. 주요 공유 플랫폼은 일반적으로 PNG/JPG 지원이 더 안정적이므로, 실제 공유 미리보기에서 SVG가 제한되는 서비스가 있으면 같은 경로를 PNG로 교체하거나 `BaseLayout` 기본값만 PNG 경로로 바꾸면 됩니다.
+- 카카오톡, Slack, Discord 등은 URL 미리보기 캐시가 강하게 남을 수 있습니다. 배포 후에도 이전 이미지나 설명이 보이면 각 서비스의 캐시 갱신 도구를 사용하거나 쿼리스트링을 붙인 URL로 다시 테스트해야 합니다.
