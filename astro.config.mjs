@@ -22,6 +22,7 @@ const optimizerIncludes = [
 const isDevCommand = process.argv.includes("dev");
 
 export default defineConfig({
+  site: "https://dolbakggom.com",
   output: "server",
   adapter: cloudflare({
     imageService: "passthrough",

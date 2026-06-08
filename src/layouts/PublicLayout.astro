@@ -6,6 +6,10 @@ interface Props {
   description?: string;
   htmlClass?: string;
   bodyClass?: string;
+  image?: string;
+  imageAlt?: string;
+  type?: "website" | "article";
+  noindex?: boolean;
 }
 
 const props = Astro.props as Props;

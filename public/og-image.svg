@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Beyond the Answer. portfolio preview</title>
+  <desc id="desc">Default Open Graph image for Ham Sihyeon's UI UX and BI BX design portfolio.</desc>
+  <rect width="1200" height="630" fill="#f7f4ee"/>
+  <rect x="0" y="0" width="1200" height="18" fill="#00c853"/>
+  <circle cx="1040" cy="120" r="180" fill="#00c853" opacity="0.13"/>
+  <circle cx="1140" cy="545" r="220" fill="#111111" opacity="0.04"/>
+  <g transform="translate(104 96) scale(2.35)" fill="#111111">
+    <path d="M22.0732 0.000976562H27.4131V49.124L44.1484 39.4609V16.8125H49.4883V42.5039L49.4873 42.5479L27.4141 55.291L27.4131 55.2891H22.0732V6.16602L5.33984 15.8271V38.4883H0V12.7432L22.0723 0L22.0732 0.000976562Z"/>
+  </g>
+  <text x="104" y="270" fill="#111111" font-family="Pretendard, Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="0">Beyond the Answer.</text>
+  <text x="108" y="340" fill="#111111" font-family="Pretendard, Arial, sans-serif" font-size="30" font-weight="500" opacity="0.58" letter-spacing="0">UI/UX and BI/BX Design Portfolio</text>
+  <text x="108" y="508" fill="#111111" font-family="Pretendard, Arial, sans-serif" font-size="28" font-weight="500" opacity="0.72" letter-spacing="0">Ham Sihyeon</text>
+  <text x="108" y="552" fill="#111111" font-family="Pretendard, Arial, sans-serif" font-size="24" font-weight="400" opacity="0.45" letter-spacing="0">dolbakggom.com</text>
+  <circle cx="770" cy="246" r="11" fill="#00c853"/>
+</svg>

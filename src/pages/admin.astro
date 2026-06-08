@@ -5,7 +5,7 @@ import AdminApp from "../components/admin/AdminApp.tsx";
 export const prerender = false;
 ---
 
-<BaseLayout title="Admin | Beyond the Answer." bodyClass="admin-body">
+<BaseLayout title="Admin | Beyond the Answer." bodyClass="admin-body" noindex>
   <AdminApp client:only="react">
     <main slot="fallback" class="admin-shell">
       <p class="admin-loading">Loading admin...</p>

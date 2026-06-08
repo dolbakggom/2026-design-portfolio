@@ -602,3 +602,34 @@
 
 ### 검증
 - `git diff --check` 통과.
+
+## 2026-06-08 OG and Social Meta Setup
+
+### 요구사항
+- 포트폴리오 공유 시 사용할 OG 이미지와 기본 메타 태그를 알맞게 설정합니다.
+- 작업물 상세 페이지는 각 작업물의 제목, 요약, 대표 이미지를 공유 메타에 반영합니다.
+
+### 구현
+- `astro.config.mjs`
+  - production canonical/absolute OG URL 계산을 위해 `site: "https://dolbakggom.com"`을 추가했습니다.
+- `src/layouts/BaseLayout.astro`
+  - canonical, description, Open Graph, Twitter card, author 메타를 공용 레이아웃에서 출력하도록 확장했습니다.
+  - `image`, `imageAlt`, `type`, `noindex` props를 추가해 페이지별 공유 이미지와 색인 정책을 제어할 수 있게 했습니다.
+- `src/layouts/PublicLayout.astro`
+  - 새 SEO props를 `BaseLayout`으로 전달하도록 타입을 확장했습니다.
+- `src/pages/work/[slug].astro`
+  - 작업물 상세 페이지의 summary를 description으로 사용하고, 현재 상세 cover 이미지 또는 기본 OG 이미지를 공유 이미지로 사용하도록 연결했습니다.
+  - 존재하지 않는 작업물은 `noindex`를 적용합니다.
+- `src/pages/admin.astro`
+  - 관리자 페이지에 `noindex, nofollow`를 적용했습니다.
+- `public/og-image.svg`
+  - 기본 공유 이미지로 사용할 1200x630 SVG OG 이미지를 추가했습니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build`
+  - 샌드박스 내부 첫 실행은 Cloudflare Vite plugin의 `0.0.0.0:9229` bind `EPERM`으로 실패했습니다.
+  - 승인된 재실행에서 `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete 확인했습니다.
+
+### 남은 주의점
+- 기본 OG 이미지는 SVG입니다. 주요 공유 플랫폼은 일반적으로 PNG/JPG 지원이 더 안정적이므로, 실제 공유 미리보기에서 SVG가 제한되는 서비스가 있으면 같은 경로를 PNG로 교체하거나 `BaseLayout` 기본값만 PNG 경로로 바꾸면 됩니다.
