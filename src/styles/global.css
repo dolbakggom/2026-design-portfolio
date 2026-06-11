@@ -1745,9 +1745,16 @@ html.home-scroll .timeline-items {
     transform: none;
   }
 
-  .timeline-card.is-active .timeline-card-details-inner span,
+  .timeline-card-details-inner h3,
   .timeline-card.is-active .timeline-card-details-inner h3 {
+    font-size: 28px;
+    line-height: 1.2;
+  }
+
+  .timeline-card-details-inner span,
+  .timeline-card.is-active .timeline-card-details-inner span {
     font-size: 16px;
+    line-height: 1.4;
   }
 
   .work-grid {

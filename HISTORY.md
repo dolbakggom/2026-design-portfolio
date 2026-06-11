@@ -634,3 +634,17 @@
 
 ### 남은 주의점
 - 카카오톡, Slack, Discord 등은 URL 미리보기 캐시가 강하게 남을 수 있습니다. 배포 후에도 이전 이미지나 설명이 보이면 각 서비스의 캐시 갱신 도구를 사용하거나 쿼리스트링을 붙인 URL로 다시 테스트해야 합니다.
+
+## 2026-06-09 Mobile Career Point Typography Stabilization
+
+### 요구사항
+- 모바일 Career point에서 선택 전/후 텍스트 크기가 달라져 폰트가 왔다 갔다 하는 느낌을 줄입니다.
+- 선택된 point의 제목은 줄바꿈을 허용하더라도 기존 큰 크기를 유지하고, 설명 텍스트만 작은 크기로 유지합니다.
+
+### 구현
+- `src/styles/global.css`
+  - 모바일 timeline card의 상세 제목(`.timeline-card-details-inner h3`)을 active 여부와 무관하게 `28px`로 고정했습니다.
+  - 상세 설명(`.timeline-card-details-inner span`)은 `16px`로 유지해 펼침 상태에서도 title/description 계층이 안정적으로 보이게 했습니다.
+
+### 검증
+- `git diff --check` 통과.
