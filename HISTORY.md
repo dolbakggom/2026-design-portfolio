@@ -648,3 +648,26 @@
 
 ### 검증
 - `git diff --check` 통과.
+
+## 2026-06-11 Admin Profile Image Save Reliability
+
+### 요구사항
+- 배포 admin에서 프로필 이미지를 업로드하고 `Save profile`을 눌렀는데 공개 페이지에 반영되지 않은 원인을 확인합니다.
+- 같은 문제가 다시 발생하지 않도록 프로필 이미지 저장 흐름을 보강합니다.
+
+### 원인
+- 원격 D1 확인 결과, R2/`assets`에는 프로필 이미지가 업로드되어 있었지만 `profile.portrait_asset_id`가 `null`이어서 공개 페이지가 fallback 이미지(`/assets/figma/profile-guitar.png`)를 사용하고 있었습니다.
+- admin UI는 프로필 이미지 업로드와 프로필 저장이 분리되어 있고, 업로드 직후 React state 갱신 타이밍과 Save 클릭 타이밍이 엇갈리면 저장 payload에 이전 `portraitAssetId`가 들어갈 수 있는 구조였습니다.
+
+### 구현
+- `src/components/admin/AdminApp.tsx`
+  - 최신 profile state를 보관하는 `profileRef`를 추가하고, `saveProfile()`이 렌더 closure의 오래된 `profile` 대신 `profileRef.current`를 저장하도록 변경했습니다.
+  - 프로필 이미지 업로드 성공 시 `portraitAssetId`와 `portrait`를 state와 ref에 동시에 반영합니다.
+  - 이미지 업로드 중에는 profile file input과 `Save profile` 버튼을 비활성화하고, 업로드 중 저장 시도를 막았습니다.
+
+### 운영 반영
+- 원격 D1의 `profile.portrait_asset_id`를 최신 업로드 asset `ff99b6f6-b9d8-40ac-9b94-292af2e3fe9c`로 직접 연결했습니다.
+- `https://dolbakggom.com/about` HTML에서 새 `/media/uploads/2026/06/...img_3872-sdr.jpg` 프로필 이미지가 내려오는 것을 확인했습니다.
+
+### 검증
+- `git diff --check` 통과.

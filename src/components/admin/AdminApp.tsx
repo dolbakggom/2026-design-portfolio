@@ -444,8 +444,10 @@ export default function AdminApp() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [profileImageUploading, setProfileImageUploading] = useState(false);
   const [draggedWorkId, setDraggedWorkId] = useState("");
   const [dragOverWorkId, setDragOverWorkId] = useState("");
+  const profileRef = useRef<Profile>(emptyProfile);
   const workDragMoved = useRef(false);
   const worksRef = useRef<WorkItem[]>([]);
   const workEditorRef = useRef<HTMLElement | null>(null);
@@ -463,6 +465,10 @@ export default function AdminApp() {
       savedWorkSnapshots[selectedWork.id] &&
       savedWorkSnapshots[selectedWork.id] !== workSnapshot(selectedWork)
   );
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useEffect(() => {
     worksRef.current = works;
@@ -580,12 +586,18 @@ export default function AdminApp() {
   };
 
   const saveProfile = async () => {
+    if (profileImageUploading) {
+      fail("프로필 이미지 업로드가 끝난 뒤 저장해주세요.");
+      return;
+    }
+
     try {
       const data = await requestJson<{ profile: Profile }>("/api/admin/profile", {
         method: "PUT",
-        body: JSON.stringify(profile)
+        body: JSON.stringify(profileRef.current)
       });
       setProfile(data.profile);
+      profileRef.current = data.profile;
       flash("자기소개가 저장되었습니다.");
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "저장에 실패했습니다.");
@@ -663,16 +675,23 @@ export default function AdminApp() {
 
   const uploadProfileImage = async (file: File | undefined) => {
     if (!file) return;
+    setProfileImageUploading(true);
     try {
       const asset = await uploadAsset(file, profile.name);
-      setProfile((current) => ({
+      setProfile((current) => {
+        const nextProfile = {
         ...current,
         portraitAssetId: asset.id,
         portrait: { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime }
-      }));
+        };
+        profileRef.current = nextProfile;
+        return nextProfile;
+      });
       flash("프로필 이미지가 업로드되었습니다. 저장을 눌러 반영하세요.");
     } catch (uploadError) {
       fail(uploadError instanceof Error ? uploadError.message : "업로드에 실패했습니다.");
+    } finally {
+      setProfileImageUploading(false);
     }
   };
 
@@ -1048,7 +1067,7 @@ export default function AdminApp() {
                 </label>
                 <label>
                   Profile Image
-                  <input type="file" accept="image/*" onChange={(event) => uploadProfileImage(event.target.files?.[0])} />
+                  <input type="file" accept="image/*" disabled={profileImageUploading} onChange={(event) => uploadProfileImage(event.target.files?.[0])} />
                 </label>
                 <label className="full-field">
                   Intro
@@ -1097,8 +1116,8 @@ export default function AdminApp() {
             </section>
 
             <div className="action-row sticky-actions">
-              <button type="button" className="primary-action" onClick={saveProfile}>
-                Save profile
+              <button type="button" className="primary-action" onClick={saveProfile} disabled={profileImageUploading}>
+                {profileImageUploading ? "Uploading..." : "Save profile"}
               </button>
             </div>
           </div>
