@@ -1664,6 +1664,13 @@ html.home-scroll .timeline-items {
     pointer-events: none;
   }
 
+  html.home-scroll .identity-section.is-career .identity-copy-panel {
+    transition:
+      opacity 320ms ease,
+      transform 320ms ease,
+      filter 320ms ease;
+  }
+
   .profile-contact {
     position: relative;
     left: auto;
@@ -1716,7 +1723,32 @@ html.home-scroll .timeline-items {
     right: var(--page-x);
     top: 50%;
     width: auto;
-    height: min(72svh, 620px);
+    height: min(84svh, 720px);
+    pointer-events: none;
+  }
+
+  .identity-section:not(.is-career-list) .timeline-items {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    filter: blur(12px) !important;
+    transform: translateY(-50%) translateX(32px) !important;
+  }
+
+  html.home-scroll .identity-section.is-career .timeline-items {
+    transition:
+      opacity 320ms ease,
+      transform 320ms ease,
+      filter 320ms ease,
+      visibility 0s linear 320ms;
+  }
+
+  .identity-section.is-career.is-career-list .timeline-items {
+    opacity: 1 !important;
+    visibility: visible !important;
+    filter: blur(0) !important;
+    transform: translateY(-50%) translateX(0) !important;
+    pointer-events: auto;
+    transition-delay: 0s;
   }
 
   .timeline-track {

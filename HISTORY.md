@@ -671,3 +671,22 @@
 
 ### 검증
 - `git diff --check` 통과.
+
+## 2026-06-11 Mobile Career Timeline Stage Separation
+
+### 요구사항
+- 모바일 Career 화면에서 timeline 항목이 상단 Career 소개 문구와 겹치지 않도록 합니다.
+- 소개 문구가 먼저 보인 뒤 디졸브로 사라지고, 그 다음 timeline이 여백 있는 풀 화면 영역을 쓰도록 단계감을 분리합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - 모바일 전용 `mobileCareerListStartProgress`를 추가해 Career 소개 문구가 나온 뒤 timeline list가 시작되도록 list 진입 시점을 늦췄습니다.
+  - 모바일 Career timeline 시작 위치 계산도 새 모바일 list 진입 progress를 기준으로 맞췄습니다.
+  - Career 소개문구 체류량은 About 체류량(`aboutHoldEndProgress`)과 동일하게 맞췄습니다.
+- `src/styles/global.css`
+  - 모바일에서 `.is-career-list` 단계 전까지 timeline을 강제로 숨겨 GSAP inline opacity와 겹쳐 보이지 않게 했습니다.
+  - `.is-career-list` 단계에서는 timeline을 중앙 기준, 여백 있는 큰 viewport 영역(`min(84svh, 720px)`)으로 표시하도록 조정했습니다.
+  - Career copy와 timeline 전환에 짧은 opacity/blur/transform transition을 부여해 단계 전환이 abrupt하게 보이지 않도록 했습니다.
+
+### 검증
+- `git diff --check` 통과.

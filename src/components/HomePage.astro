@@ -676,8 +676,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
     const aboutHoldEndProgress = 0.09;
     const careerStartProgress = 0.29;
-    const careerEndProgress = 0.97;
-    const careerListStartProgress = careerStartProgress + (careerEndProgress - careerStartProgress) * 0.14;
+    const mobileCareerListStartProgress = careerStartProgress + aboutHoldEndProgress;
     const getCareerTransitionProgress = (identityProgress: number) => (
       gsap.utils.clamp(
         0,
@@ -726,7 +725,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
       return getIdentityTop() + getIdentityProgressRange() * clampedProgress;
     };
-    const getCareerEntryTop = () => getCareerTimelineScrollForProgress(isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress);
+    const getCareerEntryTop = () => getCareerTimelineScrollForProgress(isMobileIdentityLayout() ? mobileCareerListStartProgress : careerStartProgress);
     const getCareerTimelineScrollForProgress = (progress: number) => {
       const clampedProgress = gsap.utils.clamp(0, 1, progress);
       const totalHeight = Math.max(1, getWorkTop() - getIdentityTop());
@@ -734,7 +733,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       const maxTimelineTravel = Math.max(1, totalHeight - panelHeight * 0.3);
       return getIdentityTop() + maxTimelineTravel * clampedProgress;
     };
-    const getCareerTimelineStartProgress = () => isMobileIdentityLayout() ? careerListStartProgress : careerStartProgress;
+    const getCareerTimelineStartProgress = () => isMobileIdentityLayout() ? mobileCareerListStartProgress : careerStartProgress;
     const getCareerTimelineStartTop = () => getCareerTimelineScrollForProgress(getCareerTimelineStartProgress());
     const getWorkRevealTop = () => getWorkTop() - getPanelHeight();
     const getCareerTimelineTravel = () => {
@@ -839,7 +838,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           }
           identityTransitionTimeline?.progress(careerTransitionProgress);
           const showCareer = careerTransitionProgress >= 0.5;
-          const showCareerList = showCareer && (!mobileIdentity || self.progress >= careerListStartProgress);
+          const showCareerList = showCareer && (!mobileIdentity || self.progress >= mobileCareerListStartProgress);
           setIdentityMode(showCareer ? "career" : "about");
           setCareerListStage(showCareerList);
         }
