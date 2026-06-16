@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { isAdminRequest } from "../../../../lib/auth";
 import { createWork, listWorks } from "../../../../lib/admin-data";
 import { badRequest, json, readJson, serverError, unauthorized } from "../../../../lib/http";
+import { deletePublicHtmlCache, getPublicHtmlCachePathsForWorks } from "../../../../lib/public-cache";
 import { workSchema } from "../../../../lib/validation";
 
 export const prerender = false;
@@ -23,7 +24,9 @@ export const POST: APIRoute = async ({ request }) => {
   if (!parsed.success) return badRequest("Invalid work payload", parsed.error.issues);
 
   try {
-    return json({ works: await createWork(parsed.data) }, { status: 201 });
+    const works = await createWork(parsed.data);
+    await deletePublicHtmlCache(request, getPublicHtmlCachePathsForWorks(works));
+    return json({ works }, { status: 201 });
   } catch {
     return serverError("Unable to create work");
   }

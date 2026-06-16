@@ -36,6 +36,54 @@
 
 ---
 
+## 2026-06-16 Admin Save Public HTML Cache Invalidation
+
+### 요구사항
+- admin에서 작업물/프로필/이력 내용을 저장한 뒤 퍼블리싱된 공개 홈페이지 반영이 늦는 이유를 히스토리 기준으로 확인합니다.
+- 기존 지연을 둔 이유와 지연이 없을 때의 문제점을 정리하고, 성능 캐시는 유지하면서 저장 직후 반영 지연을 줄입니다.
+- Superpowers systematic debugging/TDD 흐름에 맞춰 원인 확인, 회귀 테스트, 구현, 검증을 진행합니다.
+
+### 원인
+- 2026-05-27 `PageSpeed LCP Font and Public HTML Cache Pass`에서 PageSpeed 모바일의 public HTML 비캐시/TTFB 병목을 줄이기 위해 `/`, `/about`, `/career`, `/work`, `/work/:slug` GET HTML에 Cloudflare Cache API를 적용했습니다.
+- edge TTL은 10분, stale-while-revalidate는 24시간으로 설정되어 있어 CMS 저장 직후 공개 페이지가 최대 10분 늦게 보일 수 있다는 주의사항이 이미 남아 있었습니다.
+- admin mutation API에는 저장 후 public HTML cache key를 삭제하는 경로가 없어, 정상적으로 저장되어도 기존 HTML 캐시가 TTL 동안 유지될 수 있었습니다.
+- 빌드 검증이 멈추던 직접 원인은 iCloud Drive 안의 `node_modules`에 `* 2` 충돌 디렉터리가 대량 생성되어 dependency ESM 파일 로딩이 비정상적으로 느려진 것이었습니다.
+  - 예: `node_modules/zod/v3 2`, `node_modules/zod/v4 2`, `node_modules/@astrojs/* 2`, `node_modules/.bin/* 2`.
+  - 충돌 상태에서는 `import("zod")`만 22초가 걸렸고, `astro check`는 4분 이상 CPU 사용 없이 I/O 대기 상태에 가까웠습니다.
+
+### 구현
+- `src/lib/public-cache.ts`
+  - middleware와 같은 형태의 HTML cache key(`GET`, `accept: text/html`)를 생성하는 helper를 추가했습니다.
+  - home route alias(`/`, `/about`, `/career`, `/work`)와 work detail route(`/work/:slug`) 삭제 대상을 계산합니다.
+  - Cloudflare `caches.default.delete(...)`를 사용해 admin 저장 요청 직후 관련 public HTML 캐시를 삭제합니다.
+- `src/pages/api/admin/profile.ts`, `timeline/*`, `works/*`, `reorder.ts`
+  - 프로필/이력 저장은 home route alias 캐시를 삭제합니다.
+  - work 생성/수정/삭제/정렬 및 block reorder는 home route alias와 work detail 캐시를 삭제합니다.
+  - work slug 변경/삭제 시 예전 slug의 `/work/:oldSlug` 캐시도 함께 삭제합니다.
+- `tests/public-cache.test.ts`
+  - Node 내장 `node:test`로 cache path 계산과 middleware cache key shape를 회귀 테스트합니다.
+- local dependency hygiene
+  - 충돌된 `node_modules`를 삭제하고 `npm ci`로 재설치했습니다.
+  - 재설치된 dependency를 `node_modules.nosync`로 옮기고 `node_modules -> node_modules.nosync` symlink를 만들어 iCloud sync 충돌 재발 가능성을 줄였습니다.
+  - `.gitignore`에 `node_modules.nosync`를 추가했습니다.
+- `tsconfig.json`
+  - `.nosync` 전환 후 TypeScript가 `node_modules.nosync`를 workspace source처럼 읽어 OOM을 내는 문제를 막기 위해 include를 `src/**/*`, `.astro/types.d.ts`, `.astro/content.d.ts`, `astro.config.mjs`로 좁혔습니다.
+  - `node_modules.nosync`, `tests`, `.wrangler`, backup folders를 exclude에 추가했습니다.
+
+### 검증
+- `find node_modules.nosync -maxdepth 3 -name '* 2' -print` 결과 없음.
+- `node --input-type=module -e 'console.time("zod"); await import("zod"); console.timeEnd("zod");'` 결과 `zod: 30.274ms`.
+- `node --test tests/public-cache.test.ts` 통과: 3 tests / 0 failures.
+- `git diff --check` 통과.
+- `npm run build` 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.
+
+### 남은 확인
+- Cloudflare Cache API 삭제는 요청을 처리한 edge cache를 즉시 비우는 방식입니다. 다른 PoP에 남은 캐시까지 전 세계적으로 즉시 제거해야 한다면 Cloudflare Zone Purge API(`CF_ZONE_ID`, purge token 등)를 추가해야 합니다.
+- 현재 설계는 PageSpeed/TTFB 보호를 위해 10분 TTL과 SWR은 유지하고, admin 저장 직후 반영 지연만 줄이는 절충안입니다. TTL을 완전히 제거하면 모든 공개 페이지 요청이 Worker 렌더/D1 조회로 돌아가 성능 병목이 재발할 수 있습니다.
+- iCloud Drive 안에서 개발하는 동안 `node_modules`가 실제 디렉터리로 돌아가거나 `* 2` 충돌 폴더가 다시 생기면 빌드가 다시 매우 느려질 수 있습니다. `node_modules`는 `node_modules.nosync` symlink 상태를 유지합니다.
+
 ## 2026-05-29 Career Timing and Work Reveal Clamp
 
 ### 요구사항
@@ -690,3 +738,23 @@
 
 ### 검증
 - `git diff --check` 통과.
+
+## 2026-06-11 Career Point Scroll-Scrub Refinement
+
+### 요구사항
+- About → Career 전환처럼 Career point 전환도 트리거식으로 끊기지 않고 스크롤 progress에 맞춰 연속적으로 재생되도록 합니다.
+
+### 구현
+- `src/components/HomePage.astro`
+  - Career timeline progress 계산에서 카드별 focus weight를 `--timeline-detail-row`, `--timeline-dot-scale`, `--timeline-dot-accent-opacity`까지 전달하도록 확장했습니다.
+  - `setActiveTimeline()`은 `aria-current`와 현재 항목 상태 관리용으로 유지하고, 시각 전환은 CSS 변수 기반으로 분리했습니다.
+- `src/styles/global.css`
+  - timeline detail 영역의 높이, opacity, y 이동이 scroll progress 변수에 따라 움직이도록 변경했습니다.
+  - dot 강조를 base dot과 acid overlay dot으로 분리해 active class 전환이 아니라 scroll progress opacity/scale로 표현되게 했습니다.
+  - dot/title의 transition을 제거해 ScrollTrigger scrub 입력과 CSS transition이 서로 늦게 따라가는 느낌을 줄였습니다.
+
+### 검증
+- `git diff --check` 통과.
+- `npm run build` 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.

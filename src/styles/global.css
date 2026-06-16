@@ -644,7 +644,10 @@ html.home-scroll .timeline-items {
   --timeline-card-opacity: 0.2;
   --timeline-card-scale: 0.97;
   --timeline-detail-opacity: 0;
+  --timeline-detail-row: 0fr;
   --timeline-detail-y: 8px;
+  --timeline-dot-accent-opacity: 0;
+  --timeline-dot-scale: 0.6667;
   position: relative;
   min-height: clamp(62px, 4.8vw, 84px);
   display: flex;
@@ -679,9 +682,23 @@ html.home-scroll .timeline-items {
   content: "";
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.52);
-  transform: translateY(-50%) scale(0.6667);
-  transition: transform 180ms ease, background 180ms ease;
+  transform: translateY(-50%) scale(var(--timeline-dot-scale));
+  transition: none;
   will-change: transform;
+}
+
+.timeline-card::after {
+  position: absolute;
+  left: -62px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  content: "";
+  border-radius: 50%;
+  background: var(--color-acid);
+  opacity: var(--timeline-dot-accent-opacity);
+  transform: translateY(-50%) scale(var(--timeline-dot-scale));
+  will-change: transform, opacity;
 }
 
 .timeline-card p,
@@ -696,21 +713,19 @@ html.home-scroll .timeline-items {
   line-height: 1.3;
   transform: none;
   transform-origin: left center;
-  transition:
-    color 180ms ease,
-    opacity 180ms ease;
+  transition: none;
   will-change: opacity;
 }
 
 .timeline-card-details {
   display: grid;
-  grid-template-rows: 1fr;
+  grid-template-rows: var(--timeline-detail-row);
   overflow: hidden;
   width: 100%;
 }
 
 .timeline-card.is-active .timeline-card-details {
-  grid-template-rows: 1fr;
+  grid-template-rows: var(--timeline-detail-row);
 }
 
 .timeline-card-details-inner {
@@ -719,6 +734,7 @@ html.home-scroll .timeline-items {
   flex-direction: column;
   gap: 6px;
   padding-top: 8px;
+  overflow: hidden;
 }
 
 .timeline-card-details-inner h3,
@@ -737,8 +753,8 @@ html.home-scroll .timeline-items {
 }
 
 .timeline-card.is-active::before {
-  background: var(--color-acid);
-  transform: translateY(-50%) scale(1);
+  background: rgba(255, 255, 255, 0.52);
+  transform: translateY(-50%) scale(var(--timeline-dot-scale));
 }
 
 .timeline-card.is-active p {
@@ -1762,7 +1778,8 @@ html.home-scroll .timeline-items {
     bottom: 0;
   }
 
-  .timeline-card::before {
+  .timeline-card::before,
+  .timeline-card::after {
     left: -46px;
   }
 

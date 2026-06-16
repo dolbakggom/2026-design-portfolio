@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { isAdminRequest } from "../../../lib/auth";
 import { readProfile, updateProfile } from "../../../lib/admin-data";
 import { badRequest, json, readJson, serverError, unauthorized } from "../../../lib/http";
+import { deletePublicHtmlCache, getHomeHtmlCachePaths } from "../../../lib/public-cache";
 import { profileSchema } from "../../../lib/validation";
 
 export const prerender = false;
@@ -23,7 +24,9 @@ export const PUT: APIRoute = async ({ request }) => {
   if (!parsed.success) return badRequest("Invalid profile payload", parsed.error.issues);
 
   try {
-    return json({ profile: await updateProfile(parsed.data) });
+    const profile = await updateProfile(parsed.data);
+    await deletePublicHtmlCache(request, getHomeHtmlCachePaths());
+    return json({ profile });
   } catch {
     return serverError("Unable to update profile");
   }

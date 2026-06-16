@@ -779,6 +779,8 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         const opacity = 0.2 + 0.8 * focusWeight;
         const scale = 0.97 + 0.03 * focusWeight;
         const detailOffset = (1 - focusWeight) * 8;
+        const detailRow = `${focusWeight.toFixed(3)}fr`;
+        const dotScale = 0.6667 + 0.3333 * focusWeight;
 
         if (focusWeight > bestWeight || (focusWeight === bestWeight && diff < bestDiff)) {
           bestWeight = focusWeight;
@@ -790,6 +792,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         card.style.setProperty("--timeline-card-scale", scale.toFixed(3));
         card.style.setProperty("--timeline-detail-opacity", focusWeight.toFixed(3));
         card.style.setProperty("--timeline-detail-y", `${detailOffset.toFixed(2)}px`);
+        card.style.setProperty("--timeline-detail-row", detailRow);
+        card.style.setProperty("--timeline-dot-scale", dotScale.toFixed(3));
+        card.style.setProperty("--timeline-dot-accent-opacity", focusWeight.toFixed(3));
       });
 
       setActiveTimeline(bestIndex);

@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { isAdminRequest } from "../../../../lib/auth";
 import { createTimeline, listTimeline } from "../../../../lib/admin-data";
 import { badRequest, json, readJson, serverError, unauthorized } from "../../../../lib/http";
+import { deletePublicHtmlCache, getHomeHtmlCachePaths } from "../../../../lib/public-cache";
 import { timelineSchema } from "../../../../lib/validation";
 
 export const prerender = false;
@@ -23,7 +24,9 @@ export const POST: APIRoute = async ({ request }) => {
   if (!parsed.success) return badRequest("Invalid timeline payload", parsed.error.issues);
 
   try {
-    return json({ timeline: await createTimeline(parsed.data) }, { status: 201 });
+    const timeline = await createTimeline(parsed.data);
+    await deletePublicHtmlCache(request, getHomeHtmlCachePaths());
+    return json({ timeline }, { status: 201 });
   } catch {
     return serverError("Unable to create timeline item");
   }

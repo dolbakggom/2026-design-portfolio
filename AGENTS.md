@@ -29,6 +29,8 @@
 - Do not store binary media in D1. Upload media to R2 and store metadata in D1.
 - Validate all admin API payloads with Zod.
 - Keep public routes resilient: if D1 is unavailable locally, render starter content instead of crashing.
+- This workspace lives inside iCloud Drive. Keep dependencies out of sync conflicts by preserving `node_modules -> node_modules.nosync`; if build/check becomes extremely slow, inspect `node_modules.nosync` for `* 2` conflict folders before changing app code.
+- Keep Astro/TypeScript checks scoped to source files. Do not let `node_modules.nosync`, `tests`, `.wrangler`, D1 backups, or R2 backups enter the main `tsconfig.json` program.
 
 ## History Workflow
 - Keep `HISTORY.md` updated so work can continue across separate Codex projects on different Macs.
