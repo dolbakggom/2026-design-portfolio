@@ -42,4 +42,5 @@
 - D1 binding: `DB`
 - R2 binding: `MEDIA_BUCKET`
 - Required secrets: `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`
+- Optional cache purge vars/secrets: `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_CACHE_PURGE_TOKEN`. When present, admin saves purge public HTML through Cloudflare's global purge API in addition to the Worker Cache API.
 - Non-secret admin username may live in Wrangler vars as `ADMIN_USERNAME`.

@@ -1,8 +1,9 @@
 import type { APIRoute } from "astro";
 import { isAdminRequest } from "../../../../lib/auth";
 import { deleteTimeline, updateTimeline } from "../../../../lib/admin-data";
+import { purgePublicHtmlCache } from "../../../../lib/admin-cache";
 import { badRequest, json, notFound, readJson, serverError, unauthorized } from "../../../../lib/http";
-import { deletePublicHtmlCache, getHomeHtmlCachePaths } from "../../../../lib/public-cache";
+import { getHomeHtmlCachePaths } from "../../../../lib/public-cache";
 import { timelineSchema } from "../../../../lib/validation";
 
 export const prerender = false;
@@ -16,7 +17,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
 
   try {
     const timeline = await updateTimeline(params.id, parsed.data);
-    if (timeline) await deletePublicHtmlCache(request, getHomeHtmlCachePaths());
+    if (timeline) await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
     return timeline ? json({ timeline }) : notFound();
   } catch {
     return serverError("Unable to update timeline item");
@@ -29,7 +30,7 @@ export const DELETE: APIRoute = async ({ params, request }) => {
 
   try {
     const timeline = await deleteTimeline(params.id);
-    await deletePublicHtmlCache(request, getHomeHtmlCachePaths());
+    await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
     return json({ timeline });
   } catch {
     return serverError("Unable to delete timeline item");

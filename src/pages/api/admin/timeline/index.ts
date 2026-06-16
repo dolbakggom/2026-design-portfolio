@@ -1,8 +1,9 @@
 import type { APIRoute } from "astro";
 import { isAdminRequest } from "../../../../lib/auth";
 import { createTimeline, listTimeline } from "../../../../lib/admin-data";
+import { purgePublicHtmlCache } from "../../../../lib/admin-cache";
 import { badRequest, json, readJson, serverError, unauthorized } from "../../../../lib/http";
-import { deletePublicHtmlCache, getHomeHtmlCachePaths } from "../../../../lib/public-cache";
+import { getHomeHtmlCachePaths } from "../../../../lib/public-cache";
 import { timelineSchema } from "../../../../lib/validation";
 
 export const prerender = false;
@@ -25,7 +26,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const timeline = await createTimeline(parsed.data);
-    await deletePublicHtmlCache(request, getHomeHtmlCachePaths());
+    await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
     return json({ timeline }, { status: 201 });
   } catch {
     return serverError("Unable to create timeline item");

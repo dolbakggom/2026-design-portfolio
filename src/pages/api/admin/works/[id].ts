@@ -1,8 +1,9 @@
 import type { APIRoute } from "astro";
 import { isAdminRequest } from "../../../../lib/auth";
 import { deleteWork, listWorks, updateWork } from "../../../../lib/admin-data";
+import { purgePublicHtmlCache } from "../../../../lib/admin-cache";
 import { badRequest, json, notFound, readJson, serverError, unauthorized } from "../../../../lib/http";
-import { deletePublicHtmlCache, getPublicHtmlCachePathsForWorks } from "../../../../lib/public-cache";
+import { getPublicHtmlCachePathsForWorks } from "../../../../lib/public-cache";
 import { workSchema } from "../../../../lib/validation";
 
 export const prerender = false;
@@ -18,7 +19,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
     const previousWork = (await listWorks()).find((work) => work.id === params.id);
     const works = await updateWork(params.id, parsed.data);
     if (works) {
-      await deletePublicHtmlCache(
+      await purgePublicHtmlCache(
         request,
         getPublicHtmlCachePathsForWorks(works, previousWork ? [`/work/${previousWork.slug}`] : [])
       );
@@ -36,7 +37,7 @@ export const DELETE: APIRoute = async ({ params, request }) => {
   try {
     const deletedWork = (await listWorks()).find((work) => work.id === params.id);
     const works = await deleteWork(params.id);
-    await deletePublicHtmlCache(
+    await purgePublicHtmlCache(
       request,
       getPublicHtmlCachePathsForWorks(works, deletedWork ? [`/work/${deletedWork.slug}`] : [])
     );

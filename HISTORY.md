@@ -36,6 +36,51 @@
 
 ---
 
+## 2026-06-17 Work Detail Stale Public Cache Follow-up
+
+### 요구사항
+- Admin에서 `ROii HMI UI 디자인`으로 저장했는데 공개 `/work/roii-hmi` 상세가 예전 제목/연도/역할로 보이는 문제를 조사합니다.
+- 같은 현상이 여러 프로젝트에서 생길 수 있으므로 저장 후 공개 상세 반영 경로를 더 안정화합니다.
+- Superpowers systematic debugging/TDD 흐름에 따라 원인 확인, 테스트 작성, 구현, 검증을 진행합니다.
+
+### 원인
+- 공개 상세 페이지는 `src/pages/work/[slug].astro`에서 `getWorkBySlug(slug)` 결과를 그대로 렌더링합니다.
+- 운영 URL `https://dolbakggom.com/work/roii-hmi`를 새로 요청했을 때 `x-portfolio-cache: MISS`였고, HTML은 admin 입력값과 일치했습니다.
+  - title: `ROii HMI UI 디자인`
+  - year: `2024~2025`
+  - role: `Figma, Adobe Illustrator`
+  - client: `(주)오토노머스에이투지`
+- 따라서 현재 D1/렌더러는 올바른 값을 만들고 있으며, 사용자가 본 화면은 저장 당시 남아 있던 edge/browser HTML 캐시 또는 이전 배포의 캐시 결과로 판단했습니다.
+- 기존 `deletePublicHtmlCache(...)`는 Worker Cache API로 저장 요청을 처리한 edge cache를 지우지만, 다른 Cloudflare PoP에 남은 HTML까지 전역으로 즉시 제거하지는 못합니다.
+
+### 구현
+- `src/lib/public-cache.ts`
+  - `createPublicHtmlPurgeUrls(...)`를 추가해 cache path들을 절대 URL로 변환하고 중복 제거합니다.
+- `src/lib/cloudflare-purge.ts`
+  - `CLOUDFLARE_ZONE_ID` + `CLOUDFLARE_CACHE_PURGE_TOKEN` 또는 `CF_*`/`CLOUDFLARE_API_TOKEN` 조합을 읽어 Cloudflare file purge 요청을 만들도록 추가했습니다.
+  - purge files 요청은 30개 단위로 나눕니다.
+- `src/lib/admin-cache.ts`
+  - admin 저장 후 기존 Worker Cache API 삭제와 선택적 Cloudflare 전역 file purge를 함께 실행합니다.
+  - purge 실패나 env 미설정이 admin 저장 성공 자체를 막지 않도록 `Promise.allSettled(...)`로 방어합니다.
+- `src/pages/api/admin/profile.ts`, `timeline/*`, `works/*`, `reorder.ts`
+  - 기존 `deletePublicHtmlCache(...)` 호출을 `purgePublicHtmlCache(...)`로 교체했습니다.
+- `.dev.vars.example`, `AGENTS.md`
+  - 선택적 전역 purge env 이름을 문서화했습니다.
+- `tests/public-cache.test.ts`, `tests/cloudflare-purge.test.ts`
+  - public purge URL 생성, Cloudflare purge credential/batch/request 생성 회귀 테스트를 추가했습니다.
+
+### 검증
+- `node --test tests/cloudflare-purge.test.ts tests/public-cache.test.ts` 통과: 8 tests / 0 failures.
+- `git diff --check` 통과.
+- `npm run build` 통과.
+  - `astro check`: 0 errors / 0 warnings / 0 hints.
+  - `astro build`: complete.
+
+### 남은 확인
+- 전역 purge는 배포 후 Cloudflare Worker 환경에 `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_CACHE_PURGE_TOKEN`이 설정되어 있어야 작동합니다.
+- 토큰은 Cloudflare Zone Cache Purge 권한만 가진 좁은 토큰으로 설정하는 것이 좋습니다.
+- env가 없으면 기존 Worker Cache API 삭제만 수행하므로, 다른 PoP의 기존 캐시는 최대 기존 TTL 영향을 받을 수 있습니다.
+
 ## 2026-06-16 Admin Save Public HTML Cache Invalidation
 
 ### 요구사항

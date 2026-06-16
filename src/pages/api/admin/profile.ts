@@ -1,8 +1,9 @@
 import type { APIRoute } from "astro";
 import { isAdminRequest } from "../../../lib/auth";
 import { readProfile, updateProfile } from "../../../lib/admin-data";
+import { purgePublicHtmlCache } from "../../../lib/admin-cache";
 import { badRequest, json, readJson, serverError, unauthorized } from "../../../lib/http";
-import { deletePublicHtmlCache, getHomeHtmlCachePaths } from "../../../lib/public-cache";
+import { getHomeHtmlCachePaths } from "../../../lib/public-cache";
 import { profileSchema } from "../../../lib/validation";
 
 export const prerender = false;
@@ -25,7 +26,7 @@ export const PUT: APIRoute = async ({ request }) => {
 
   try {
     const profile = await updateProfile(parsed.data);
-    await deletePublicHtmlCache(request, getHomeHtmlCachePaths());
+    await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
     return json({ profile });
   } catch {
     return serverError("Unable to update profile");

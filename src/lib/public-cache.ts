@@ -52,6 +52,11 @@ export const createPublicHtmlCacheKeys = (originUrl: string | URL, paths: string
   );
 };
 
+export const createPublicHtmlPurgeUrls = (originUrl: string | URL, paths: string[]) => {
+  const origin = new URL(originUrl.toString()).origin;
+  return uniquePaths(paths).map((path) => new URL(path, origin).toString());
+};
+
 export const deletePublicHtmlCache = async (request: Request, paths: string[]) => {
   if (typeof caches === "undefined") return;
 

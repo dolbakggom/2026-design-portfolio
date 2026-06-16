@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   createPublicHtmlCacheKeys,
+  createPublicHtmlPurgeUrls,
   getHomeHtmlCachePaths,
   getPublicHtmlCachePathsForWorks
 } from "../src/lib/public-cache.ts";
@@ -35,4 +36,15 @@ test("cache delete keys match the middleware HTML cache key shape", () => {
   assert.equal(keys[0].method, "GET");
   assert.equal(keys[0].url, "https://dolbakggom.com/work/test");
   assert.equal(keys[0].headers.get("accept"), "text/html");
+});
+
+test("global purge urls are absolute and de-duplicated", () => {
+  const urls = createPublicHtmlPurgeUrls("https://dolbakggom.com/api/admin/works/1", [
+    "/",
+    "/work/test",
+    "work/test",
+    " /about/ "
+  ]);
+
+  assert.deepEqual(urls, ["https://dolbakggom.com/", "https://dolbakggom.com/work/test", "https://dolbakggom.com/about"]);
 });

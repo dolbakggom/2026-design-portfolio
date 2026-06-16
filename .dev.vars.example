@@ -2,3 +2,7 @@ ADMIN_USERNAME=dolbakggom
 # Generate a hash with the README command before deploying.
 ADMIN_PASSWORD_HASH=sha256:replace-with-password-sha256-hex
 SESSION_SECRET=replace-with-long-random-secret
+
+# Optional: enables global Cloudflare file purge after admin saves.
+CLOUDFLARE_ZONE_ID=replace-with-zone-id
+CLOUDFLARE_CACHE_PURGE_TOKEN=replace-with-cache-purge-token
