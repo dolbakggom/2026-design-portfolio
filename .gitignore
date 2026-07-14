@@ -1,8 +1,11 @@
 node_modules
 node_modules.nosync
+node_modules [0-9]*
 dist
 .astro
 .wrangler
 .dev.vars
 .DS_Store
 npm-debug.log*
+d1-backups/
+r2-backups/

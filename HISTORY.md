@@ -1110,3 +1110,49 @@
 ### 남은 주의점
 - 남은 low 3건은 Astro 6의 esbuild가 Windows 개발 서버에서 로컬 파일 읽기를 허용할 수 있다는 advisory입니다. 현재 macOS 개발 및 Cloudflare 배포 런타임에는 해당하지 않습니다.
 - 이를 audit 0으로 만들려면 Astro 7, Cloudflare adapter 14 등 메이저 업그레이드가 필요합니다. 기능 회귀 위험에 비해 현재 이득이 작아 `npm audit fix --force`는 실행하지 않았습니다.
+
+## 2026-07-14 Maintenance, Observability, Integration Tests, And File Structure
+
+### 요구사항
+- 초기 사이트 감사에서 남은 대형 파일, 부족한 핵심 흐름 테스트, Git 내부 D1/R2 백업, 조용한 D1 fallback 문제를 모두 개선합니다.
+- 기존 공개 페이지 복원력과 10분 HTML cache 정책은 유지합니다.
+
+### 구현
+- 저장소와 iCloud 구조
+  - Git이 추적하던 D1/R2 snapshot을 프로젝트 상위 `../backups/d1`, `../backups/r2`로 이전했습니다.
+  - 중복된 두 R2 snapshot은 byte 단위 동일함을 확인한 뒤 최신 한 벌만 보관했습니다.
+  - `d1-backups/`, `r2-backups/`, iCloud가 만드는 `node_modules 2` 형태를 ignore하고 `node_modules -> node_modules.nosync` 링크를 복구했습니다.
+- D1 관측성
+  - `src/lib/content-observability.ts`를 추가해 홈/작업물 D1 조회 실패를 `portfolio.content.read_failed` 구조화 이벤트로 기록합니다.
+  - fallback starter content 동작은 유지하며 로그에는 scope, optional slug, 정규화된 오류명/메시지만 포함합니다.
+  - `wrangler.toml`에서 Workers Logs를 100% 보존하고 invocation log는 비활성화했습니다.
+  - 이미지 업로드 내부 오류도 `portfolio.asset.upload_failed`로 기록합니다.
+- 통합 테스트
+  - Wrangler `createTestHarness`와 테스트 전용 D1 migration Worker를 사용해 빌드된 Astro Worker를 임시 D1/R2/KV에서 실행합니다.
+  - 관리자 로그인, 작업물 생성·수정 후 D1 block 공개 렌더링과 cache purge, 이미지 R2 업로드·D1 metadata·media 응답을 검증합니다.
+  - `playwright-core`와 설치된 Chrome의 390x844 viewport로 `/about`, `/career`, wheel scroll, timeline 활성 상태, 가로 overflow를 검증합니다.
+  - 이 테스트에서 `/about` 초기 진행률 24%가 career 판정 구간에 들어가던 회귀를 발견해 about 유지 구간 5%로 수정했습니다.
+- 파일 구조
+  - `HomePage.astro`의 모션 코드를 `src/scripts/home-page.ts`로 이동해 1,426줄에서 308줄로 줄였습니다.
+  - `AdminApp.tsx`의 icon, 공용 타입/유틸, 이미지 전처리, live preview를 `AdminSupport.tsx`로 분리해 1,547줄에서 1,111줄로 줄였습니다.
+  - `global.css`를 공통 기반, home identity, home work/gallery, work detail, responsive 파일로 분리해 각 파일을 240~603줄 범위로 줄였습니다.
+  - `npm run test:unit`, `npm run test:integration`, `npm test` script와 README 실행법을 추가했습니다.
+
+### 중요 파일
+- `.gitignore`, `README.md`, `wrangler.toml`, `package.json`, `package-lock.json`
+- `src/lib/content-observability.ts`, `src/lib/content.ts`, `src/pages/api/admin/assets.ts`
+- `tests/content-observability.test.ts`, `tests/integration/worker.integration.ts`, `tests/fixtures/`
+- `src/components/HomePage.astro`, `src/scripts/home-page.ts`
+- `src/components/admin/AdminApp.tsx`, `src/components/admin/AdminSupport.tsx`
+- `src/styles/global.css`, `src/styles/home-identity.css`, `src/styles/home-work.css`, `src/styles/work-detail.css`, `src/styles/responsive.css`
+
+### 검증
+- `node --test tests/*.test.ts`: 55 tests passed.
+- `npm run test:integration`: 4 integration tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- `git diff --check`: 통과.
+
+### 남은 주의점
+- `AdminApp.tsx`는 크게 줄었지만 상태와 저장 orchestration이 1,111줄에 남아 있습니다. 다음 관리자 기능 추가 전에 Profile/Timeline/Works 화면 컴포넌트와 controller hook을 추가 분리하는 것이 좋습니다.
+- `.git`에는 과거 commit의 압축된 백업 object가 남아 있습니다. 이번 변경을 commit한 뒤 일반 `git gc`로 일부 회수할 수 있지만, 과거 history에서 완전히 제거하려면 파괴적인 history rewrite가 필요하므로 수행하지 않았습니다.
+- 통합 테스트는 macOS의 `/Applications/Google Chrome.app`을 사용합니다. Chrome이 없는 CI에서는 실행 경로를 환경변수로 바꾸거나 Playwright browser provisioning이 필요합니다.

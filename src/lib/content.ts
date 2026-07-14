@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import type { AssetVariant, HomeContent, LinkItem, Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
 import { sanitizeProfileIntro } from "./content-sanitizer";
+import { reportContentReadFailure } from "./content-observability";
 import { fallbackContent, fallbackWorks } from "./fallback";
 import { getWorkFallback } from "./public-resilience";
 import { attachAssetVariants } from "./responsive-images";
@@ -307,7 +308,8 @@ export const getHomeContent = async (): Promise<HomeContent> => {
       featuredWorks: works.filter((work: WorkItem) => work.featured).slice(0, 5),
       works
     };
-  } catch {
+  } catch (error) {
+    reportContentReadFailure({ scope: "home" }, error);
     return fallbackContent;
   }
 };
@@ -353,7 +355,8 @@ export const getWorkBySlug = async (slug: string): Promise<WorkItem | null> => {
       ...enrichWorkAssets(work, variantsByAssetId),
       blocks: blocks.map((block) => enrichWorkBlockAssets(block, variantsByAssetId))
     };
-  } catch {
+  } catch (error) {
+    reportContentReadFailure({ scope: "work", slug }, error);
     return getWorkFallback(slug, fallbackWorks, true);
   }
 };

@@ -6,6 +6,15 @@ routes = [
   { pattern = "dolbakggom.com", custom_domain = true }
 ]
 
+[observability]
+enabled = true
+
+  [observability.logs]
+  enabled = true
+  head_sampling_rate = 1
+  invocation_logs = false
+  persist = true
+
 [[d1_databases]]
 binding = "DB"
 database_name = "portfolio-db"

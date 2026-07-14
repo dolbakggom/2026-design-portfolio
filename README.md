@@ -41,6 +41,14 @@ Regenerate Cloudflare binding/runtime types after changing `wrangler.toml`:
 npm run cf:types
 ```
 
+Public routes keep rendering starter content when D1 is unavailable. These fallback events are recorded as `portfolio.content.read_failed` with `home` or `work` scope. Inspect production failures in Workers Logs or stream only matching entries:
+
+```bash
+npx wrangler tail --search portfolio.content.read_failed
+```
+
+The event contains only the route scope, optional work slug, and a normalized error name/message. It does not include D1 rows, request bodies, or secret values.
+
 ## Responsive Image Backfill
 
 New admin uploads generate self-hosted WebP variants automatically. For legacy R2 assets, inspect the remote plan before applying it:
@@ -51,6 +59,33 @@ npm run images:backfill:apply:remote
 ```
 
 The apply command adds `variants/...` objects and D1 metadata. It does not replace or delete existing `uploads/...` originals and can be run again safely.
+
+## Backups
+
+Repository snapshots are kept outside Git in the parent project folder:
+
+```text
+../backups/d1/
+../backups/r2/
+```
+
+Do not restore binary R2 snapshots into this repository. `d1-backups/` and `r2-backups/` are ignored to prevent accidental reintroduction.
+
+## Tests
+
+Run fast source-level regression tests:
+
+```bash
+npm run test:unit
+```
+
+Run the production build followed by the local Cloudflare integration suite:
+
+```bash
+npm run test:integration
+```
+
+The integration suite uses Wrangler's isolated Worker runtime with temporary D1, R2, and KV storage. It covers admin login, work save/update through public block rendering, image upload/media delivery, and mobile `/about`/`/career` scrolling in the installed system Chrome. `playwright-core` does not download a separate browser.
 
 ## Routes
 

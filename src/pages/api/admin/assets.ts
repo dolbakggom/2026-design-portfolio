@@ -11,6 +11,7 @@ import {
   MAX_IMAGE_UPLOAD_REQUEST_BYTES,
   parseImageVariantManifest
 } from "../../../lib/image-upload";
+import { normalizeErrorForLog } from "../../../lib/content-observability";
 
 export const prerender = false;
 
@@ -168,7 +169,11 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     return json({ asset }, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error("[portfolio.asset.upload_failed]", {
+      event: "portfolio.asset.upload_failed",
+      ...normalizeErrorForLog(error)
+    });
     return serverError("Unable to upload asset");
   }
 };
