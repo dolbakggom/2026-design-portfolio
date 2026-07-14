@@ -3,6 +3,7 @@ import PublicLayout from "../../layouts/PublicLayout.astro";
 import NotFoundPage from "../../components/NotFoundPage.astro";
 import WorkBlocks from "../../components/WorkBlocks.astro";
 import { getWorkBySlug } from "../../lib/content";
+import { buildResponsiveImageSource } from "../../lib/responsive-images";
 import { createWorkStructuredData } from "../../lib/seo";
 
 export const prerender = false;
@@ -10,6 +11,7 @@ export const prerender = false;
 const { slug } = Astro.params;
 const work = slug ? await getWorkBySlug(slug) : null;
 const coverImage = work?.featuredThumbnail?.url ? work.featuredThumbnail : work?.thumbnail?.url ? work.thumbnail : null;
+const coverSource = buildResponsiveImageSource(coverImage);
 const yearDateTime = work?.year?.match(/\d{4}/)?.[0] ?? "2026";
 const workDescription = work?.summary?.trim() || "Beyond the Answer. 작업물 상세 페이지입니다.";
 const workOgImage = coverImage?.url ?? "/og-image.png";
@@ -44,7 +46,9 @@ if (!work) {
             <div class="work-detail-cover-placeholder" aria-hidden="true" />
             {coverImage?.url ? (
               <img
-                src={coverImage.url}
+                src={coverSource.src}
+                srcset={coverSource.srcset}
+                sizes="100vw"
                 alt={coverImage.alt ?? work.title}
                 crossorigin="anonymous"
                 width={coverImage.width ?? undefined}

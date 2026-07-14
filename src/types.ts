@@ -13,6 +13,15 @@ export interface AssetRef {
   mime?: string | null;
   width?: number | null;
   height?: number | null;
+  variants?: AssetVariant[];
+}
+
+export interface AssetVariant {
+  url: string;
+  mime: string;
+  width: number;
+  height: number;
+  size: number;
 }
 
 export interface Profile {

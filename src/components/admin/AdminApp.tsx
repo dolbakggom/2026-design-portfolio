@@ -1,7 +1,8 @@
 import { Component, Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, PointerEvent, ReactNode, SyntheticEvent } from "react";
-import type { Profile, TimelineItem, WorkBlock, WorkCategory, WorkItem } from "../../types";
+import type { AssetVariant, Profile, TimelineItem, WorkBlock, WorkCategory, WorkItem } from "../../types";
 import { fitImageDimensions, MAX_IMAGE_UPLOAD_BYTES } from "../../lib/image-upload";
+import { selectVariantWidths, variantDimensions } from "../../lib/responsive-images";
 import "../../styles/admin.css";
 
 const BlockEditor = lazy(() => import("./BlockEditor"));
@@ -35,6 +36,7 @@ type AssetResponse = {
     size: number;
     width: number | null;
     height: number | null;
+    variants: AssetVariant[];
   };
 };
 
@@ -308,32 +310,56 @@ const normalizeImageForUpload = async (file: File) => {
 
   if (file.type === "image/gif") {
     decoded.cleanup();
-    return { file, width: decoded.width, height: decoded.height };
+    return { file, width: decoded.width, height: decoded.height, variants: [] };
   }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = dimensions.width;
-  canvas.height = dimensions.height;
-  const context = canvas.getContext("2d", { colorSpace: "srgb" } as CanvasRenderingContext2DSettings);
-
-  if (!context) {
-    decoded.cleanup();
-    throw new Error("이미지 SDR 변환에 실패했습니다.");
-  }
-
-  context.drawImage(decoded.source, 0, 0, dimensions.width, dimensions.height);
-  decoded.cleanup();
-
-  const blob = await canvasToBlob(canvas, "image/webp", 0.9);
   const baseName = file.name.replace(/\.[^.]+$/, "") || "upload";
+  const widths = selectVariantWidths(dimensions.width);
 
-  return {
-    file: new File([blob], `${baseName}-optimized.webp`, {
-      type: "image/webp",
-      lastModified: Date.now()
-    }),
-    ...dimensions
-  };
+  try {
+    const variants = await Promise.all(
+      widths.map(async (targetWidth, index) => {
+        const variant = variantDimensions(dimensions.width, dimensions.height, targetWidth);
+        const canvas = document.createElement("canvas");
+        canvas.width = variant.width;
+        canvas.height = variant.height;
+        const context = canvas.getContext("2d", { colorSpace: "srgb" } as CanvasRenderingContext2DSettings);
+
+        if (!context) {
+          throw new Error("이미지 SDR 변환에 실패했습니다.");
+        }
+
+        context.drawImage(decoded.source, 0, 0, variant.width, variant.height);
+        const blob = await canvasToBlob(canvas, "image/webp", 0.9);
+        const isCanonical = index === widths.length - 1;
+
+        return {
+          field: isCanonical ? "file" : `variant-${index}`,
+          file: new File([blob], `${baseName}-${variant.width}w.webp`, {
+            type: "image/webp",
+            lastModified: Date.now()
+          }),
+          width: variant.width,
+          height: variant.height,
+          mime: "image/webp" as const
+        };
+      })
+    );
+    const canonical = variants.at(-1);
+
+    if (!canonical) {
+      throw new Error("이미지 변형본 생성에 실패했습니다.");
+    }
+
+    return {
+      file: canonical.file,
+      width: canonical.width,
+      height: canonical.height,
+      variants
+    };
+  } finally {
+    decoded.cleanup();
+  }
 };
 
 const contentText = (block: WorkBlock, key: string, fallback = "") => {
@@ -724,6 +750,15 @@ export default function AdminApp() {
     form.set("alt", alt);
     form.set("width", String(upload.width));
     form.set("height", String(upload.height));
+    form.set(
+      "variantManifest",
+      JSON.stringify(
+        upload.variants.map(({ field, width, height, mime }) => ({ field, width, height, mime }))
+      )
+    );
+    for (const variant of upload.variants) {
+      if (variant.field !== "file") form.set(variant.field, variant.file);
+    }
 
     const response = await fetch("/api/admin/assets", {
       method: "POST",
@@ -747,7 +782,15 @@ export default function AdminApp() {
         const nextProfile = {
         ...current,
         portraitAssetId: asset.id,
-        portrait: { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime, width: asset.width, height: asset.height }
+        portrait: {
+          id: asset.id,
+          url: asset.url,
+          alt: asset.alt,
+          mime: asset.mime,
+          width: asset.width,
+          height: asset.height,
+          variants: asset.variants
+        }
         };
         profileRef.current = nextProfile;
         return nextProfile;
@@ -970,7 +1013,15 @@ export default function AdminApp() {
 
   const workAssetPatch = (kind: WorkAssetKind, asset: AssetResponse["asset"] | null): Partial<WorkItem> => {
     const assetRef = asset
-      ? { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime, width: asset.width, height: asset.height }
+      ? {
+          id: asset.id,
+          url: asset.url,
+          alt: asset.alt,
+          mime: asset.mime,
+          width: asset.width,
+          height: asset.height,
+          variants: asset.variants
+        }
       : null;
 
     if (kind === "thumbnail") {

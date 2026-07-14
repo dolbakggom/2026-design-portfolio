@@ -1,9 +1,10 @@
 import { getD1 } from "./db";
-import type { Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
+import type { AssetVariant, Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
 import type { z } from "zod";
 import { sanitizeProfileIntro } from "./content-sanitizer";
 import type { profileSchema, timelineSchema, workSchema } from "./validation";
 import { normalizeStoredWorkBlockContent } from "./work-block-content";
+import { attachAssetVariants } from "./responsive-images";
 
 type ProfileInput = z.infer<typeof profileSchema>;
 type TimelineInput = z.infer<typeof timelineSchema>;
@@ -19,6 +20,16 @@ type AssetRow = {
   size: number;
   created_at: string;
 };
+
+type AssetVariantRecord = {
+  width: number;
+  height: number;
+  r2_key: string;
+  mime: string;
+  size: number;
+};
+
+type AssetVariantRow = AssetVariantRecord & { asset_id: string };
 
 type ProfileRow = {
   headline: string;
@@ -87,6 +98,54 @@ type BlockRow = {
 const mediaUrl = (key: string | null | undefined) => {
   if (!key) return null;
   return `/media/${key.split("/").map(encodeURIComponent).join("/")}`;
+};
+
+const loadAssetVariants = async (assetIds: Array<string | null | undefined>) => {
+  const ids = [...new Set(assetIds.filter((id): id is string => Boolean(id)))];
+  const variantsByAssetId = new Map<string, AssetVariant[]>();
+  if (!ids.length) return variantsByAssetId;
+
+  const result = await getD1()
+    .prepare(
+      `SELECT asset_id, r2_key, mime, width, height, size FROM asset_variants
+      WHERE asset_id IN (${ids.map(() => "?").join(", ")})
+      ORDER BY asset_id ASC, width ASC`
+    )
+    .bind(...ids)
+    .all<AssetVariantRow>();
+
+  for (const row of result.results as AssetVariantRow[]) {
+    const variants = variantsByAssetId.get(row.asset_id) ?? [];
+    variants.push({
+      url: mediaUrl(row.r2_key) ?? "",
+      mime: row.mime,
+      width: row.width,
+      height: row.height,
+      size: row.size
+    });
+    variantsByAssetId.set(row.asset_id, variants);
+  }
+
+  return variantsByAssetId;
+};
+
+const enrichBlockAssets = (block: WorkBlock, variantsByAssetId: Map<string, AssetVariant[]>): WorkBlock => {
+  if (block.type === "image" && typeof block.content.assetId === "string") {
+    const variants = variantsByAssetId.get(block.content.assetId);
+    return variants?.length ? { ...block, content: { ...block.content, variants } } : block;
+  }
+  if (block.type !== "gallery" || !Array.isArray(block.content.images)) return block;
+  return {
+    ...block,
+    content: {
+      ...block.content,
+      images: block.content.images.map((image) => {
+        if (!image || typeof image !== "object" || !("assetId" in image) || typeof image.assetId !== "string") return image;
+        const variants = variantsByAssetId.get(image.assetId);
+        return variants?.length ? { ...image, variants } : image;
+      })
+    }
+  };
 };
 
 const parseJsonArray = <T>(value: string, fallback: T[]) => {
@@ -202,7 +261,10 @@ export const readProfile = async () => {
     )
     .first<ProfileRow>();
 
-  return row ? toProfile(row) : null;
+  if (!row) return null;
+  const profile = toProfile(row);
+  const variantsByAssetId = await loadAssetVariants([profile.portraitAssetId]);
+  return { ...profile, portrait: attachAssetVariants(profile.portrait, variantsByAssetId) };
 };
 
 export const updateProfile = async (input: ProfileInput) => {
@@ -306,7 +368,28 @@ export const listWorks = async () => {
     blocksByWork.set(row.work_id, blocks);
   });
 
-  return (worksResult.results as WorkRow[]).map((row: WorkRow) => toWork(row, blocksByWork.get(row.id) ?? []));
+  const works = (worksResult.results as WorkRow[]).map((row: WorkRow) => toWork(row, blocksByWork.get(row.id) ?? []));
+  const blockIds = works.flatMap((work) =>
+    (work.blocks ?? []).flatMap((block) => {
+      if (block.type === "image") return typeof block.content.assetId === "string" ? [block.content.assetId] : [];
+      if (block.type !== "gallery" || !Array.isArray(block.content.images)) return [];
+      return block.content.images.flatMap((image) =>
+        image && typeof image === "object" && "assetId" in image && typeof image.assetId === "string" ? [image.assetId] : []
+      );
+    })
+  );
+  const variantsByAssetId = await loadAssetVariants([
+    ...works.flatMap((work) => [work.thumbnailAssetId, work.featuredThumbnailAssetId, work.heroAssetId]),
+    ...blockIds
+  ]);
+
+  return works.map((work) => ({
+    ...work,
+    thumbnail: attachAssetVariants(work.thumbnail, variantsByAssetId),
+    featuredThumbnail: attachAssetVariants(work.featuredThumbnail, variantsByAssetId),
+    hero: attachAssetVariants(work.hero, variantsByAssetId),
+    blocks: (work.blocks ?? []).map((block) => enrichBlockAssets(block, variantsByAssetId))
+  }));
 };
 
 export const createWork = async (input: WorkInput) => {
@@ -407,11 +490,25 @@ export const deleteWork = async (id: string) => {
   return listWorks();
 };
 
-export const createAssetRecord = async (asset: Omit<AssetRow, "created_at">) => {
-  await getD1()
-    .prepare("INSERT INTO assets (id, r2_key, alt, mime, width, height, size) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(asset.id, asset.r2_key, asset.alt, asset.mime, asset.width, asset.height, asset.size)
-    .run();
+export const createAssetRecord = async (
+  asset: Omit<AssetRow, "created_at">,
+  variants: AssetVariantRecord[] = []
+) => {
+  const db = getD1();
+  const statements = [
+    db
+      .prepare("INSERT INTO assets (id, r2_key, alt, mime, width, height, size) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(asset.id, asset.r2_key, asset.alt, asset.mime, asset.width, asset.height, asset.size),
+    ...variants.map((variant) =>
+      db
+        .prepare(
+          "INSERT INTO asset_variants (asset_id, width, height, r2_key, mime, size) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .bind(asset.id, variant.width, variant.height, variant.r2_key, variant.mime, variant.size)
+    )
+  ];
+
+  await db.batch(statements);
 
   return {
     id: asset.id,
@@ -420,7 +517,16 @@ export const createAssetRecord = async (asset: Omit<AssetRow, "created_at">) => 
     mime: asset.mime,
     width: asset.width,
     height: asset.height,
-    size: asset.size
+    size: asset.size,
+    variants: variants
+      .map((variant) => ({
+        url: mediaUrl(variant.r2_key) ?? "",
+        mime: variant.mime,
+        width: variant.width,
+        height: variant.height,
+        size: variant.size
+      }))
+      .sort((left, right) => left.width - right.width)
   };
 };
 

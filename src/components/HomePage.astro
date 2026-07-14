@@ -2,6 +2,7 @@
 import PublicLayout from "../layouts/PublicLayout.astro";
 import { sanitizeProfileIntro } from "../lib/content-sanitizer";
 import { getHomeContent } from "../lib/content";
+import { buildResponsiveImageSource } from "../lib/responsive-images";
 import { createHomeStructuredData } from "../lib/seo";
 
 interface Props {
@@ -13,7 +14,10 @@ const { profile, timeline, featuredWorks, works } = await getHomeContent();
 const categories = ["ALL", "UI/UX", "BI/BX"];
 const logoPath = "M22.0732 0.000976562H27.4131V49.124L44.1484 39.4609V16.8125H49.4883V42.5039L49.4873 42.5479L27.4141 55.291L27.4131 55.2891H22.0732V6.16602L5.33984 15.8271V38.4883H0V12.7432L22.0723 0L22.0732 0.000976562Z";
 const fallbackPortraitSrc = "/assets/figma/profile-guitar.png";
-const portraitSrc = profile.portrait?.url ?? fallbackPortraitSrc;
+const portraitSource = profile.portrait?.url
+  ? buildResponsiveImageSource(profile.portrait)
+  : { src: fallbackPortraitSrc };
+const portraitSrc = portraitSource.src;
 const portraitWidth = profile.portrait?.width ?? 768;
 const portraitHeight = profile.portrait?.height ?? 1024;
 const deferPortrait = initialSection === "intro";
@@ -108,6 +112,9 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
             <img
               src={deferPortrait ? undefined : portraitSrc}
               data-deferred-src={deferPortrait ? portraitSrc : undefined}
+              srcset={deferPortrait ? undefined : portraitSource.srcset}
+              data-deferred-srcset={deferPortrait ? portraitSource.srcset : undefined}
+              sizes="(max-width: 760px) 100vw, 50vw"
               alt={profile.portrait?.alt ?? profile.name}
               width={portraitWidth}
               height={portraitHeight}
@@ -116,7 +123,7 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
               fetchpriority={deferPortrait ? "low" : "high"}
               data-public-image
             />
-            {deferPortrait ? <noscript><img src={portraitSrc} alt={profile.portrait?.alt ?? profile.name} width={portraitWidth} height={portraitHeight} /></noscript> : null}
+            {deferPortrait ? <noscript><img src={portraitSrc} srcset={portraitSource.srcset} sizes="(max-width: 760px) 100vw, 50vw" alt={profile.portrait?.alt ?? profile.name} width={portraitWidth} height={portraitHeight} /></noscript> : null}
             <figcaption>취미로 기타를 치고 있습니다.</figcaption>
           </figure>
 
@@ -161,7 +168,10 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
         </div>
         <div class="featured-list">
           {
-            featuredWorks.map((work, index) => (
+            featuredWorks.map((work, index) => {
+              const image = work.featuredThumbnail?.url ? work.featuredThumbnail : work.thumbnail;
+              const imageSource = buildResponsiveImageSource(image);
+              return (
               <article
                 class:list={["featured-work", index === 0 && "is-active"]}
                 style={`--work-index:${index};`}
@@ -176,13 +186,15 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
                   tabindex={index === 0 ? undefined : -1}
                 >
                   <div class="work-visual" data-image-frame>
-                    {work.featuredThumbnail?.url || work.thumbnail?.url ? (
+                    {image?.url ? (
                       <img
-                        src={work.featuredThumbnail?.url ?? work.thumbnail?.url}
-                        alt={work.featuredThumbnail?.alt ?? work.thumbnail?.alt ?? work.title}
+                        src={imageSource.src}
+                        srcset={imageSource.srcset}
+                        sizes="100vw"
+                        alt={image.alt ?? work.title}
                         crossorigin="anonymous"
-                        width={work.featuredThumbnail?.width ?? work.thumbnail?.width ?? undefined}
-                        height={work.featuredThumbnail?.height ?? work.thumbnail?.height ?? undefined}
+                        width={image.width ?? undefined}
+                        height={image.height ?? undefined}
                         loading="lazy"
                         decoding="async"
                         data-public-image
@@ -201,7 +213,8 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
                   </div>
                 </a>
               </article>
-            ))
+              );
+            })
           }
         </div>
         {
@@ -251,12 +264,16 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
         </div>
         <div class="work-grid" id="work-gallery-grid" role="tabpanel" aria-labelledby={filterId("ALL")}>
           {
-            works.map((work) => (
+            works.map((work) => {
+              const imageSource = buildResponsiveImageSource(work.thumbnail);
+              return (
               <a class="work-tile" href={`/work/${work.slug}`} data-category={work.category} aria-label={`${work.title} 자세히 보기`}>
                 <div class:list={["work-tile-media", work.thumbnail?.url && "has-image"]} data-image-frame>
                   {work.thumbnail?.url ? (
                     <img
-                      src={work.thumbnail.url}
+                      src={imageSource.src}
+                      srcset={imageSource.srcset}
+                      sizes="(max-width: 760px) 100vw, (max-width: 1280px) 50vw, 33vw"
                       alt=""
                       width={work.thumbnail.width ?? undefined}
                       height={work.thumbnail.height ?? undefined}
@@ -270,7 +287,8 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
                   <h3>{work.title}</h3>
                 </div>
               </a>
-            ))
+              );
+            })
           }
         </div>
         {works.length === 0 ? (
@@ -285,10 +303,14 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
   </main>
 
   <script>
-    import gsap from "gsap";
-    import { ScrollTrigger } from "gsap/ScrollTrigger";
     import { getRovingTabIndex } from "../lib/keyboard-navigation";
-    gsap.registerPlugin(ScrollTrigger);
+    import { getReducedMotionTarget, shouldLoadMotion, type MotionIntent } from "../lib/motion-loader";
+
+    type GsapModule = typeof import("gsap").default;
+    type ScrollTriggerModule = typeof import("gsap/ScrollTrigger").ScrollTrigger;
+    let gsap: GsapModule;
+    let ScrollTrigger: ScrollTriggerModule;
+    let homeMotionPromise: Promise<void> | null = null;
 
     let activeHomeShell: HTMLElement | null = null;
     let cleanupHomePage = () => {};
@@ -379,8 +401,11 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
     const loadDeferredImage = (image: HTMLImageElement) => {
       const source = image.dataset.deferredSrc;
       if (!source || image.src) return;
+      const sourceSet = image.dataset.deferredSrcset;
+      if (sourceSet) image.srcset = sourceSet;
       image.src = source;
       image.removeAttribute("data-deferred-src");
+      image.removeAttribute("data-deferred-srcset");
     };
 
     if (deferredImages.length && "IntersectionObserver" in window) {
@@ -1321,8 +1346,81 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
 
     };
 
-    document.addEventListener("astro:before-swap", () => cleanupHomePage());
-    document.addEventListener("astro:page-load", initHomePage);
-    initHomePage();
+    let homeMotionIntentCleanup = () => {};
+
+    const loadHomeMotion = (intent: MotionIntent) => {
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!shouldLoadMotion({ route: window.location.pathname, reducedMotion, intent })) return;
+      if (homeMotionPromise) return;
+
+      document.dispatchEvent(new CustomEvent("portfolio:motion-intent"));
+      homeMotionPromise = Promise.all([import("gsap"), import("gsap/ScrollTrigger")])
+        .then(([gsapModule, scrollTriggerModule]) => {
+          gsap = gsapModule.default;
+          ScrollTrigger = scrollTriggerModule.ScrollTrigger;
+          gsap.registerPlugin(ScrollTrigger);
+          initHomePage();
+        })
+        .catch(() => {
+          document.documentElement.classList.add("motion-load-failed");
+          homeMotionPromise = null;
+        });
+    };
+
+    const prepareHomeMotion = () => {
+      homeMotionIntentCleanup();
+      const controller = new AbortController();
+      const signal = controller.signal;
+      const route = window.location.pathname;
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      if (reducedMotion) {
+        const target = getReducedMotionTarget(route);
+        const identity = document.querySelector<HTMLElement>("[data-identity]");
+        if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+        document.documentElement.style.scrollBehavior = "auto";
+        identity?.classList.toggle("is-career", target?.career ?? false);
+        identity?.classList.toggle("is-career-list", target?.career ?? false);
+        const jumpToReducedMotionTarget = () => {
+          if (target) {
+            const targetElement = document.querySelector<HTMLElement>(target.selector);
+            if (targetElement) window.scrollTo(0, targetElement.offsetTop);
+          } else if (route === "/") {
+            window.scrollTo(0, 0);
+          }
+        };
+        window.requestAnimationFrame(jumpToReducedMotionTarget);
+        window.setTimeout(jumpToReducedMotionTarget, 100);
+      }
+
+      if (shouldLoadMotion({ route, reducedMotion, intent: "initial" })) {
+        loadHomeMotion("initial");
+      } else if (!reducedMotion && route === "/") {
+        window.addEventListener("wheel", () => loadHomeMotion("wheel"), { once: true, passive: true, signal });
+        window.addEventListener("touchstart", () => loadHomeMotion("touch"), { once: true, passive: true, signal });
+        window.addEventListener("keydown", (event) => {
+          if (["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "].includes(event.key)) {
+            loadHomeMotion("keyboard");
+          }
+        }, { signal });
+        const idleTimer = window.setTimeout(() => loadHomeMotion("idle"), 1500);
+        homeMotionIntentCleanup = () => {
+          controller.abort();
+          window.clearTimeout(idleTimer);
+        };
+        return;
+      }
+
+      homeMotionIntentCleanup = () => controller.abort();
+    };
+
+    document.addEventListener("astro:before-swap", () => {
+      homeMotionIntentCleanup();
+      cleanupHomePage();
+      homeMotionPromise = null;
+      document.documentElement.style.removeProperty("scroll-behavior");
+    });
+    document.addEventListener("astro:page-load", prepareHomeMotion);
+    prepareHomeMotion();
   </script>
 </PublicLayout>

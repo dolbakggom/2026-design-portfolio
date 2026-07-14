@@ -36,6 +36,45 @@
 
 ---
 
+## 2026-07-14 Responsive Images, Deferred Motion, and Astro 7
+
+### 요구사항
+- 이전 전체 검수에서 남은 반응형 이미지, 초기 JavaScript, 접근성/성능, 운영 설정, Astro 7 항목을 모두 개선합니다.
+- Cloudflare Images 없이 R2에 자체 WebP 변형본을 저장하는 1번 방식을 사용합니다.
+- 모든 개선이 끝난 뒤 한 번에 커밋할 수 있도록 중간 커밋은 만들지 않습니다.
+
+### 구현
+- `migrations/0005_asset_variants.sql`, `src/lib/responsive-images.ts`, `src/lib/image-upload.ts`
+  - `asset_variants` 스키마와 640/1280/1920/2560 변형 정책을 추가했습니다.
+  - 관리자 브라우저가 WebP 변형본을 만들고 API가 파일 시그니처/매니페스트/총 용량을 검증합니다.
+  - R2 업로드와 D1 batch 저장을 연결하고 실패 시 새 R2 키를 롤백합니다. GIF는 단일 원본을 유지합니다.
+- `src/lib/content.ts`, `src/lib/admin-data.ts`, public Astro components
+  - 페이지별 asset ID를 한 번에 조회해 변형본을 붙이고 모든 공개 이미지 컨텍스트에 `srcset`/`sizes`를 적용했습니다.
+- `scripts/backfill-image-variants.mjs`
+  - dry-run/apply, 기존 너비 건너뛰기, 치수 누락 원본 검사, 실패 롤백을 지원합니다.
+  - 운영 D1 migration 적용 후 33개 자산 치수를 복구하고 새 WebP 104개(22,213,010 bytes)를 R2에 저장했습니다. 원본은 변경하지 않았습니다.
+- `src/lib/motion-loader.ts`, `PublicLayout.astro`, `HomePage.astro`
+  - 홈의 GSAP/ScrollTrigger/Lenis를 입력 또는 idle 시점의 동적 import로 분리하고 상세 페이지에서 다운로드하지 않도록 했습니다.
+  - reduced-motion 직접 진입과 모션 청크 실패 fallback을 추가했습니다.
+- 패키지/Cloudflare 타입
+  - Astro 7.0.9, Cloudflare adapter 14.1.3, React adapter 6.0.1, Wrangler 4.110.0, TypeScript 6.0.3으로 정렬했습니다.
+  - Wrangler 생성 `worker-configuration.d.ts`로 전환하고 `@cloudflare/workers-types`를 제거했습니다.
+  - dev 서버와 Wrangler 4.105 사이의 `_cf_ALARM` 메타데이터 충돌이 버전 정렬 후 해소됐습니다.
+
+### 검증
+- `node --test tests/*.test.ts`: 53 tests / 0 failures.
+- `npm run cf:types`: 성공.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, production build complete.
+- `npx wrangler d1 execute portfolio-db --local --command "SELECT COUNT(*) AS works FROM works" --json`: dev 서버 동시 실행 상태에서 성공, works 7.
+- 운영 D1: dimensioned assets 33, variants 104, variant bytes 22,213,010.
+- 운영 R2 샘플: valid WebP, 1280x1280.
+- 감사 상세: `docs/audits/2026-07-14-accessibility-performance.md`.
+
+### 남은 확인
+- 현재 배포본 `/sitemap.xml`은 404입니다. 다음 커밋/배포 후 200 및 published work 목록을 확인하고 Search Console에 제출해야 합니다.
+- 인앱 브라우저 런타임 연결 실패로 전체 키보드 순회는 자동화하지 못했습니다. 배포 후 실제 브라우저 수동 점검이 남아 있습니다.
+- 관리자 PBKDF2 비밀번호는 새 비밀번호를 전달받지 않아 회전하지 않았습니다.
+
 ## 2026-06-17 Work Detail Stale Public Cache Follow-up
 
 ### 요구사항

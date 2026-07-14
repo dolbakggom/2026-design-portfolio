@@ -31,9 +31,26 @@ npm run dev
 - KV binding: `SESSION`
 - Rate limiting binding: `ADMIN_LOGIN_RATE_LIMITER` (10 attempts per minute per Cloudflare location)
 - Required secrets: `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`
-- Deploy with Cloudflare Workers, not Cloudflare Pages. Astro 6 + `@astrojs/cloudflare` v13 targets Workers.
+- Deploy with Cloudflare Workers, not Cloudflare Pages. Astro 7 + `@astrojs/cloudflare` v14 targets Workers.
 - Build command: `npm run build`
 - Deploy command: `npx wrangler deploy`
+
+Regenerate Cloudflare binding/runtime types after changing `wrangler.toml`:
+
+```bash
+npm run cf:types
+```
+
+## Responsive Image Backfill
+
+New admin uploads generate self-hosted WebP variants automatically. For legacy R2 assets, inspect the remote plan before applying it:
+
+```bash
+npm run images:backfill:dry:remote
+npm run images:backfill:apply:remote
+```
+
+The apply command adds `variants/...` objects and D1 metadata. It does not replace or delete existing `uploads/...` originals and can be run again safely.
 
 ## Routes
 

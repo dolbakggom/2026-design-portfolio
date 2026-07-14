@@ -1,8 +1,9 @@
 import { env } from "cloudflare:workers";
-import type { HomeContent, LinkItem, Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
+import type { AssetVariant, HomeContent, LinkItem, Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
 import { sanitizeProfileIntro } from "./content-sanitizer";
 import { fallbackContent, fallbackWorks } from "./fallback";
 import { getWorkFallback } from "./public-resilience";
+import { attachAssetVariants } from "./responsive-images";
 import { normalizeStoredWorkBlockContent } from "./work-block-content";
 
 type ProfileRow = {
@@ -68,9 +69,92 @@ type BlockRow = {
   sort_order: number;
 };
 
+type AssetVariantRow = {
+  asset_id: string;
+  r2_key: string;
+  mime: string;
+  width: number;
+  height: number;
+  size: number;
+};
+
 const mediaUrl = (key: string | null | undefined) => {
   if (!key) return null;
   return `/media/${key.split("/").map(encodeURIComponent).join("/")}`;
+};
+
+const loadAssetVariants = async (db: D1Database, assetIds: Array<string | null | undefined>) => {
+  const ids = [...new Set(assetIds.filter((id): id is string => Boolean(id)))];
+  const variantsByAssetId = new Map<string, AssetVariant[]>();
+  if (!ids.length) return variantsByAssetId;
+
+  const placeholders = ids.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `SELECT asset_id, r2_key, mime, width, height, size
+      FROM asset_variants
+      WHERE asset_id IN (${placeholders})
+      ORDER BY asset_id ASC, width ASC`
+    )
+    .bind(...ids)
+    .all<AssetVariantRow>();
+
+  for (const row of result.results as AssetVariantRow[]) {
+    const variants = variantsByAssetId.get(row.asset_id) ?? [];
+    variants.push({
+      url: mediaUrl(row.r2_key) ?? "",
+      mime: row.mime,
+      width: row.width,
+      height: row.height,
+      size: row.size
+    });
+    variantsByAssetId.set(row.asset_id, variants);
+  }
+
+  return variantsByAssetId;
+};
+
+const enrichWorkAssets = (work: WorkItem, variantsByAssetId: Map<string, AssetVariant[]>): WorkItem => ({
+  ...work,
+  thumbnail: attachAssetVariants(work.thumbnail, variantsByAssetId),
+  featuredThumbnail: attachAssetVariants(work.featuredThumbnail, variantsByAssetId),
+  hero: attachAssetVariants(work.hero, variantsByAssetId)
+});
+
+const blockAssetIds = (blocks: WorkBlock[]) =>
+  blocks.flatMap((block) => {
+    if (block.type === "image") {
+      return typeof block.content.assetId === "string" ? [block.content.assetId] : [];
+    }
+    if (block.type !== "gallery" || !Array.isArray(block.content.images)) return [];
+    return block.content.images.flatMap((image) =>
+      image && typeof image === "object" && "assetId" in image && typeof image.assetId === "string"
+        ? [image.assetId]
+        : []
+    );
+  });
+
+const enrichWorkBlockAssets = (block: WorkBlock, variantsByAssetId: Map<string, AssetVariant[]>): WorkBlock => {
+  if (block.type === "image" && typeof block.content.assetId === "string") {
+    const variants = variantsByAssetId.get(block.content.assetId);
+    return variants?.length ? { ...block, content: { ...block.content, variants } } : block;
+  }
+
+  if (block.type !== "gallery" || !Array.isArray(block.content.images)) return block;
+
+  return {
+    ...block,
+    content: {
+      ...block.content,
+      images: block.content.images.map((image) => {
+        if (!image || typeof image !== "object" || !("assetId" in image) || typeof image.assetId !== "string") {
+          return image;
+        }
+        const variants = variantsByAssetId.get(image.assetId);
+        return variants?.length ? { ...image, variants } : image;
+      })
+    }
+  };
 };
 
 const parseLinks = (links: string): LinkItem[] => {
@@ -209,10 +293,16 @@ export const getHomeContent = async (): Promise<HomeContent> => {
       )
       .all<WorkRow>();
 
-    const works = (worksResult.results as WorkRow[]).map(toWork);
+    const profile = profileRow ? toProfile(profileRow) : fallbackContent.profile;
+    const rawWorks = (worksResult.results as WorkRow[]).map(toWork);
+    const variantsByAssetId = await loadAssetVariants(db, [
+      profile.portraitAssetId,
+      ...rawWorks.flatMap((work) => [work.thumbnailAssetId, work.featuredThumbnailAssetId, work.heroAssetId])
+    ]);
+    const works = rawWorks.map((work) => enrichWorkAssets(work, variantsByAssetId));
 
     return {
-      profile: profileRow ? toProfile(profileRow) : fallbackContent.profile,
+      profile: { ...profile, portrait: attachAssetVariants(profile.portrait, variantsByAssetId) },
       timeline: (timelineResult.results as TimelineRow[]).map(toTimeline),
       featuredWorks: works.filter((work: WorkItem) => work.featured).slice(0, 5),
       works
@@ -250,9 +340,18 @@ export const getWorkBySlug = async (slug: string): Promise<WorkItem | null> => {
       .bind(row.id)
       .all<BlockRow>();
 
+    const work = toWork(row);
+    const blocks = (blockResult.results as BlockRow[]).map(toBlock);
+    const variantsByAssetId = await loadAssetVariants(db, [
+      work.thumbnailAssetId,
+      work.featuredThumbnailAssetId,
+      work.heroAssetId,
+      ...blockAssetIds(blocks)
+    ]);
+
     return {
-      ...toWork(row),
-      blocks: (blockResult.results as BlockRow[]).map(toBlock)
+      ...enrichWorkAssets(work, variantsByAssetId),
+      blocks: blocks.map((block) => enrichWorkBlockAssets(block, variantsByAssetId))
     };
   } catch {
     return getWorkFallback(slug, fallbackWorks, true);

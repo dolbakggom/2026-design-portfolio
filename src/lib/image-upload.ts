@@ -1,6 +1,73 @@
 export const MAX_IMAGE_DIMENSION = 2560;
 export const MAX_IMAGE_UPLOAD_BYTES = 16 * 1024 * 1024;
+export const MAX_IMAGE_UPLOAD_REQUEST_BYTES = 32 * 1024 * 1024;
+export const MAX_IMAGE_VARIANTS = 4;
 export const IMAGE_UPLOAD_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+export type ImageVariantManifestEntry = {
+  field: string;
+  width: number;
+  height: number;
+  mime: "image/webp";
+};
+
+const isValidDimension = (value: unknown): value is number =>
+  Number.isInteger(value) && Number(value) > 0 && Number(value) <= 20_000;
+
+export const parseImageVariantManifest = (value: string | null | undefined): ImageVariantManifestEntry[] => {
+  if (!value) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Image variant manifest must be valid JSON");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Image variant manifest must be an array");
+  }
+
+  if (parsed.length > MAX_IMAGE_VARIANTS) {
+    throw new Error(`Image variant manifest supports at most ${MAX_IMAGE_VARIANTS} entries`);
+  }
+
+  const entries = parsed.map((entry): ImageVariantManifestEntry => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error("Image variant manifest contains an invalid entry");
+    }
+
+    const candidate = entry as Record<string, unknown>;
+    const validField = candidate.field === "file" || /^variant-[0-3]$/.test(String(candidate.field));
+    if (!validField || !isValidDimension(candidate.width) || !isValidDimension(candidate.height)) {
+      throw new Error("Image variant manifest contains invalid metadata");
+    }
+
+    if (candidate.mime !== "image/webp") {
+      throw new Error("Image variants must use image/webp");
+    }
+
+    return {
+      field: String(candidate.field),
+      width: candidate.width,
+      height: candidate.height,
+      mime: candidate.mime
+    };
+  });
+
+  if (new Set(entries.map((entry) => entry.width)).size !== entries.length) {
+    throw new Error("Image variant widths must be unique");
+  }
+
+  if (new Set(entries.map((entry) => entry.field)).size !== entries.length) {
+    throw new Error("Image variant fields must be unique");
+  }
+
+  return entries.sort((a, b) => a.width - b.width);
+};
+
+export const buildUploadedImageKeys = (canonicalKey: string, variantKeys: string[]) =>
+  Array.from(new Set([canonicalKey, ...variantKeys]));
 
 const startsWithBytes = (bytes: Uint8Array, signature: number[]) =>
   signature.every((value, index) => bytes[index] === value);

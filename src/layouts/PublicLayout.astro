@@ -27,30 +27,37 @@ const { skipTarget = "#main-content" } = props;
     document.documentElement.classList.add("portfolio-fade-ready");
   </script>
   <script>
-    import Lenis from "lenis";
-    import gsap from "gsap";
-    import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-    gsap.registerPlugin(ScrollTrigger);
+    type LenisInstance = import("lenis").default;
 
     type PortfolioWindow = Window & {
-      __portfolioLenis?: Lenis;
+      __portfolioLenis?: LenisInstance;
       __portfolioLenisCleanup?: () => void;
-      __portfolioLenisScrollTo?: (target: number | string | HTMLElement, options?: Parameters<Lenis["scrollTo"]>[1]) => void;
+      __portfolioLenisScrollTo?: (target: number | string | HTMLElement, options?: Parameters<LenisInstance["scrollTo"]>[1]) => void;
     };
 
+    let portfolioMotionPromise: Promise<void> | null = null;
+
     const initPortfolioLenis = () => {
+      if (portfolioMotionPromise) return portfolioMotionPromise;
+      portfolioMotionPromise = (async () => {
       const portfolioWindow = window as PortfolioWindow;
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       portfolioWindow.__portfolioLenisCleanup?.();
 
-      if (reduceMotion) {
+      if (reduceMotion || !document.documentElement.classList.contains("home-scroll")) {
         delete portfolioWindow.__portfolioLenis;
         delete portfolioWindow.__portfolioLenisScrollTo;
         portfolioWindow.__portfolioLenisCleanup = () => {};
         return;
       }
+
+      const [{ default: Lenis }, { default: gsap }, { ScrollTrigger }] = await Promise.all([
+        import("lenis"),
+        import("gsap"),
+        import("gsap/ScrollTrigger")
+      ]);
+      gsap.registerPlugin(ScrollTrigger);
 
       const lenis = new Lenis({
         anchors: true,
@@ -81,13 +88,22 @@ const { skipTarget = "#main-content" } = props;
       };
 
       ScrollTrigger.refresh();
+      })().catch(() => {
+        portfolioMotionPromise = null;
+      });
+      return portfolioMotionPromise;
     };
 
     document.addEventListener("astro:before-swap", () => {
       (window as PortfolioWindow).__portfolioLenisCleanup?.();
+      portfolioMotionPromise = null;
     });
-    document.addEventListener("astro:page-load", initPortfolioLenis);
-    initPortfolioLenis();
+    document.addEventListener("portfolio:motion-intent", initPortfolioLenis);
+    document.addEventListener("astro:page-load", () => {
+      if (document.documentElement.classList.contains("home-scroll") && window.location.pathname !== "/") {
+        void initPortfolioLenis();
+      }
+    });
   </script>
   <a class="skip-link" href={skipTarget}>본문으로 건너뛰기</a>
   <slot />

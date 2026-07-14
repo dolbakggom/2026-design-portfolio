@@ -2130,4 +2130,26 @@ html.home-scroll .timeline-items {
     grid-area: auto;
     pointer-events: auto;
   }
+
+  .site-shell[data-initial-section="about"] .intro-section,
+  .site-shell[data-initial-section="career"] .intro-section,
+  .site-shell[data-initial-section="work"] .intro-section,
+  .site-shell[data-initial-section="work"] .identity-section {
+    display: none;
+  }
+
+  .site-shell[data-initial-section="career"] .identity-section {
+    min-height: 100svh;
+  }
+}
+
+html.motion-load-failed .intro-logo,
+html.motion-load-failed .identity-copy-panel,
+html.motion-load-failed .profile-contact,
+html.motion-load-failed .profile-media {
+  opacity: 1 !important;
+  visibility: visible !important;
+  filter: none !important;
+  transform: none !important;
+  clip-path: none !important;
 }
