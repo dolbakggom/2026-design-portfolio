@@ -1003,3 +1003,71 @@
 ### 남은 주의점
 - Rate Limiting binding은 Cloudflare location별 permissive counter입니다. 단일 관리자 로그인 보호에는 적합하지만 전역의 정확한 회계용 제한은 아닙니다.
 - 기존 배포의 `sha256:` 비밀번호 해시는 로그인 중단 방지를 위해 계속 지원합니다. 보안 강도를 높이려면 README 명령으로 PBKDF2 해시를 만든 뒤 Cloudflare `ADMIN_PASSWORD_HASH` secret을 교체해야 합니다.
+
+## 2026-07-14 Rich Text Sanitization And Work Block Integrity
+
+### 요구사항
+- 사이트 감사의 다음 단계로 관리자 리치 텍스트와 작업물 블록의 저장/출력 경계를 강화합니다.
+- 기존 작업물 내용은 가능한 한 보존하면서 실행 가능한 HTML이나 비정상적인 블록 옵션이 공개 페이지에 전달되지 않게 합니다.
+
+### 원인
+- 프로필 소개와 작업물 문단/인용은 데이터베이스 문자열을 `set:html`로 출력했지만 서버 측 HTML allowlist 정제가 없었습니다.
+- 작업물 블록 `content`가 임의의 JSON object를 허용해 타입과 관계없는 필드, 임의 CSS 값, 외부 또는 실행 가능한 이미지 URL도 저장할 수 있었습니다.
+- 기존 D1 레코드가 현재 에디터 규칙과 다를 때 안전하게 복구하는 조회 정책이 없었습니다.
+
+### 구현
+- `src/lib/content-sanitizer.ts`, `sanitize-html`
+  - 프로필 소개는 `p`, `br`, `em`, `strong`만 허용합니다.
+  - 작업물 본문은 Tiptap 텍스트 구조에 필요한 문단, 강조, 목록, 인용, 코드 태그만 허용하고 모든 속성, script/style, embedded media를 제거합니다.
+- `src/lib/work-block-content.ts`, `src/lib/validation.ts`
+  - heading, paragraph, quote, image, gallery별 Zod content schema를 추가했습니다.
+  - 행간, 문단 간격, 폭, 정렬 값을 에디터 선택지로 제한하고 block은 100개, gallery 이미지는 24개로 제한했습니다.
+  - 본문 이미지는 같은 사이트의 `/media/` 경로만 허용하며 `javascript:`, `data:`, 외부 origin, 경로 이탈을 거부합니다.
+  - API 저장 전 HTML을 정제하고 타입과 관계없는 JSON 필드를 제거합니다.
+- `src/lib/content.ts`, `src/lib/admin-data.ts`, `src/components/HomePage.astro`, `src/components/WorkBlocks.astro`
+  - public/admin 조회 시 기존 레코드도 정규화하고 실제 HTML 출력 지점에서 한 번 더 정제합니다.
+  - 기존 블록의 일부 옵션이 잘못된 경우 본문 전체를 버리지 않고 안전한 텍스트는 보존하며 해당 옵션만 기본값으로 복구합니다.
+- `tests/content-sanitizer.test.ts`, `tests/work-block-content.test.ts`
+  - XSS markup 제거, Tiptap 태그 보존, 외부 미디어 차단, unknown field 제거, collection limit, legacy data 복구 회귀 테스트를 추가했습니다.
+
+### 검증
+- 신규 테스트를 구현 전에 실행해 모듈 부재 및 legacy 복구 기대값 불일치를 확인한 뒤 구현했습니다.
+- `node --test tests/*.test.ts`: 37 tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- `git diff --check`: 통과.
+
+### 남은 주의점
+- 기존 D1 행은 조회 시 안전하게 정규화되지만 데이터베이스 자체가 즉시 다시 작성되지는 않습니다. 관리자가 해당 작업물을 다음에 저장하면 정제된 canonical content가 저장됩니다.
+- 작업물 본문 이미지는 R2 media route 사용을 전제로 하므로 외부 이미지 URL을 직접 입력하는 방식은 지원하지 않습니다.
+
+## 2026-07-14 Dependency Security Patch And Dev Watch Stability
+
+### 요구사항
+- 사이트 감사 후속 작업으로 npm이 보고한 의존성 보안 항목의 실제 경로와 영향 범위를 확인하고 호환성을 유지하며 패치합니다.
+- iCloud용 `node_modules.nosync` 구조를 유지하면서 의존성 업데이트 후 개발 서버가 안정적으로 동작하게 합니다.
+
+### 원인
+- `astro 6.2.1`이 공개된 XSS/SSRF 수정 버전보다 낮았고 `wrangler 4.87.0`도 Miniflare, undici, ws 보안 수정선보다 낮았습니다.
+- `@astrojs/cloudflare 13.3.0`이 오래된 Cloudflare Vite plugin과 별도 Wrangler를 중첩 설치해 루트 Wrangler만 올려도 고위험 advisory가 남았습니다.
+- `node_modules`가 `node_modules.nosync`를 가리키는 symlink라 Vite watcher가 실제 target 내부의 설치 변경을 소스 변경으로 감지해 반복 reload와 stale optimized dependency 오류를 일으켰습니다.
+
+### 구현
+- `package.json`, `package-lock.json`
+  - Astro를 `6.4.8`, Cloudflare adapter를 `13.7.0`, 루트 Wrangler를 `4.105.0`으로 업데이트했습니다.
+  - Wrangler는 기존 `@cloudflare/workers-types 4` 계열과 호환되는 보안 수정 버전으로 고정해 불필요한 types 5 메이저 전환을 피했습니다.
+  - 비강제 `npm audit fix`로 Vite, Babel, YAML language server, fast-uri 등 호환 가능한 하위 보안 패치를 적용했습니다.
+- `astro.config.mjs`
+  - Vite watcher에서 `**/node_modules.nosync/**`를 제외해 의존성 변경이 애플리케이션 소스 reload로 처리되지 않게 했습니다.
+  - `node_modules -> node_modules.nosync` symlink 구조는 그대로 유지했습니다.
+
+### 검증
+- 최초 `npm audit`: 16 vulnerabilities (2 low, 5 moderate, 9 high).
+- 업데이트 후 `npm audit`: 3 low, 0 moderate, 0 high, 0 critical.
+- `node --test tests/*.test.ts`: 37 tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- 실제 physical dependency tree에서 Astro `6.4.8`, Cloudflare adapter `13.7.0`, root Wrangler `4.105.0`과 안전한 중첩 Vite/Wrangler 버전을 확인했습니다.
+- 새 dev server에서 `/`, `/about`, `/career`, `/work`, `/admin`이 HTTP 200으로 응답하고 watcher 오류가 다시 발생하지 않는 것을 확인했습니다.
+
+### 남은 주의점
+- 남은 low 3건은 Astro 6의 esbuild가 Windows 개발 서버에서 로컬 파일 읽기를 허용할 수 있다는 advisory입니다. 현재 macOS 개발 및 Cloudflare 배포 런타임에는 해당하지 않습니다.
+- 이를 audit 0으로 만들려면 Astro 7, Cloudflare adapter 14 등 메이저 업그레이드가 필요합니다. 기능 회귀 위험에 비해 현재 이득이 작아 `npm audit fix --force`는 실행하지 않았습니다.

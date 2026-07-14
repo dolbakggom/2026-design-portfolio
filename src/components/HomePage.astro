@@ -1,5 +1,6 @@
 ---
 import PublicLayout from "../layouts/PublicLayout.astro";
+import { sanitizeProfileIntro } from "../lib/content-sanitizer";
 import { getHomeContent } from "../lib/content";
 import { createHomeStructuredData } from "../lib/seo";
 
@@ -25,6 +26,7 @@ const mobileIdentityTravelSvh = Math.max(330, 190 + timeline.length * 34) + 200 
 const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.[0] ?? "2026";
 const filterId = (category: string) => `work-filter-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "all"}`;
 const structuredData = createHomeStructuredData(profile);
+const safeProfileIntro = sanitizeProfileIntro(profile.intro);
 ---
 
 <PublicLayout
@@ -65,7 +67,7 @@ const structuredData = createHomeStructuredData(profile);
             <path d={logoPath} fill="currentColor" />
           </svg>
           <div class="identity-copy-stack">
-            <div class="profile-intro identity-copy-panel is-active" data-type-copy="about" set:html={profile.intro} />
+            <div class="profile-intro identity-copy-panel is-active" data-type-copy="about" set:html={safeProfileIntro} />
             <div class="timeline-heading identity-copy-panel" data-type-copy="career">
               <h2>초등학교 방과 후 교실에서 포토샵에 흥미를 가진 이후,<br />2014년부터 계속 활동하고 있습니다.</h2>
             </div>

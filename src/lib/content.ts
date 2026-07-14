@@ -1,7 +1,9 @@
 import { env } from "cloudflare:workers";
 import type { HomeContent, LinkItem, Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
+import { sanitizeProfileIntro } from "./content-sanitizer";
 import { fallbackContent, fallbackWorks } from "./fallback";
 import { getWorkFallback } from "./public-resilience";
+import { normalizeStoredWorkBlockContent } from "./work-block-content";
 
 type ProfileRow = {
   headline: string;
@@ -93,7 +95,7 @@ const toProfile = (row: ProfileRow): Profile => ({
   headline: row.headline,
   name: row.name,
   role: row.role,
-  intro: row.intro,
+  intro: sanitizeProfileIntro(row.intro),
   bio: row.bio,
   portraitAssetId: row.portrait_asset_id,
   portrait: row.portrait_key
@@ -168,7 +170,7 @@ const toWork = (row: WorkRow): WorkItem => ({
 const toBlock = (row: BlockRow): WorkBlock => ({
   id: row.id,
   type: row.type,
-  content: parseBlockContent(row.content),
+  content: normalizeStoredWorkBlockContent(row.type, parseBlockContent(row.content)),
   sortOrder: row.sort_order
 });
 

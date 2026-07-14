@@ -1,5 +1,6 @@
 ---
 import type { WorkBlock } from "../types";
+import { sanitizeRichTextHtml } from "../lib/content-sanitizer";
 
 interface Props {
   blocks: WorkBlock[];
@@ -14,7 +15,7 @@ const textOf = (block: WorkBlock, key = "text") => {
 
 const htmlOf = (block: WorkBlock) => {
   const value = block.content.html;
-  return typeof value === "string" ? value : "";
+  return typeof value === "string" ? sanitizeRichTextHtml(value) : "";
 };
 
 const imagesOf = (block: WorkBlock) => {

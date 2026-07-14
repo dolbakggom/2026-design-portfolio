@@ -1,7 +1,9 @@
 import { getD1 } from "./db";
 import type { Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
 import type { z } from "zod";
+import { sanitizeProfileIntro } from "./content-sanitizer";
 import type { profileSchema, timelineSchema, workSchema } from "./validation";
+import { normalizeStoredWorkBlockContent } from "./work-block-content";
 
 type ProfileInput = z.infer<typeof profileSchema>;
 type TimelineInput = z.infer<typeof timelineSchema>;
@@ -109,7 +111,7 @@ const toProfile = (row: ProfileRow): Profile => ({
   headline: row.headline,
   name: row.name,
   role: row.role,
-  intro: row.intro,
+  intro: sanitizeProfileIntro(row.intro),
   bio: row.bio,
   portraitAssetId: row.portrait_asset_id,
   portrait: row.portrait_key
@@ -185,7 +187,7 @@ const toWork = (row: WorkRow, blocks: WorkBlock[] = []): WorkItem => ({
 const toBlock = (row: BlockRow): WorkBlock => ({
   id: row.id,
   type: row.type,
-  content: parseContent(row.content),
+  content: normalizeStoredWorkBlockContent(row.type, parseContent(row.content)),
   sortOrder: row.sort_order
 });
 

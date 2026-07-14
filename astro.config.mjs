@@ -39,6 +39,11 @@ export default defineConfig({
       assetsInlineLimit: 128 * 1024
     },
     cacheDir: isDevCommand ? "node_modules/.vite-portfolio-dev" : "node_modules/.vite-portfolio-build",
+    server: {
+      watch: {
+        ignored: ["**/node_modules.nosync/**"]
+      }
+    },
     optimizeDeps: {
       include: optimizerIncludes,
       exclude: optimizerExcludes

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { sanitizeProfileIntro } from "./content-sanitizer.ts";
+import { workBlockSchema } from "./work-block-content.ts";
 
 const workCategories = ["UI/UX", "BI/BX", "UI/UX, BI/BX"] as const;
 
@@ -21,7 +23,7 @@ export const profileSchema = z.object({
   headline: z.string().min(1).max(120),
   name: z.string().min(1).max(120),
   role: z.string().max(160).default(""),
-  intro: z.string().min(1).max(500),
+  intro: z.string().min(1).max(500).transform(sanitizeProfileIntro),
   bio: z.string().min(1).max(1600),
   portraitAssetId: z.string().nullable().optional(),
   links: z.array(linkSchema).max(8).default([])
@@ -32,13 +34,6 @@ export const timelineSchema = z.object({
   title: z.string().min(1).max(160),
   organization: z.string().max(160).default(""),
   description: z.string().max(1200).default(""),
-  sortOrder: z.number().int().min(0).optional()
-});
-
-export const workBlockSchema = z.object({
-  id: z.string().optional(),
-  type: z.enum(["heading", "paragraph", "image", "gallery", "quote"]),
-  content: z.record(z.string(), z.unknown()).default({}),
   sortOrder: z.number().int().min(0).optional()
 });
 
@@ -56,7 +51,7 @@ export const workSchema = z.object({
   featured: z.boolean().default(false),
   published: z.boolean().default(true),
   sortOrder: z.number().int().min(0).optional(),
-  blocks: z.array(workBlockSchema).default([])
+  blocks: z.array(workBlockSchema).max(100).default([])
 });
 
 export const loginSchema = z.object({
