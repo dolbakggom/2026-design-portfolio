@@ -19,5 +19,13 @@ bucket_name = "portfolio-media"
 binding = "SESSION"
 id = "d5ac5efdcd7544399999b227b19633d6"
 
+[[ratelimits]]
+name = "ADMIN_LOGIN_RATE_LIMITER"
+namespace_id = "71014"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
 [vars]
 ADMIN_USERNAME = "dolbakggom"

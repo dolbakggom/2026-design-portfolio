@@ -45,20 +45,22 @@ export const purgeCloudflareFiles = async ({ credentials, urls, fetcher = fetch 
   const endpoint = `https://api.cloudflare.com/client/v4/zones/${credentials.zoneId}/purge_cache`;
   const batches = createCloudflarePurgeBatches(urls);
   const responses = await Promise.allSettled(
-    batches.map((files) =>
-      fetcher(endpoint, {
+    batches.map(async (files) => {
+      const response = await fetcher(endpoint, {
         method: "POST",
         headers: {
           authorization: `Bearer ${credentials.token}`,
           "content-type": "application/json"
         },
         body: JSON.stringify({ files })
-      })
-    )
+      });
+      const payload = await response.clone().json().catch(() => null) as { success?: boolean } | null;
+      return response.ok && payload?.success !== false;
+    })
   );
 
   return {
-    ok: responses.every((response) => response.status === "fulfilled" && response.value.ok),
+    ok: responses.every((response) => response.status === "fulfilled" && response.value),
     skipped: false
   };
 };

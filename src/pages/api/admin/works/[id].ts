@@ -19,12 +19,13 @@ export const PUT: APIRoute = async ({ params, request }) => {
     const previousWork = (await listWorks()).find((work) => work.id === params.id);
     const works = await updateWork(params.id, parsed.data);
     if (works) {
-      await purgePublicHtmlCache(
+      const publication = await purgePublicHtmlCache(
         request,
         getPublicHtmlCachePathsForWorks(works, previousWork ? [`/work/${previousWork.slug}`] : [])
       );
+      return json({ works, publication });
     }
-    return works ? json({ works }) : notFound();
+    return notFound();
   } catch {
     return serverError("Unable to update work");
   }
@@ -37,11 +38,11 @@ export const DELETE: APIRoute = async ({ params, request }) => {
   try {
     const deletedWork = (await listWorks()).find((work) => work.id === params.id);
     const works = await deleteWork(params.id);
-    await purgePublicHtmlCache(
+    const publication = await purgePublicHtmlCache(
       request,
       getPublicHtmlCachePathsForWorks(works, deletedWork ? [`/work/${deletedWork.slug}`] : [])
     );
-    return json({ works });
+    return json({ works, publication });
   } catch {
     return serverError("Unable to delete work");
   }

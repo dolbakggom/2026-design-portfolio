@@ -26,8 +26,8 @@ export const PUT: APIRoute = async ({ request }) => {
 
   try {
     const profile = await updateProfile(parsed.data);
-    await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
-    return json({ profile });
+    const publication = await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
+    return json({ profile, publication });
   } catch {
     return serverError("Unable to update profile");
   }

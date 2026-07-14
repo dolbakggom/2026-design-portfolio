@@ -803,3 +803,203 @@
 - `npm run build` 통과.
   - `astro check`: 0 errors / 0 warnings / 0 hints.
   - `astro build`: complete.
+
+## 2026-07-14 Admin Save And Publication Reliability
+
+### 요구사항
+- 사이트 전반 감사에서 확인한 개선점을 순서대로 적용합니다.
+- 첫 단계로 작업물 저장의 부분 성공 가능성을 제거하고, 저장 후 공개 캐시 반영 상태를 관리자가 분명히 알 수 있게 합니다.
+
+### 구현
+- `src/lib/admin-data.ts`
+  - 작업물 생성 시 기본 정보와 본문 블록 INSERT를 하나의 D1 batch로 실행하도록 변경했습니다.
+  - 작업물 수정 시 기본 정보 UPDATE, 기존 블록 DELETE, 신규 블록 INSERT를 하나의 D1 batch로 묶어 기본 정보만 저장되는 부분 성공을 방지했습니다.
+- `src/lib/public-cache.ts`, `src/lib/cloudflare-purge.ts`, `src/lib/admin-cache.ts`
+  - Worker Cache API 삭제와 Cloudflare global purge가 `ok`/`skipped` 결과를 반환하도록 변경했습니다.
+  - Cloudflare purge API가 HTTP 200과 함께 `success: false`를 반환하는 경우도 실패로 판정합니다.
+  - 최종 게시 상태를 `purged`, `deferred`, `failed`로 구분해 API 호출자에게 전달합니다.
+- `src/pages/api/admin/**`
+  - profile, timeline, works, reorder 변경 응답에 `publication` 결과를 포함했습니다.
+- `src/components/admin/AdminApp.tsx`, `src/styles/admin.css`
+  - 저장 결과를 즉시 공개 반영, 최대 10분 지연, 캐시 갱신 실패로 구분해 안내합니다.
+  - 데이터 저장에는 성공했지만 공개 반영이 지연되거나 실패한 경우 별도의 경고색 toast를 표시합니다.
+- `tests/cloudflare-purge.test.ts`, `tests/public-cache.test.ts`
+  - Cloudflare의 논리 실패 응답, 자격 증명 누락, Worker Cache runtime 부재에 대한 회귀 테스트를 추가했습니다.
+
+### 검증
+- `node --test tests/*.test.ts`: 11 tests passed.
+- `git diff --check`: 통과.
+- `npm run build`: `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete.
+
+### 남은 주의점
+- 이 변경은 배포 후부터 관리자 화면에 게시 상태가 표시됩니다.
+- 다음 우선순위는 공개 이미지의 반응형 변환 및 전송량 절감입니다.
+
+## 2026-07-14 Public Image Upload And Loading Optimization
+
+### 요구사항
+- 사이트 감사 후속 작업으로 홈 첫 진입의 이미지 전송량을 줄입니다.
+- 이후 관리자가 업로드하는 이미지가 원본 해상도와 용량 그대로 공개되지 않게 합니다.
+
+### 구현
+- `src/lib/image-upload.ts`, `tests/image-upload.test.ts`
+  - 이미지의 비율을 유지하며 최대 2560px 안에 맞추는 공용 계산 함수를 추가했습니다.
+  - 16MB 업로드 제한과 허용 이미지 MIME 목록을 공용 상수로 정의했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - JPG, PNG, WebP 정지 이미지를 최대 2560px, 품질 0.9 WebP로 변환한 뒤 업로드합니다.
+  - GIF는 애니메이션 보존을 위해 원본을 유지하고 실제 크기 메타데이터를 함께 전송합니다.
+  - SVG와 16MB 초과 이미지는 클라이언트에서 안내 후 차단합니다.
+- `src/pages/api/admin/assets.ts`
+  - 서버에서도 MIME allowlist와 16MB 제한을 검증합니다.
+  - 업로드된 이미지의 width/height를 assets 테이블에 저장합니다.
+- `src/lib/content.ts`, `src/lib/admin-data.ts`
+  - 프로필뿐 아니라 작업물 thumbnail, featured thumbnail, hero에도 이미지 크기와 MIME 메타데이터를 전달합니다.
+- `src/components/HomePage.astro`, `src/pages/work/[slug].astro`, `src/components/WorkBlocks.astro`
+  - 이미지 크기 메타데이터를 HTML width/height 속성으로 출력해 레이아웃 이동을 줄였습니다.
+  - `/` 첫 진입에서는 3MB 이상인 프로필 이미지를 실제 About 영역 진입 전까지 요청하지 않습니다.
+  - `/about`, `/career` 직접 진입에서는 프로필 이미지를 eager/high priority로 바로 요청합니다.
+  - 본문 이미지와 갤러리 이미지에도 저장된 크기 메타데이터를 반영합니다.
+
+### 검증
+- `node --test tests/*.test.ts`: 15 tests passed.
+- `npm run build`: `astro check` 0 errors / 0 warnings / 0 hints, `astro build` complete.
+- 로컬 `/` HTML에서 프로필 이미지가 `data-deferred-src`만 가지고 초기 `src`는 없는 것을 확인했습니다.
+- 로컬 `/about` HTML에서 프로필 이미지가 `loading="eager"`, `fetchpriority="high"`로 출력되는 것을 확인했습니다.
+- Chrome 1440x1000, 390x844 첫 화면 screenshot에서 기존 인트로 레이아웃이 유지되는 것을 확인했습니다.
+
+### 남은 주의점
+- 기존 R2 이미지는 자동으로 다시 인코딩되지 않습니다. 현재 3.44MB 프로필 이미지는 배포 후 admin에서 한 번 다시 업로드해야 최적화된 WebP asset으로 교체됩니다.
+- Cloudflare Images 또는 Image Resizing binding을 도입하지 않았으므로 viewport별 다중 `srcset` 생성은 후속 선택 사항입니다.
+
+## 2026-07-14 Public SEO, Sitemap, And Favicon
+
+### 요구사항
+- 사이트 전반 감사의 다음 단계로 검색엔진 중복 문서, 구조화 데이터, sitemap/robots, 파비콘 부재를 개선합니다.
+
+### 구현
+- `src/lib/seo.ts`, `src/layouts/BaseLayout.astro`, `src/layouts/PublicLayout.astro`
+  - canonical URL, 안전한 JSON-LD 직렬화, sitemap XML 생성 로직을 공용화했습니다.
+  - 공용 레이아웃에 SVG/ICO 파비콘과 구조화 데이터 출력을 추가했습니다.
+  - 작업물 공유 이미지의 실제 width/height를 Open Graph 메타데이터에 반영합니다.
+- `src/components/HomePage.astro`
+  - `/about`, `/career`, `/work`는 진입용 별칭으로 유지하면서 canonical을 `/`로 통일해 동일 홈 문서의 중복 색인을 방지했습니다.
+  - 홈에 `Person`과 `WebSite` JSON-LD를 추가했습니다.
+- `src/pages/work/[slug].astro`
+  - 각 공개 작업물에 고유 canonical과 `CreativeWork` JSON-LD를 추가했습니다.
+- `src/pages/sitemap.xml.ts`, `public/robots.txt`
+  - D1의 공개 작업물 목록을 반영하는 동적 sitemap을 추가하고 관리자 경로는 검색 로봇에서 제외했습니다.
+- `public/favicon.svg`, `public/favicon.ico`
+  - 포트폴리오 로고와 메인 accent를 사용한 브라우저 파비콘을 추가했습니다.
+- `src/lib/public-cache.ts`
+  - 작업물 추가, 수정, 삭제 시 `/sitemap.xml`도 캐시 purge 대상에 포함했습니다.
+- `tests/seo.test.ts`, `tests/public-cache.test.ts`
+  - sitemap 중복 제거/XML escaping, JSON-LD script escaping, sitemap purge 경로를 검증합니다.
+
+### 검증
+- `node --test tests/*.test.ts`: 17 tests passed.
+- `npm run build`: `astro check` 0 errors, Cloudflare server build complete.
+- 로컬 응답에서 `/about`, `/career`, `/work` canonical이 `/`를 가리키고 작업물 상세는 자체 canonical과 `CreativeWork` JSON-LD를 갖는 것을 확인했습니다.
+- `/sitemap.xml`, `/robots.txt`, `/favicon.svg`, `/favicon.ico`가 모두 HTTP 200과 올바른 content type으로 응답하는 것을 확인했습니다.
+
+### 남은 주의점
+- 배포 후 Google Search Console 또는 다른 검색 도구에 `https://dolbakggom.com/sitemap.xml`을 한 번 제출하면 신규 작업물 발견이 더 안정적입니다.
+
+## 2026-07-14 Public Keyboard And Screen Reader Accessibility
+
+### 요구사항
+- 사이트 전반 감사의 다음 단계로 공개 화면의 키보드 탐색과 스크린 리더 문맥을 개선합니다.
+- 기존 Figma 기반 시각 디자인과 홈 스크롤 연출은 유지합니다.
+
+### 구현
+- `src/layouts/PublicLayout.astro`, `src/styles/global.css`
+  - 공개 페이지 첫 포커스에만 표시되는 `본문으로 건너뛰기` 링크를 추가했습니다.
+  - 홈은 Intro를 건너뛰어 About으로, 작업물 상세는 본문으로 바로 이동합니다.
+- `src/components/HomePage.astro`
+  - 대표 작업물의 이미지, 제목, 메타, CTA 전체를 하나의 링크로 구성해 썸네일을 포함한 카드 전체를 클릭하거나 키보드로 열 수 있게 했습니다.
+  - 비활성 대표 작업물은 초기 서버 HTML부터 `aria-hidden="true"`와 `tabindex="-1"`를 사용해 보이지 않는 링크가 먼저 포커스되는 문제를 막았습니다.
+  - WORK 카테고리 tablist에 roving tabindex와 ArrowLeft/ArrowRight/Home/End 이동을 추가했습니다.
+  - 필터 변경 후 선택 카테고리와 표시 작업물 개수를 `aria-live`로 안내합니다.
+- `src/lib/keyboard-navigation.ts`, `tests/keyboard-navigation.test.ts`
+  - 순환형 수평 탭 키보드 이동 계산을 공용 함수로 분리하고 경계/무관 키 회귀 테스트를 추가했습니다.
+- `src/pages/work/[slug].astro`, `src/components/WorkBlocks.astro`
+  - 작업물 뒤로가기 버튼의 접근성 이름을 한국어로 변경하고, 빈 이미지 placeholder가 불필요하게 읽히지 않도록 숨겼습니다.
+
+### 검증
+- 키보드 이동 테스트를 구현 전에 실행해 모듈 부재로 실패하는 것을 확인한 뒤 구현 후 3 tests passed를 확인했습니다.
+- `npm run build`: `astro check` 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- 로컬 캐시 우회 HTML에서 skip link, 대표 작업물의 초기 `aria-hidden`/`tabindex`, 갤러리 탭의 roving tabindex, 결과 live region 출력을 확인했습니다.
+
+### 남은 주의점
+- Codex 인앱 브라우저가 런타임 초기화 충돌로 연결되지 않아 실제 Tab 키 입력 자동화는 수행하지 못했습니다. 키 이동 계산은 단위 테스트로 검증했고, 배포 전 수동 키보드 확인을 한 번 더 권장합니다.
+
+## 2026-07-14 Public Error And Empty State Resilience
+
+### 요구사항
+- 사이트 전반 감사의 다음 단계로 존재하지 않는 페이지, 삭제된 작업물, 빈 작업물 목록, 공개 이미지 로딩 실패를 안정적으로 처리합니다.
+
+### 원인
+- D1 조회가 정상적으로 완료됐지만 slug가 없는 경우에도 같은 slug의 starter fallback 작업물이 있으면 다시 노출될 수 있었습니다.
+- 일반 미존재 경로는 브랜드 레이아웃이 아닌 기본 404에 의존했습니다.
+- 이미지 URL이 존재하지만 네트워크/R2 문제로 실패하면 브라우저의 깨진 이미지 표시가 그대로 노출됐습니다.
+- 대표/갤러리 작업물이 0개일 때 Featured 구간이 빈 높이를 차지하거나 설명 없는 빈 grid가 표시될 수 있었습니다.
+
+### 구현
+- `src/lib/public-resilience.ts`, `src/lib/content.ts`, `tests/public-resilience.test.ts`
+  - 정상적인 D1 조회 결과가 `없음`이면 반드시 404를 반환하고, D1 자체가 unavailable인 경우에만 starter work fallback을 사용하도록 정책을 분리했습니다.
+  - 완료된 이미지의 intrinsic width가 0인 실패 상태 판정 로직을 공용화했습니다.
+- `src/components/NotFoundPage.astro`, `src/pages/404.astro`, `src/pages/work/[slug].astro`
+  - 일반 404와 작업물 404가 동일한 브랜드 타이포, 안내 문구, 처음/작업물 이동 액션을 사용하도록 구성했습니다.
+  - 두 응답 모두 HTTP 404와 `noindex, nofollow`를 유지합니다.
+- `src/layouts/PublicLayout.astro`, `src/components/HomePage.astro`, `src/components/WorkBlocks.astro`, `src/styles/global.css`
+  - 공개 이미지에 공통 실패 감지를 연결하고 깨진 이미지 대신 영역별 placeholder를 표시합니다.
+  - 이미지 대체텍스트가 있으면 실패 상태도 스크린 리더에 안내합니다.
+  - 공개 작업물이 없으면 빈 갤러리 안내를 표시하고 빈 Featured scroll 구간은 제거합니다.
+
+### 검증
+- fallback 정책과 이미지 실패 판정 테스트를 구현 전 실패 확인 후 구현했으며 3 tests passed를 확인했습니다.
+- `npm run build`: `astro check` 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- 로컬 `/missing-page`, `/work/missing-work`가 HTTP 404, HTML 응답, `noindex, nofollow`, 공용 이동 액션을 반환하는 것을 확인했습니다.
+- Chrome 1440×1000과 390×844에서 404 화면을 확인했고, 최초 모바일 캡처에서 발견한 설명문 가로 잘림을 수정한 뒤 재캡처로 정상 줄바꿈을 확인했습니다.
+
+### 남은 주의점
+- 공개 이미지 실패 placeholder는 네트워크/R2 장애 시에만 보이며 원본 asset을 복구하지는 않습니다. 반복적으로 같은 asset이 실패하면 R2 객체 또는 저장된 key를 확인해야 합니다.
+
+## 2026-07-14 Admin Authentication And Upload Security
+
+### 요구사항
+- 사이트 감사의 다음 단계로 관리자 인증, admin API 요청, 이미지 업로드 검증과 오류 응답을 보강합니다.
+
+### 원인
+- 로그인 시도 횟수 제한이 없어 비밀번호 대입 공격을 Worker가 계속 처리할 수 있었습니다.
+- admin 상태 변경 요청은 세션 쿠키만 확인하고 `Origin`을 검증하지 않았습니다.
+- 업로드 API가 브라우저가 보낸 MIME을 신뢰해 실제 파일 내용이 다른 위장 업로드를 구분하지 못했습니다.
+- R2 저장 후 D1 asset metadata 생성이 실패하면 사용되지 않는 R2 객체가 남을 수 있었습니다.
+- JSON 요청과 로그인 필드에 명시적인 자원 사용 상한이 없었습니다.
+
+### 구현
+- `wrangler.toml`, `src/env.d.ts`, `src/pages/api/admin/login.ts`
+  - Workers Rate Limiting binding `ADMIN_LOGIN_RATE_LIMITER`를 추가해 관리자 로그인 처리를 Cloudflare location별 분당 10회로 제한했습니다.
+  - 제한 시 `429`, `Retry-After: 60`, 한국어 안내를 반환합니다.
+- `src/lib/request-security.ts`, `src/middleware.ts`, `src/lib/auth.ts`
+  - admin 상태 변경 API는 요청 URL과 정확히 일치하는 `Origin`만 허용합니다.
+  - 세션 쿠키를 `SameSite=Strict`로 강화하고 `SESSION_SECRET`이 최소 32바이트 미만이면 세션 서명을 거부합니다.
+- `src/lib/http.ts`, `src/lib/validation.ts`
+  - admin JSON 응답에 `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`를 기본 적용했습니다.
+  - JSON 본문은 최대 2MB로 제한하고 로그인 필드 길이와 profile link 프로토콜을 검증해 `javascript:`/`data:` URL을 차단합니다.
+- `src/lib/image-upload.ts`, `src/pages/api/admin/assets.ts`
+  - JPEG, PNG, WebP, GIF magic bytes로 실제 파일 형식을 판별하고 선언 MIME과 다르면 업로드를 거부합니다.
+  - D1 asset record 생성 실패 시 방금 저장한 R2 객체를 삭제합니다.
+- `src/components/admin/AdminApp.tsx`
+  - 로그인 요청 중 입력과 버튼을 잠가 중복 제출로 rate limit을 불필요하게 소모하지 않게 했습니다.
+- `README.md`, `.dev.vars.example`, `AGENTS.md`
+  - 신규 비밀번호는 salt가 포함된 PBKDF2 310,000회 방식으로 생성하도록 안내하고 새 binding/세션키 규칙을 기록했습니다.
+
+### 검증
+- 동일 출처, JSON 크기, 이미지 시그니처, URL scheme, 로그인 길이, 세션키 정책 테스트를 구현 전 실패 확인 후 통과시켰습니다.
+- `npm run build`: `astro check` 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- 로컬 API에서 교차 출처 로그인은 `403`, 동일 출처의 잘못된 로그인은 `401`, 분당 한도 초과는 `429`와 `Retry-After: 60`을 반환했습니다.
+- API 오류 응답에 `Cache-Control: no-store`와 `X-Content-Type-Options: nosniff`가 포함되는 것을 확인했습니다.
+
+### 남은 주의점
+- Rate Limiting binding은 Cloudflare location별 permissive counter입니다. 단일 관리자 로그인 보호에는 적합하지만 전역의 정확한 회계용 제한은 아닙니다.
+- 기존 배포의 `sha256:` 비밀번호 해시는 로그인 중단 방지를 위해 계속 지원합니다. 보안 강도를 높이려면 README 명령으로 PBKDF2 해시를 만든 뒤 Cloudflare `ADMIN_PASSWORD_HASH` secret을 교체해야 합니다.

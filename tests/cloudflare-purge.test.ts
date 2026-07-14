@@ -48,3 +48,23 @@ test("cloudflare purge sends every batch and reports success", async () => {
     files: ["https://dolbakggom.com/", "https://dolbakggom.com/work/test"]
   });
 });
+
+test("cloudflare purge treats a successful HTTP response with success false as failure", async () => {
+  const result = await purgeCloudflareFiles({
+    credentials: { zoneId: "zone-123", token: "token-123" },
+    urls: ["https://dolbakggom.com/work/test"],
+    fetcher: async () => new Response(JSON.stringify({ success: false }), { status: 200 })
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.skipped, false);
+});
+
+test("cloudflare purge reports skipped when credentials are unavailable", async () => {
+  const result = await purgeCloudflareFiles({
+    credentials: null,
+    urls: ["https://dolbakggom.com/work/test"]
+  });
+
+  assert.deepEqual(result, { ok: false, skipped: true });
+});

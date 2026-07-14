@@ -1,6 +1,7 @@
 ---
 import PublicLayout from "../layouts/PublicLayout.astro";
 import { getHomeContent } from "../lib/content";
+import { createHomeStructuredData } from "../lib/seo";
 
 interface Props {
   initialSection?: "intro" | "about" | "career" | "work";
@@ -11,6 +12,10 @@ const { profile, timeline, featuredWorks, works } = await getHomeContent();
 const categories = ["ALL", "UI/UX", "BI/BX"];
 const logoPath = "M22.0732 0.000976562H27.4131V49.124L44.1484 39.4609V16.8125H49.4883V42.5039L49.4873 42.5479L27.4141 55.291L27.4131 55.2891H22.0732V6.16602L5.33984 15.8271V38.4883H0V12.7432L22.0723 0L22.0732 0.000976562Z";
 const fallbackPortraitSrc = "/assets/figma/profile-guitar.png";
+const portraitSrc = profile.portrait?.url ?? fallbackPortraitSrc;
+const portraitWidth = profile.portrait?.width ?? 768;
+const portraitHeight = profile.portrait?.height ?? 1024;
+const deferPortrait = initialSection === "intro";
 const slogan = profile.headline.replace(/\.$/, "");
 const emailLink = profile.links.find((link) => link.url.startsWith("mailto:"));
 const phoneLink = profile.links.find((link) => link.url.startsWith("tel:") || /010[-\d]+/.test(link.label));
@@ -19,10 +24,19 @@ const identityTravelSvh = Math.max(210, 126 + timeline.length * 18) + 200 + 100;
 const mobileIdentityTravelSvh = Math.max(330, 190 + timeline.length * 34) + 200 + 100;
 const yearDateTime = (year: string | null | undefined) => year?.match(/\d{4}/)?.[0] ?? "2026";
 const filterId = (category: string) => `work-filter-${category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "all"}`;
+const structuredData = createHomeStructuredData(profile);
 ---
 
-<PublicLayout title={`${profile.headline} | ${profile.name}`} description={profile.bio} htmlClass="home-scroll" bodyClass="home-body">
-  <main class="site-shell" data-initial-section={initialSection}>
+<PublicLayout
+  title={`${profile.headline} | ${profile.name}`}
+  description={profile.bio}
+  htmlClass="home-scroll"
+  bodyClass="home-body"
+  canonicalPath="/"
+  structuredData={structuredData}
+  skipTarget="#about"
+>
+  <main id="main-content" class="site-shell" data-initial-section={initialSection} tabindex="-1">
     <section class="intro-section" aria-label="Intro" data-route="/">
       <div class="intro-grid">
         <svg class="site-logo intro-logo" viewBox="0 0 50 56" aria-hidden="true" focusable="false">
@@ -40,6 +54,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     <section
       class="identity-section"
       id="about"
+      tabindex="-1"
       data-identity
       data-route="/about"
       style={`--identity-travel:${identityTravelSvh}svh; --identity-mobile-travel:${mobileIdentityTravelSvh}svh;`}
@@ -87,8 +102,19 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         </div>
 
         <div class="identity-side">
-          <figure class="profile-media" data-profile-media>
-            <img src={profile.portrait?.url ?? fallbackPortraitSrc} alt={profile.portrait?.alt ?? profile.name} decoding="async" />
+          <figure class="profile-media" data-profile-media data-image-frame>
+            <img
+              src={deferPortrait ? undefined : portraitSrc}
+              data-deferred-src={deferPortrait ? portraitSrc : undefined}
+              alt={profile.portrait?.alt ?? profile.name}
+              width={portraitWidth}
+              height={portraitHeight}
+              loading={deferPortrait ? "lazy" : "eager"}
+              decoding="async"
+              fetchpriority={deferPortrait ? "low" : "high"}
+              data-public-image
+            />
+            {deferPortrait ? <noscript><img src={portraitSrc} alt={profile.portrait?.alt ?? profile.name} width={portraitWidth} height={portraitHeight} /></noscript> : null}
             <figcaption>취미로 기타를 치고 있습니다.</figcaption>
           </figure>
 
@@ -126,7 +152,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       <h2>WORK</h2>
     </section>
 
-    <section class="featured-section" id="featured-work" data-route="/work">
+    <section class:list={["featured-section", featuredWorks.length === 0 && "is-empty"]} id="featured-work" data-route="/work">
       <div class="featured-stage">
         <div class="section-heading">
           <p class="section-kicker">Selected Work</p>
@@ -134,16 +160,30 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
         <div class="featured-list">
           {
             featuredWorks.map((work, index) => (
-              <article class:list={["featured-work", index === 0 && "is-active"]} style={`--work-index:${index};`} data-featured-panel data-route="/work">
-                <div class="featured-link">
-                  <div class="work-visual">
+              <article
+                class:list={["featured-work", index === 0 && "is-active"]}
+                style={`--work-index:${index};`}
+                data-featured-panel
+                data-route="/work"
+                aria-hidden={index === 0 ? "false" : "true"}
+              >
+                <a
+                  class="featured-link"
+                  href={`/work/${work.slug}`}
+                  aria-label={`${work.title} 자세히 보기`}
+                  tabindex={index === 0 ? undefined : -1}
+                >
+                  <div class="work-visual" data-image-frame>
                     {work.featuredThumbnail?.url || work.thumbnail?.url ? (
                       <img
                         src={work.featuredThumbnail?.url ?? work.thumbnail?.url}
                         alt={work.featuredThumbnail?.alt ?? work.thumbnail?.alt ?? work.title}
                         crossorigin="anonymous"
+                        width={work.featuredThumbnail?.width ?? work.thumbnail?.width ?? undefined}
+                        height={work.featuredThumbnail?.height ?? work.thumbnail?.height ?? undefined}
                         loading="lazy"
                         decoding="async"
+                        data-public-image
                       />
                     ) : null}
                   </div>
@@ -155,9 +195,9 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
                       {work.client ? <span>{work.client}</span> : null}
                       <span>{work.role || "Figma + Adobe Illustrator"}</span>
                     </p>
-                    <a href={`/work/${work.slug}`} class="featured-more" aria-label={`${work.title} 자세히 보기 - 더 알아보기`}><span>더 알아보기</span></a>
+                    <span class="featured-more" aria-hidden="true"><span>더 알아보기</span></span>
                   </div>
-                </div>
+                </a>
               </article>
             ))
           }
@@ -185,10 +225,10 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       </div>
     </section>
 
-    <section class="gallery-section" aria-label="Work gallery" data-route="/work">
+    <section class:list={["gallery-section", featuredWorks.length === 0 && "is-featured-empty"]} aria-label="Work gallery" data-route="/work">
       <div class="gallery-canvas">
         <div class="section-heading gallery-heading">
-          <div class="category-filter" role="tablist" aria-label="Work category">
+          <div class="category-filter" role="tablist" aria-label="Work category" aria-orientation="horizontal">
             {
               categories.map((category) => (
                 <button
@@ -199,6 +239,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
                   data-filter={category}
                   aria-selected={category === "ALL" ? "true" : "false"}
                   aria-controls="work-gallery-grid"
+                  tabindex={category === "ALL" ? 0 : -1}
                 >
                   {category}
                 </button>
@@ -210,8 +251,18 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           {
             works.map((work) => (
               <a class="work-tile" href={`/work/${work.slug}`} data-category={work.category} aria-label={`${work.title} 자세히 보기`}>
-                <div class:list={["work-tile-media", work.thumbnail?.url && "has-image"]}>
-                  {work.thumbnail?.url ? <img src={work.thumbnail.url} alt="" loading="lazy" decoding="async" /> : null}
+                <div class:list={["work-tile-media", work.thumbnail?.url && "has-image"]} data-image-frame>
+                  {work.thumbnail?.url ? (
+                    <img
+                      src={work.thumbnail.url}
+                      alt=""
+                      width={work.thumbnail.width ?? undefined}
+                      height={work.thumbnail.height ?? undefined}
+                      loading="lazy"
+                      decoding="async"
+                      data-public-image
+                    />
+                  ) : null}
                 </div>
                 <div>
                   <h3>{work.title}</h3>
@@ -220,6 +271,13 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
             ))
           }
         </div>
+        {works.length === 0 ? (
+          <div class="gallery-empty" role="status">
+            <p>공개된 작업물이 없습니다.</p>
+            <span>새 작업물이 준비되는 대로 이곳에 표시됩니다.</span>
+          </div>
+        ) : null}
+        <p class="visually-hidden" aria-live="polite" aria-atomic="true" data-gallery-status>전체 작업물 {works.length}개</p>
       </div>
     </section>
   </main>
@@ -227,6 +285,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
   <script>
     import gsap from "gsap";
     import { ScrollTrigger } from "gsap/ScrollTrigger";
+    import { getRovingTabIndex } from "../lib/keyboard-navigation";
     gsap.registerPlugin(ScrollTrigger);
 
     let activeHomeShell: HTMLElement | null = null;
@@ -258,6 +317,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
       let lastSyncedViewportHeight = 0;
       let currentIdentityMode: "about" | "career" | null = null;
       let currentCareerListVisible: boolean | null = null;
+      let deferredImageObserver: IntersectionObserver | null = null;
       let activeTimelineIndex = -1;
       let activeFeaturedIndex = -1;
       let identityProgressTrigger: ScrollTrigger | null = null;
@@ -300,6 +360,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           window.clearTimeout(routeDebounceTimeout);
         }
         typewriterTimers.forEach((timer) => window.clearTimeout(timer));
+        deferredImageObserver?.disconnect();
         document.documentElement.style.removeProperty("--home-viewport-height");
         ScrollTrigger.removeEventListener("refreshInit", updateScrollGeometryCache);
         ScrollTrigger.removeEventListener("refresh", updateScrollGeometryCache);
@@ -312,6 +373,27 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const initialSection = shell.dataset.initialSection ?? "intro";
+    const deferredImages = Array.from(document.querySelectorAll<HTMLImageElement>("img[data-deferred-src]"));
+    const loadDeferredImage = (image: HTMLImageElement) => {
+      const source = image.dataset.deferredSrc;
+      if (!source || image.src) return;
+      image.src = source;
+      image.removeAttribute("data-deferred-src");
+    };
+
+    if (deferredImages.length && "IntersectionObserver" in window) {
+      deferredImageObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const image = entry.target as HTMLImageElement;
+          loadDeferredImage(image);
+          deferredImageObserver?.unobserve(image);
+        });
+      }, { rootMargin: "0px" });
+      deferredImages.forEach((image) => deferredImageObserver?.observe(image));
+    } else {
+      deferredImages.forEach(loadDeferredImage);
+    }
     const navigationEntry = window.performance?.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     const shouldPreserveRestoredWorkScroll = initialSection === "work" && navigationEntry?.type === "back_forward";
 
@@ -493,7 +575,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
     const featuredPanels = gsap.utils.toArray<HTMLElement>("[data-featured-panel]");
     const featuredDots = gsap.utils.toArray<HTMLElement>("[data-featured-dot]");
     const featuredStage = document.querySelector<HTMLElement>(".featured-stage");
-    const featuredSection = document.querySelector<HTMLElement>("#featured-work");
+    const featuredSection = document.querySelector<HTMLElement>("#featured-work:not(.is-empty)");
     const gallerySection = document.querySelector<HTMLElement>(".gallery-section");
     const mobileIdentityQuery = window.matchMedia("(max-width: 1180px)");
 
@@ -1124,6 +1206,7 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
 
     const filterButtons = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
     const galleryPanel = document.querySelector<HTMLElement>("#work-gallery-grid");
+    const galleryStatus = document.querySelector<HTMLElement>("[data-gallery-status]");
     const tiles = Array.from(document.querySelectorAll<HTMLElement>("[data-category]"));
 
     const animateGalleryFilter = (filter: string) => {
@@ -1210,11 +1293,27 @@ const filterId = (category: string) => `work-filter-${category.toLowerCase().rep
           const isSelected = item === button;
           item.classList.toggle("is-active", isSelected);
           item.setAttribute("aria-selected", isSelected ? "true" : "false");
+          item.tabIndex = isSelected ? 0 : -1;
         });
         if (button.id) {
           galleryPanel?.setAttribute("aria-labelledby", button.id);
         }
         animateGalleryFilter(filter);
+        const visibleCount = tiles.filter((tile) => !tile.hidden).length;
+        if (galleryStatus) {
+          galleryStatus.textContent = `${filter === "ALL" ? "전체" : filter} 작업물 ${visibleCount}개`;
+        }
+      }, { signal: pageSignal });
+
+      button.addEventListener("keydown", (event) => {
+        const currentIndex = Array.from(filterButtons).indexOf(button);
+        const nextIndex = getRovingTabIndex(currentIndex, event.key, filterButtons.length);
+        if (nextIndex === null) return;
+
+        event.preventDefault();
+        const nextButton = filterButtons[nextIndex];
+        nextButton?.focus();
+        nextButton?.click();
       }, { signal: pageSignal });
     });
 

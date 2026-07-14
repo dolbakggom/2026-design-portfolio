@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
+import type { JsonLd } from "../lib/seo";
 
 interface Props {
   title?: string;
@@ -8,11 +9,17 @@ interface Props {
   bodyClass?: string;
   image?: string;
   imageAlt?: string;
+  imageWidth?: number;
+  imageHeight?: number;
   type?: "website" | "article";
   noindex?: boolean;
+  canonicalPath?: string;
+  structuredData?: JsonLd;
+  skipTarget?: string;
 }
 
 const props = Astro.props as Props;
+const { skipTarget = "#main-content" } = props;
 ---
 
 <BaseLayout {...props}>
@@ -82,7 +89,55 @@ const props = Astro.props as Props;
     document.addEventListener("astro:page-load", initPortfolioLenis);
     initPortfolioLenis();
   </script>
+  <a class="skip-link" href={skipTarget}>본문으로 건너뛰기</a>
   <slot />
+  <script>
+    import { hasImageLoadFailed } from "../lib/public-resilience";
+
+    type PublicImageWindow = Window & {
+      __publicImageFallbackCleanup?: () => void;
+    };
+
+    const initPublicImageFallbacks = () => {
+      const publicWindow = window as PublicImageWindow;
+      publicWindow.__publicImageFallbackCleanup?.();
+
+      const controller = new AbortController();
+      const images = document.querySelectorAll<HTMLImageElement>("img[data-public-image]");
+
+      images.forEach((image) => {
+        const frame = image.closest<HTMLElement>("[data-image-frame]");
+        if (!frame) return;
+
+        const showFallback = () => {
+          frame.classList.add("is-image-unavailable");
+          image.hidden = true;
+          image.setAttribute("aria-hidden", "true");
+
+          const alt = image.alt.trim();
+          if (alt) {
+            frame.setAttribute("role", "img");
+            frame.setAttribute("aria-label", `${alt} 이미지를 불러오지 못했습니다.`);
+          }
+        };
+
+        if (hasImageLoadFailed(image.complete, image.naturalWidth)) {
+          showFallback();
+          return;
+        }
+
+        image.addEventListener("error", showFallback, { once: true, signal: controller.signal });
+      });
+
+      publicWindow.__publicImageFallbackCleanup = () => controller.abort();
+    };
+
+    document.addEventListener("astro:before-swap", () => {
+      (window as PublicImageWindow).__publicImageFallbackCleanup?.();
+    });
+    document.addEventListener("astro:page-load", initPublicImageFallbacks);
+    initPublicImageFallbacks();
+  </script>
   <button class="floating-top-button" type="button" data-floating-top aria-label="맨 위로 이동">↑</button>
   <script is:inline>
     if (!window.__portfolioFadeNavigationSetup) {

@@ -1,0 +1,14 @@
+---
+import NotFoundPage from "../components/NotFoundPage.astro";
+import PublicLayout from "../layouts/PublicLayout.astro";
+
+export const prerender = false;
+---
+
+<PublicLayout
+  title="페이지를 찾을 수 없습니다. | Beyond the Answer."
+  description="요청한 페이지를 찾을 수 없습니다."
+  noindex={true}
+>
+  <NotFoundPage />
+</PublicLayout>

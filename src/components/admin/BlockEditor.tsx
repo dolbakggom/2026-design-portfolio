@@ -10,6 +10,8 @@ type UploadedAsset = {
   id: string;
   url: string;
   alt: string;
+  width: number | null;
+  height: number | null;
 };
 
 type Props = {
@@ -215,7 +217,7 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
         ...block,
         content: {
           ...block.content,
-          images: [...images, { assetId: asset.id, url: asset.url, alt: asset.alt }]
+          images: [...images, { assetId: asset.id, url: asset.url, alt: asset.alt, width: asset.width, height: asset.height }]
         }
       });
       return;
@@ -227,7 +229,9 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
         ...block.content,
         assetId: asset.id,
         url: asset.url,
-        alt: asset.alt
+        alt: asset.alt,
+        width: asset.width,
+        height: asset.height
       }
     });
   };

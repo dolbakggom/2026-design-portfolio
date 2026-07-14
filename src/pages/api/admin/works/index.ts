@@ -26,8 +26,8 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const works = await createWork(parsed.data);
-    await purgePublicHtmlCache(request, getPublicHtmlCachePathsForWorks(works));
-    return json({ works }, { status: 201 });
+    const publication = await purgePublicHtmlCache(request, getPublicHtmlCachePathsForWorks(works));
+    return json({ works, publication }, { status: 201 });
   } catch {
     return serverError("Unable to create work");
   }

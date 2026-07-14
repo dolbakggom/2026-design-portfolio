@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, PointerEvent, ReactNode, SyntheticEvent } from "react";
 import type { Profile, TimelineItem, WorkBlock, WorkCategory, WorkItem } from "../../types";
+import { fitImageDimensions, MAX_IMAGE_UPLOAD_BYTES } from "../../lib/image-upload";
 import "../../styles/admin.css";
 
 const BlockEditor = lazy(() => import("./BlockEditor"));
@@ -32,8 +33,27 @@ type AssetResponse = {
     alt: string;
     mime: string;
     size: number;
+    width: number | null;
+    height: number | null;
   };
 };
+
+type PublicationResult = {
+  status: "purged" | "deferred" | "failed";
+};
+
+type PublishedResponse<T> = T & {
+  publication: PublicationResult;
+};
+
+const publicationPriority: Record<PublicationResult["status"], number> = {
+  purged: 0,
+  deferred: 1,
+  failed: 2
+};
+
+const lessSuccessfulPublication = (current: PublicationResult | null, next: PublicationResult) =>
+  !current || publicationPriority[next.status] > publicationPriority[current.status] ? next : current;
 
 type Tab = "profile" | "timeline" | "works";
 type WorkScreen = "list" | "editor";
@@ -275,13 +295,25 @@ const decodeImageSource = async (file: File) => {
 };
 
 const normalizeImageForUpload = async (file: File) => {
-  const passthroughTypes = new Set(["image/gif", "image/svg+xml"]);
-  if (!file.type.startsWith("image/") || passthroughTypes.has(file.type)) return file;
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+    throw new Error("JPG, PNG, WebP 또는 GIF 이미지만 업로드할 수 있습니다.");
+  }
+
+  if (file.size <= 0 || file.size > MAX_IMAGE_UPLOAD_BYTES) {
+    throw new Error("이미지는 16MB보다 작아야 합니다.");
+  }
 
   const decoded = await decodeImageSource(file);
+  const dimensions = fitImageDimensions(decoded.width, decoded.height);
+
+  if (file.type === "image/gif") {
+    decoded.cleanup();
+    return { file, width: decoded.width, height: decoded.height };
+  }
+
   const canvas = document.createElement("canvas");
-  canvas.width = decoded.width;
-  canvas.height = decoded.height;
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
   const context = canvas.getContext("2d", { colorSpace: "srgb" } as CanvasRenderingContext2DSettings);
 
   if (!context) {
@@ -289,19 +321,19 @@ const normalizeImageForUpload = async (file: File) => {
     throw new Error("이미지 SDR 변환에 실패했습니다.");
   }
 
-  context.drawImage(decoded.source, 0, 0, decoded.width, decoded.height);
+  context.drawImage(decoded.source, 0, 0, dimensions.width, dimensions.height);
   decoded.cleanup();
 
-  const isPng = file.type === "image/png";
-  const outputType = isPng ? "image/png" : "image/jpeg";
-  const outputExtension = isPng ? "png" : "jpg";
-  const blob = await canvasToBlob(canvas, outputType, isPng ? undefined : 0.92);
+  const blob = await canvasToBlob(canvas, "image/webp", 0.9);
   const baseName = file.name.replace(/\.[^.]+$/, "") || "upload";
 
-  return new File([blob], `${baseName}-sdr.${outputExtension}`, {
-    type: outputType,
-    lastModified: Date.now()
-  });
+  return {
+    file: new File([blob], `${baseName}-optimized.webp`, {
+      type: "image/webp",
+      lastModified: Date.now()
+    }),
+    ...dimensions
+  };
 };
 
 const contentText = (block: WorkBlock, key: string, fallback = "") => {
@@ -430,6 +462,7 @@ function WorkLivePreview({ work }: { work: WorkItem }) {
 
 export default function AdminApp() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [loginPending, setLoginPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [profile, setProfile] = useState<Profile>(emptyProfile);
@@ -443,6 +476,7 @@ export default function AdminApp() {
   const [isMobileAdmin, setIsMobileAdmin] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [warning, setWarning] = useState("");
   const [error, setError] = useState("");
   const [profileImageUploading, setProfileImageUploading] = useState(false);
   const [draggedWorkId, setDraggedWorkId] = useState("");
@@ -516,13 +550,35 @@ export default function AdminApp() {
 
   const flash = (value: string) => {
     setMessage(value);
+    setWarning("");
     setError("");
     window.setTimeout(() => setMessage(""), 2400);
+  };
+
+  const warn = (value: string) => {
+    setWarning(value);
+    setMessage("");
+    setError("");
   };
 
   const fail = (value: string) => {
     setError(value);
     setMessage("");
+    setWarning("");
+  };
+
+  const reportPublication = (publication: PublicationResult, successMessage: string) => {
+    if (publication.status === "purged") {
+      flash(`${successMessage} 공개 페이지에도 바로 반영됩니다.`);
+      return;
+    }
+
+    if (publication.status === "deferred") {
+      warn(`${successMessage} CDN 즉시 갱신이 설정되지 않아 최대 10분 뒤 반영됩니다.`);
+      return;
+    }
+
+    warn(`${successMessage} 다만 공개 캐시 갱신에 실패했습니다. 잠시 후 다시 저장해주세요.`);
   };
 
   const loadAll = async () => {
@@ -563,7 +619,10 @@ export default function AdminApp() {
 
   const login = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (loginPending) return;
+
     const form = new FormData(event.currentTarget);
+    setLoginPending(true);
 
     try {
       await requestJson("/api/admin/login", {
@@ -577,6 +636,8 @@ export default function AdminApp() {
       flash("로그인되었습니다.");
     } catch (loginError) {
       fail(loginError instanceof Error ? loginError.message : "로그인에 실패했습니다.");
+    } finally {
+      setLoginPending(false);
     }
   };
 
@@ -592,13 +653,13 @@ export default function AdminApp() {
     }
 
     try {
-      const data = await requestJson<{ profile: Profile }>("/api/admin/profile", {
+      const data = await requestJson<PublishedResponse<{ profile: Profile }>>("/api/admin/profile", {
         method: "PUT",
         body: JSON.stringify(profileRef.current)
       });
       setProfile(data.profile);
       profileRef.current = data.profile;
-      flash("자기소개가 저장되었습니다.");
+      reportPublication(data.publication, "자기소개가 저장되었습니다.");
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "저장에 실패했습니다.");
     }
@@ -607,17 +668,19 @@ export default function AdminApp() {
   const saveTimeline = async () => {
     try {
       let nextTimeline = timeline;
+      let publication: PublicationResult | null = null;
 
       for (const item of timeline) {
-        const data = await requestJson<{ timeline: TimelineItem[] }>(`/api/admin/timeline/${item.id}`, {
+        const data = await requestJson<PublishedResponse<{ timeline: TimelineItem[] }>>(`/api/admin/timeline/${item.id}`, {
           method: "PUT",
           body: JSON.stringify({ ...item, description: "" })
         });
         nextTimeline = data.timeline;
+        publication = lessSuccessfulPublication(publication, data.publication);
       }
 
       setTimeline(nextTimeline);
-      flash("이력이 모두 저장되었습니다.");
+      if (publication) reportPublication(publication, "이력이 모두 저장되었습니다.");
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "이력 저장에 실패했습니다.");
     }
@@ -625,7 +688,7 @@ export default function AdminApp() {
 
   const addTimelineItem = async () => {
     try {
-      const data = await requestJson<{ timeline: TimelineItem[] }>("/api/admin/timeline", {
+      const data = await requestJson<PublishedResponse<{ timeline: TimelineItem[] }>>("/api/admin/timeline", {
         method: "POST",
         body: JSON.stringify({
           period: "2026",
@@ -635,7 +698,7 @@ export default function AdminApp() {
         })
       });
       setTimeline(data.timeline);
-      flash("이력이 추가되었습니다.");
+      reportPublication(data.publication, "이력이 추가되었습니다.");
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "이력 추가에 실패했습니다.");
     }
@@ -644,21 +707,23 @@ export default function AdminApp() {
   const deleteTimelineItem = async (id: string) => {
     if (!window.confirm("정말 삭제하시겠습니까?")) return;
     try {
-      const data = await requestJson<{ timeline: TimelineItem[] }>(`/api/admin/timeline/${id}`, {
+      const data = await requestJson<PublishedResponse<{ timeline: TimelineItem[] }>>(`/api/admin/timeline/${id}`, {
         method: "DELETE"
       });
       setTimeline(data.timeline);
-      flash("이력이 삭제되었습니다.");
+      reportPublication(data.publication, "이력이 삭제되었습니다.");
     } catch (deleteError) {
       fail(deleteError instanceof Error ? deleteError.message : "이력 삭제에 실패했습니다.");
     }
   };
 
   const uploadAsset = async (file: File, alt = "") => {
-    const uploadFile = await normalizeImageForUpload(file);
+    const upload = await normalizeImageForUpload(file);
     const form = new FormData();
-    form.set("file", uploadFile);
+    form.set("file", upload.file);
     form.set("alt", alt);
+    form.set("width", String(upload.width));
+    form.set("height", String(upload.height));
 
     const response = await fetch("/api/admin/assets", {
       method: "POST",
@@ -682,7 +747,7 @@ export default function AdminApp() {
         const nextProfile = {
         ...current,
         portraitAssetId: asset.id,
-        portrait: { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime }
+        portrait: { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime, width: asset.width, height: asset.height }
         };
         profileRef.current = nextProfile;
         return nextProfile;
@@ -712,7 +777,7 @@ export default function AdminApp() {
 
   const saveWork = async (work: WorkItem) => {
     try {
-      const data = await requestJson<{ works: WorkItem[] }>(`/api/admin/works/${work.id}`, {
+      const data = await requestJson<PublishedResponse<{ works: WorkItem[] }>>(`/api/admin/works/${work.id}`, {
         method: "PUT",
         body: JSON.stringify({
           ...work,
@@ -724,7 +789,7 @@ export default function AdminApp() {
       setWorks(data.works);
       setSavedWorkSnapshots(workSnapshots(data.works));
       setSelectedWorkId(work.id);
-      flash("작업물이 저장되었습니다.");
+      reportPublication(data.publication, "작업물이 저장되었습니다.");
       return true;
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "작업물 저장에 실패했습니다.");
@@ -847,7 +912,7 @@ export default function AdminApp() {
   const addWork = async () => {
     const title = "New Project";
     try {
-      const data = await requestJson<{ works: WorkItem[] }>("/api/admin/works", {
+      const data = await requestJson<PublishedResponse<{ works: WorkItem[] }>>("/api/admin/works", {
         method: "POST",
         body: JSON.stringify({
           slug: slugify(`${title}-${Date.now()}`),
@@ -867,7 +932,7 @@ export default function AdminApp() {
       setSelectedWorkId(data.works[data.works.length - 1]?.id ?? "");
       setActiveTab("works");
       setWorkScreen("editor");
-      flash("작업물이 추가되었습니다.");
+      reportPublication(data.publication, "작업물이 추가되었습니다.");
     } catch (saveError) {
       fail(saveError instanceof Error ? saveError.message : "작업물 추가에 실패했습니다.");
     }
@@ -877,14 +942,14 @@ export default function AdminApp() {
     if (!window.confirm("정말 삭제하시겠습니까?")) return;
     if (!selectedWork) return;
     try {
-      const data = await requestJson<{ works: WorkItem[] }>(`/api/admin/works/${selectedWork.id}`, {
+      const data = await requestJson<PublishedResponse<{ works: WorkItem[] }>>(`/api/admin/works/${selectedWork.id}`, {
         method: "DELETE"
       });
       setWorks(data.works);
       setSavedWorkSnapshots(workSnapshots(data.works));
       setSelectedWorkId(data.works[0]?.id ?? "");
       setWorkScreen("list");
-      flash("작업물이 삭제되었습니다.");
+      reportPublication(data.publication, "작업물이 삭제되었습니다.");
     } catch (deleteError) {
       fail(deleteError instanceof Error ? deleteError.message : "작업물 삭제에 실패했습니다.");
     }
@@ -892,16 +957,21 @@ export default function AdminApp() {
 
   const persistWorkOrder = async (items: WorkItem[]) => {
     setWorks(items);
-    await requestJson<{ works: WorkItem[] }>("/api/admin/reorder", {
+    await requestJson<PublishedResponse<{ works: WorkItem[] }>>("/api/admin/reorder", {
       method: "PATCH",
       body: JSON.stringify({ type: "works", ids: items.map((item) => item.id) })
     })
-      .then((data) => setWorks(data.works))
+      .then((data) => {
+        setWorks(data.works);
+        reportPublication(data.publication, "작업물 순서가 저장되었습니다.");
+      })
       .catch(() => fail("작업물 순서 저장에 실패했습니다."));
   };
 
   const workAssetPatch = (kind: WorkAssetKind, asset: AssetResponse["asset"] | null): Partial<WorkItem> => {
-    const assetRef = asset ? { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime } : null;
+    const assetRef = asset
+      ? { id: asset.id, url: asset.url, alt: asset.alt, mime: asset.mime, width: asset.width, height: asset.height }
+      : null;
 
     if (kind === "thumbnail") {
       return { thumbnailAssetId: asset?.id ?? null, thumbnail: assetRef };
@@ -948,14 +1018,14 @@ export default function AdminApp() {
           <h1>Admin Login</h1>
           <label>
             Username
-            <input name="username" autoComplete="username" required />
+            <input name="username" autoComplete="username" disabled={loginPending} required />
           </label>
           <label>
             Password
-            <input name="password" type="password" autoComplete="current-password" required />
+            <input name="password" type="password" autoComplete="current-password" disabled={loginPending} required />
           </label>
           {error ? <div className="admin-alert error">{error}</div> : null}
-          <button type="submit">Login</button>
+          <button type="submit" disabled={loginPending}>{loginPending ? "Signing in..." : "Login"}</button>
         </form>
       </main>
     );
@@ -963,9 +1033,9 @@ export default function AdminApp() {
 
   return (
     <>
-      {message || error ? (
-        <div className={`admin-toast ${error ? "error" : ""}`} role={error ? "alert" : "status"}>
-          {error || message}
+      {message || warning || error ? (
+        <div className={`admin-toast ${error ? "error" : warning ? "warning" : ""}`} role={error ? "alert" : "status"}>
+          {error || warning || message}
         </div>
       ) : null}
       <main

@@ -22,6 +22,8 @@ const imagesOf = (block: WorkBlock) => {
   return Array.isArray(value) ? value : [];
 };
 
+const numberOf = (value: unknown) => typeof value === "number" && value > 0 ? value : undefined;
+
 const optionOf = (block: WorkBlock, key: string, allowed: string[], fallback: string) => {
   const value = block.content[key];
   return typeof value === "string" && allowed.includes(value) ? value : fallback;
@@ -56,8 +58,19 @@ const textBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", paragr
         const alt = textOf(block, "alt");
         const caption = textOf(block, "caption");
         return (
-          <figure class="work-block-image">
-            {src ? <img src={src} alt={alt} loading="lazy" decoding="async" /> : <div class="media-placeholder" aria-label="No image" />}
+          <figure class:list={["work-block-image", !src && "is-image-unavailable"]} data-image-frame>
+            {src ? (
+              <img
+                src={src}
+                alt={alt}
+                width={numberOf(block.content.width)}
+                height={numberOf(block.content.height)}
+                loading="lazy"
+                decoding="async"
+                data-public-image
+              />
+            ) : null}
+            <div class="media-placeholder" aria-hidden="true" />
             {caption ? <figcaption>{caption}</figcaption> : null}
           </figure>
         );
@@ -70,7 +83,14 @@ const textBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", paragr
               if (!image || typeof image !== "object") return null;
               const src = "url" in image && typeof image.url === "string" ? image.url : "";
               const alt = "alt" in image && typeof image.alt === "string" ? image.alt : "";
-              return src ? <img src={src} alt={alt} loading="lazy" decoding="async" /> : null;
+              const width = "width" in image ? numberOf(image.width) : undefined;
+              const height = "height" in image ? numberOf(image.height) : undefined;
+              return (
+                <div class:list={["work-block-gallery-item", !src && "is-image-unavailable"]} data-image-frame>
+                  {src ? <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" data-public-image /> : null}
+                  <div class="media-placeholder" aria-hidden="true" />
+                </div>
+              );
             })}
           </div>
         );

@@ -19,13 +19,13 @@ export const PATCH: APIRoute = async ({ request }) => {
 
     if (parsed.data.type === "timeline") {
       const timeline = await listTimeline();
-      await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
-      return json({ timeline });
+      const publication = await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
+      return json({ timeline, publication });
     }
 
     const works = await listWorks();
-    await purgePublicHtmlCache(request, getPublicHtmlCachePathsForWorks(works));
-    return json({ works });
+    const publication = await purgePublicHtmlCache(request, getPublicHtmlCachePathsForWorks(works));
+    return json({ works, publication });
   } catch {
     return serverError("Unable to reorder items");
   }

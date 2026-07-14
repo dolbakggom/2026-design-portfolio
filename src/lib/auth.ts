@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { isStrongSessionSecret } from "./request-security";
 
 const COOKIE_NAME = "portfolio_admin";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -41,6 +42,10 @@ const timingSafeEqual = (a: Uint8Array, b: Uint8Array) => {
 };
 
 const hmac = async (value: string) => {
+  if (!isStrongSessionSecret(env.SESSION_SECRET)) {
+    throw new Error("SESSION_SECRET must contain at least 32 bytes");
+  }
+
   const key = await crypto.subtle.importKey(
     "raw",
     encoder.encode(env.SESSION_SECRET),
@@ -111,13 +116,13 @@ export const createSessionCookie = async (request: Request) => {
   const token = `${payload}.${signature}`;
   const isSecure = new URL(request.url).protocol === "https:";
 
-  return `${COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_MAX_AGE}${
+  return `${COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MAX_AGE}${
     isSecure ? "; Secure" : ""
   }`;
 };
 
 export const createExpiredSessionCookie = () =>
-  `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
+  `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`;
 
 export const isAdminRequest = async (request: Request) => {
   const token = getCookie(request, COOKIE_NAME);

@@ -3,6 +3,7 @@ type WorkCacheTarget = {
 };
 
 const HOME_HTML_CACHE_PATHS = ["/", "/about", "/career", "/work"] as const;
+const SITEMAP_CACHE_PATH = "/sitemap.xml";
 
 const normalizeCachePath = (path: string) => {
   const trimmed = path.trim();
@@ -36,7 +37,12 @@ const uniquePaths = (paths: Array<string | null | undefined>) => {
 export const getHomeHtmlCachePaths = () => [...HOME_HTML_CACHE_PATHS];
 
 export const getPublicHtmlCachePathsForWorks = (works: WorkCacheTarget[], extraPaths: string[] = []) =>
-  uniquePaths([...getHomeHtmlCachePaths(), ...works.map((work) => getWorkHtmlCachePath(work.slug)), ...extraPaths]);
+  uniquePaths([
+    ...getHomeHtmlCachePaths(),
+    SITEMAP_CACHE_PATH,
+    ...works.map((work) => getWorkHtmlCachePath(work.slug)),
+    ...extraPaths
+  ]);
 
 export const createPublicHtmlCacheKeys = (originUrl: string | URL, paths: string[]) => {
   const origin = new URL(originUrl.toString()).origin;
@@ -58,9 +64,14 @@ export const createPublicHtmlPurgeUrls = (originUrl: string | URL, paths: string
 };
 
 export const deletePublicHtmlCache = async (request: Request, paths: string[]) => {
-  if (typeof caches === "undefined") return;
+  if (typeof caches === "undefined") return { ok: false, skipped: true };
 
   const cache = (caches as unknown as { default: Cache }).default;
   const cacheKeys = createPublicHtmlCacheKeys(request.url, paths);
-  await Promise.allSettled(cacheKeys.map((cacheKey) => cache.delete(cacheKey)));
+  const results = await Promise.allSettled(cacheKeys.map((cacheKey) => cache.delete(cacheKey)));
+
+  return {
+    ok: results.every((result) => result.status === "fulfilled"),
+    skipped: false
+  };
 };

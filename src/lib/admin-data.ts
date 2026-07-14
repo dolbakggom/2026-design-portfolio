@@ -59,10 +59,19 @@ type WorkRow = {
   sort_order: number;
   thumbnail_key: string | null;
   thumbnail_alt: string | null;
+  thumbnail_mime: string | null;
+  thumbnail_width: number | null;
+  thumbnail_height: number | null;
   featured_thumbnail_key: string | null;
   featured_thumbnail_alt: string | null;
+  featured_thumbnail_mime: string | null;
+  featured_thumbnail_width: number | null;
+  featured_thumbnail_height: number | null;
   hero_key: string | null;
   hero_alt: string | null;
+  hero_mime: string | null;
+  hero_width: number | null;
+  hero_height: number | null;
 };
 
 type BlockRow = {
@@ -144,21 +153,30 @@ const toWork = (row: WorkRow, blocks: WorkBlock[] = []): WorkItem => ({
     ? {
         id: row.thumbnail_asset_id,
         url: mediaUrl(row.thumbnail_key),
-        alt: row.thumbnail_alt
+        alt: row.thumbnail_alt,
+        mime: row.thumbnail_mime,
+        width: row.thumbnail_width,
+        height: row.thumbnail_height
     }
     : null,
   featuredThumbnail: row.featured_thumbnail_key
     ? {
         id: row.featured_thumbnail_asset_id,
         url: mediaUrl(row.featured_thumbnail_key),
-        alt: row.featured_thumbnail_alt
+        alt: row.featured_thumbnail_alt,
+        mime: row.featured_thumbnail_mime,
+        width: row.featured_thumbnail_width,
+        height: row.featured_thumbnail_height
       }
     : null,
   hero: row.hero_key
     ? {
         id: row.hero_asset_id,
         url: mediaUrl(row.hero_key),
-        alt: row.hero_alt
+        alt: row.hero_alt,
+        mime: row.hero_mime,
+        width: row.hero_width,
+        height: row.hero_height
       }
     : null,
   blocks
@@ -260,9 +278,13 @@ export const deleteTimeline = async (id: string) => {
 export const listWorks = async () => {
   const worksResult = await getD1()
     .prepare(
-      `SELECT w.*, thumb.r2_key AS thumbnail_key, thumb.alt AS thumbnail_alt,
+      `SELECT w.*, thumb.r2_key AS thumbnail_key, thumb.alt AS thumbnail_alt, thumb.mime AS thumbnail_mime,
+        thumb.width AS thumbnail_width, thumb.height AS thumbnail_height,
         featured_thumb.r2_key AS featured_thumbnail_key, featured_thumb.alt AS featured_thumbnail_alt,
-        hero.r2_key AS hero_key, hero.alt AS hero_alt
+        featured_thumb.mime AS featured_thumbnail_mime, featured_thumb.width AS featured_thumbnail_width,
+        featured_thumb.height AS featured_thumbnail_height,
+        hero.r2_key AS hero_key, hero.alt AS hero_alt, hero.mime AS hero_mime,
+        hero.width AS hero_width, hero.height AS hero_height
       FROM works w
       LEFT JOIN assets thumb ON thumb.id = w.thumbnail_asset_id
       LEFT JOIN assets featured_thumb ON featured_thumb.id = w.featured_thumbnail_asset_id
@@ -286,11 +308,12 @@ export const listWorks = async () => {
 };
 
 export const createWork = async (input: WorkInput) => {
+  const db = getD1();
   const id = crypto.randomUUID();
-  const max = await getD1().prepare("SELECT COALESCE(MAX(sort_order), 0) AS value FROM works").first<{ value: number }>();
+  const max = await db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS value FROM works").first<{ value: number }>();
 
-  await getD1()
-    .prepare(
+  const statements = [
+    db.prepare(
       `INSERT INTO works (
         id, slug, title, category, summary, client, year, role,
         thumbnail_asset_id, featured_thumbnail_asset_id, hero_asset_id, featured, published, sort_order
@@ -311,26 +334,13 @@ export const createWork = async (input: WorkInput) => {
       input.featured ? 1 : 0,
       input.published ? 1 : 0,
       input.sortOrder ?? (max?.value ?? 0) + 1
-    )
-    .run();
-
-  if (input.blocks.length) {
-    await replaceWorkBlocks(id, input.blocks);
-  }
-
-  return listWorks();
-};
-
-export const replaceWorkBlocks = async (workId: string, blocks: WorkInput["blocks"]) => {
-  const db = getD1();
-  const statements = [
-    db.prepare("DELETE FROM work_blocks WHERE work_id = ?").bind(workId),
-    ...blocks.map((block, index) =>
+    ),
+    ...input.blocks.map((block, index) =>
       db
         .prepare("INSERT INTO work_blocks (id, work_id, type, content, sort_order) VALUES (?, ?, ?, ?, ?)")
         .bind(
           block.id ?? crypto.randomUUID(),
-          workId,
+          id,
           block.type,
           JSON.stringify(block.content),
           block.sortOrder ?? index + 1
@@ -339,12 +349,14 @@ export const replaceWorkBlocks = async (workId: string, blocks: WorkInput["block
   ];
 
   await db.batch(statements);
+
+  return listWorks();
 };
 
 export const updateWork = async (id: string, input: WorkInput) => {
   const db = getD1();
-  const result = await db
-    .prepare(
+  const statements = [
+    db.prepare(
       `UPDATE works SET
         slug = ?, title = ?, category = ?, summary = ?, client = ?, year = ?, role = ?,
         thumbnail_asset_id = ?, featured_thumbnail_asset_id = ?, hero_asset_id = ?, featured = ?, published = ?,
@@ -366,12 +378,25 @@ export const updateWork = async (id: string, input: WorkInput) => {
       input.published ? 1 : 0,
       input.sortOrder ?? null,
       id
+    ),
+    db.prepare("DELETE FROM work_blocks WHERE work_id = ?").bind(id),
+    ...input.blocks.map((block, index) =>
+      db
+        .prepare("INSERT INTO work_blocks (id, work_id, type, content, sort_order) VALUES (?, ?, ?, ?, ?)")
+        .bind(
+          block.id ?? crypto.randomUUID(),
+          id,
+          block.type,
+          JSON.stringify(block.content),
+          block.sortOrder ?? index + 1
+        )
     )
-    .run();
+  ];
+
+  const [result] = await db.batch(statements);
 
   if (result.meta.changes === 0) return null;
 
-  await replaceWorkBlocks(id, input.blocks);
   return listWorks();
 };
 

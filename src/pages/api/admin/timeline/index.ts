@@ -26,8 +26,8 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const timeline = await createTimeline(parsed.data);
-    await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
-    return json({ timeline }, { status: 201 });
+    const publication = await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
+    return json({ timeline, publication }, { status: 201 });
   } catch {
     return serverError("Unable to create timeline item");
   }

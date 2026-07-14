@@ -283,6 +283,12 @@
   color: #8f1f11;
 }
 
+.admin-toast.warning {
+  border-color: rgba(201, 145, 38, 0.42);
+  background: rgba(255, 248, 226, 0.96);
+  color: #6f4a08;
+}
+
 .admin-topbar {
   display: flex;
   justify-content: space-between;

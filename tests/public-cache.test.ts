@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   createPublicHtmlCacheKeys,
   createPublicHtmlPurgeUrls,
+  deletePublicHtmlCache,
   getHomeHtmlCachePaths,
   getPublicHtmlCachePathsForWorks
 } from "../src/lib/public-cache.ts";
@@ -22,6 +23,7 @@ test("work mutations purge home routes, current detail pages, and stale slug pat
     "/about",
     "/career",
     "/work",
+    "/sitemap.xml",
     "/work/identity-system",
     "/work/mobile-app",
     "/work/old-slug",
@@ -47,4 +49,10 @@ test("global purge urls are absolute and de-duplicated", () => {
   ]);
 
   assert.deepEqual(urls, ["https://dolbakggom.com/", "https://dolbakggom.com/work/test", "https://dolbakggom.com/about"]);
+});
+
+test("cache deletion reports skipped outside the Cloudflare cache runtime", async () => {
+  const result = await deletePublicHtmlCache(new Request("https://dolbakggom.com/admin"), ["/"]);
+
+  assert.deepEqual(result, { ok: false, skipped: true });
 });

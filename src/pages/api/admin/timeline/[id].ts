@@ -17,8 +17,9 @@ export const PUT: APIRoute = async ({ params, request }) => {
 
   try {
     const timeline = await updateTimeline(params.id, parsed.data);
-    if (timeline) await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
-    return timeline ? json({ timeline }) : notFound();
+    if (!timeline) return notFound();
+    const publication = await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
+    return json({ timeline, publication });
   } catch {
     return serverError("Unable to update timeline item");
   }
@@ -30,8 +31,8 @@ export const DELETE: APIRoute = async ({ params, request }) => {
 
   try {
     const timeline = await deleteTimeline(params.id);
-    await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
-    return json({ timeline });
+    const publication = await purgePublicHtmlCache(request, getHomeHtmlCachePaths());
+    return json({ timeline, publication });
   } catch {
     return serverError("Unable to delete timeline item");
   }

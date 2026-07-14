@@ -1,4 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
+import { forbidden } from "./lib/http";
+import { isAllowedAdminMutation } from "./lib/request-security";
 
 const EDGE_TTL_SECONDS = 600;
 const STALE_WHILE_REVALIDATE_SECONDS = 86_400;
@@ -46,6 +48,10 @@ const withPublicCacheHeaders = (response: Response, cacheState: "MISS" | "BYPASS
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const requestUrl = new URL(context.request.url);
+  if (requestUrl.pathname.startsWith("/api/admin/") && !isAllowedAdminMutation(context.request)) {
+    return forbidden();
+  }
+
   const isPublicCacheCandidate =
     context.request.method === "GET" &&
     !requestUrl.search &&

@@ -2,9 +2,19 @@ import { z } from "zod";
 
 const workCategories = ["UI/UX", "BI/BX", "UI/UX, BI/BX"] as const;
 
+const isAllowedLinkUrl = (value: string) => {
+  if (/^#[a-z][a-z0-9_-]*$/i.test(value)) return true;
+
+  try {
+    return ["http:", "https:", "mailto:", "tel:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+};
+
 export const linkSchema = z.object({
   label: z.string().min(1).max(80),
-  url: z.string().min(1).max(500)
+  url: z.string().min(1).max(500).refine(isAllowedLinkUrl, "Unsupported link URL")
 });
 
 export const profileSchema = z.object({
@@ -50,8 +60,8 @@ export const workSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1)
+  username: z.string().min(1).max(120),
+  password: z.string().min(1).max(1024)
 });
 
 export const reorderSchema = z.object({
