@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  createDatabaseHealthFailureEvent,
   createContentReadFailureEvent,
-  reportContentReadFailure
+  reportContentReadFailure,
+  reportDatabaseHealthFailure
 } from "../src/lib/content-observability.ts";
 
 test("content read failures include a stable event name and route context", () => {
@@ -42,4 +44,19 @@ test("content failure reporting emits one sanitized structured event", () => {
     errorMessage: "query failed"
   });
   assert.equal(JSON.stringify(calls).includes("must-not-be-logged"), false);
+});
+
+test("database health failures use a stable dependency event", () => {
+  assert.deepEqual(createDatabaseHealthFailureEvent(new Error("binding unavailable")), {
+    event: "portfolio.health.database_unavailable",
+    dependency: "D1",
+    errorName: "Error",
+    errorMessage: "binding unavailable"
+  });
+
+  const calls: unknown[][] = [];
+  reportDatabaseHealthFailure({ message: "schema missing", token: "do-not-log" }, (...args) => calls.push(args));
+
+  assert.equal(calls[0]?.[0], "[portfolio.health.database_unavailable]");
+  assert.equal(JSON.stringify(calls).includes("do-not-log"), false);
 });

@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro:middleware";
+import { isFallbackContentResponse } from "./lib/content-response";
 import { forbidden } from "./lib/http";
 import { isAllowedAdminMutation } from "./lib/request-security";
 
@@ -24,6 +25,7 @@ const isPublicHtmlRoute = (url: URL) => {
 const isCacheableHtmlResponse = (response: Response) => {
   if (response.status !== 200) return false;
   if (response.headers.has("set-cookie")) return false;
+  if (isFallbackContentResponse(response)) return false;
   return response.headers.get("content-type")?.includes("text/html") ?? false;
 };
 

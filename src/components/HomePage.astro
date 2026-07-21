@@ -1,7 +1,8 @@
 ---
 import PublicLayout from "../layouts/PublicLayout.astro";
 import { sanitizeProfileIntro } from "../lib/content-sanitizer";
-import { getHomeContent } from "../lib/content";
+import { getHomeContentResult } from "../lib/content";
+import { applyPublicContentStatus } from "../lib/content-response";
 import { buildResponsiveImageSource } from "../lib/responsive-images";
 import { createHomeStructuredData } from "../lib/seo";
 
@@ -10,7 +11,9 @@ interface Props {
 }
 
 const { initialSection = "intro" } = Astro.props;
-const { profile, timeline, featuredWorks, works } = await getHomeContent();
+const contentResult = await getHomeContentResult();
+const { profile, timeline, featuredWorks, works } = contentResult.data;
+applyPublicContentStatus(Astro.response.headers, contentResult.source);
 const categories = ["ALL", "UI/UX", "BI/BX"];
 const logoPath = "M22.0732 0.000976562H27.4131V49.124L44.1484 39.4609V16.8125H49.4883V42.5039L49.4873 42.5479L27.4141 55.291L27.4131 55.2891H22.0732V6.16602L5.33984 15.8271V38.4883H0V12.7432L22.0723 0L22.0732 0.000976562Z";
 const fallbackPortraitSrc = "/assets/figma/profile-guitar.png";

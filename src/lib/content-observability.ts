@@ -50,3 +50,16 @@ export const reportContentReadFailure = (
 ) => {
   logger("[portfolio.content.read_failed]", createContentReadFailureEvent(context, error));
 };
+
+export const createDatabaseHealthFailureEvent = (error: unknown) => ({
+  event: "portfolio.health.database_unavailable" as const,
+  dependency: "D1" as const,
+  ...normalizeErrorForLog(error)
+});
+
+export const reportDatabaseHealthFailure = (
+  error: unknown,
+  logger: ErrorLogger = console.error
+) => {
+  logger("[portfolio.health.database_unavailable]", createDatabaseHealthFailureEvent(error));
+};

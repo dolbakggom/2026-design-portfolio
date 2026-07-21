@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import type { AssetVariant, HomeContent, LinkItem, Profile, TimelineItem, WorkBlock, WorkItem } from "../types";
 import { sanitizeProfileIntro } from "./content-sanitizer";
 import { reportContentReadFailure } from "./content-observability";
+import type { PublicContentResult } from "./content-response";
 import { fallbackContent, fallbackWorks } from "./fallback";
 import { getWorkFallback } from "./public-resilience";
 import { attachAssetVariants } from "./responsive-images";
@@ -259,7 +260,7 @@ const toBlock = (row: BlockRow): WorkBlock => ({
   sortOrder: row.sort_order
 });
 
-export const getHomeContent = async (): Promise<HomeContent> => {
+export const getHomeContentResult = async (): Promise<PublicContentResult<HomeContent>> => {
   try {
     const db = env.DB;
     const profileRow = await db
@@ -303,18 +304,23 @@ export const getHomeContent = async (): Promise<HomeContent> => {
     const works = rawWorks.map((work) => enrichWorkAssets(work, variantsByAssetId));
 
     return {
-      profile: { ...profile, portrait: attachAssetVariants(profile.portrait, variantsByAssetId) },
-      timeline: (timelineResult.results as TimelineRow[]).map(toTimeline),
-      featuredWorks: works.filter((work: WorkItem) => work.featured).slice(0, 5),
-      works
+      source: "database",
+      data: {
+        profile: { ...profile, portrait: attachAssetVariants(profile.portrait, variantsByAssetId) },
+        timeline: (timelineResult.results as TimelineRow[]).map(toTimeline),
+        featuredWorks: works.filter((work: WorkItem) => work.featured).slice(0, 5),
+        works
+      }
     };
   } catch (error) {
     reportContentReadFailure({ scope: "home" }, error);
-    return fallbackContent;
+    return { data: fallbackContent, source: "fallback" };
   }
 };
 
-export const getWorkBySlug = async (slug: string): Promise<WorkItem | null> => {
+export const getHomeContent = async (): Promise<HomeContent> => (await getHomeContentResult()).data;
+
+export const getWorkBySlugResult = async (slug: string): Promise<PublicContentResult<WorkItem | null>> => {
   try {
     const db = env.DB;
     const row = await db
@@ -335,7 +341,7 @@ export const getWorkBySlug = async (slug: string): Promise<WorkItem | null> => {
       .bind(slug)
       .first<WorkRow>();
 
-    if (!row) return getWorkFallback(slug, fallbackWorks, false);
+    if (!row) return { data: getWorkFallback(slug, fallbackWorks, false), source: "database" };
 
     const blockResult = await db
       .prepare("SELECT * FROM work_blocks WHERE work_id = ? ORDER BY sort_order ASC, created_at ASC")
@@ -352,11 +358,17 @@ export const getWorkBySlug = async (slug: string): Promise<WorkItem | null> => {
     ]);
 
     return {
-      ...enrichWorkAssets(work, variantsByAssetId),
-      blocks: blocks.map((block) => enrichWorkBlockAssets(block, variantsByAssetId))
+      source: "database",
+      data: {
+        ...enrichWorkAssets(work, variantsByAssetId),
+        blocks: blocks.map((block) => enrichWorkBlockAssets(block, variantsByAssetId))
+      }
     };
   } catch (error) {
     reportContentReadFailure({ scope: "work", slug }, error);
-    return getWorkFallback(slug, fallbackWorks, true);
+    return { data: getWorkFallback(slug, fallbackWorks, true), source: "fallback" };
   }
 };
+
+export const getWorkBySlug = async (slug: string): Promise<WorkItem | null> =>
+  (await getWorkBySlugResult(slug)).data;

@@ -36,6 +36,73 @@
 
 ---
 
+## 2026-07-21 Public Content Degraded-State Observability
+
+### 요구사항
+- D1 조회 오류가 starter content로 조용히 대체되어 운영 장애를 발견하기 어려운 문제를 개선합니다.
+- 로컬 개발과 일시 장애 상황의 public fallback은 유지하되, 장애 응답이 정상 콘텐츠처럼 캐시되지 않게 합니다.
+
+### 구현
+- `src/lib/content-response.ts`
+  - public content 조회 출처를 `database | fallback`으로 표현하는 결과 타입을 추가했습니다.
+  - 모든 public 응답에 `x-portfolio-content-source` 진단 헤더를 적용할 수 있게 했습니다.
+  - fallback 응답에는 browser/CDN/Cloudflare용 `no-store` 헤더를 함께 적용합니다.
+- `src/lib/content.ts`
+  - `getHomeContentResult`, `getWorkBySlugResult`가 데이터와 조회 출처를 함께 반환합니다.
+  - 기존 `getHomeContent`, `getWorkBySlug`는 호환 wrapper로 유지했습니다.
+  - D1 오류의 구조화된 `portfolio.content.read_failed` 로그와 starter content fallback 동작은 유지합니다.
+- `src/components/HomePage.astro`, `src/pages/work/[slug].astro`, `src/pages/sitemap.xml.ts`
+  - 조회 출처를 응답 헤더에 반영합니다. D1 정상 응답은 기존 캐시 정책을 유지하고 fallback만 `no-store`로 전환합니다.
+- `src/pages/api/health.ts`
+  - Cache API를 거치지 않고 D1 binding과 public content 필수 테이블 6개의 준비 상태를 직접 확인합니다.
+  - 정상은 `200 { status: "ok" }`, 장애는 `503 { status: "degraded" }`와 `no-store`로 응답합니다.
+- `src/middleware.ts`
+  - fallback 표시가 있는 HTML은 Cloudflare Cache API에 저장하지 않습니다. D1 복구 뒤 임시 콘텐츠가 edge TTL 동안 남는 문제를 차단했습니다.
+- `tests/content-response.test.ts`, `tests/integration/worker.integration.ts`
+  - 정상/장애 응답 헤더와 cache policy를 단위 테스트합니다.
+  - 격리된 테스트 D1을 의도적으로 사용 불가 상태로 만든 뒤 fallback이 두 번 모두 새로 생성되고 Cache API에 들어가지 않는지 검증합니다.
+
+### 운영 확인
+- Cloudflare Worker 로그에서 `portfolio.content.read_failed`로 D1 조회 오류를 검색할 수 있습니다.
+- D1 binding/schema 상태를 즉시 점검하려면 `/api/health`의 HTTP 200 여부를 확인합니다. 장애 시 `portfolio.health.database_unavailable` 구조화 로그도 남습니다.
+- 외부 상태 점검에서는 `x-portfolio-content-source: database`를 정상 조건으로 사용할 수 있습니다. `fallback`이면 사이트는 표시되지만 D1 조회가 저하된 상태입니다.
+
+### 검증
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `npm run test:unit`: 58 tests / 0 failures.
+- `node --test tests/integration/*.integration.ts`: 9 tests / 0 failures. 권한 허용 상태에서 Wrangler와 Chrome 통합 검사를 완료했습니다.
+- `git diff --check`: 통과.
+
+### 남은 확인
+- 현재 Cloudflare Observability는 전체 로그 수집이 활성화되어 있습니다. 별도 외부 uptime monitor를 추가할 경우 `/api/health`의 HTTP 200을 검사하고, public fallback 여부는 `/`의 `x-portfolio-content-source`로 보조 확인할 수 있습니다.
+
+## 2026-07-21 Repository Backup Hygiene Audit
+
+### 요구사항
+- 약 721MB로 지적됐던 저장소와 R2/D1 백업 추적 상태를 점검하고, Git 이력을 훼손하지 않는 범위에서 용량을 정리합니다.
+
+### 점검 및 정리
+- 현재 작업 폴더의 대부분은 Git에 포함되지 않는 로컬 개발 데이터입니다.
+  - `node_modules.nosync`: 약 532MB. iCloud 충돌을 피하기 위한 의존성 디렉터리이므로 유지했습니다.
+  - `.wrangler`: 약 98MB. 로컬 D1/R2 테스트 데이터이며 `.gitignore` 대상이므로 유지했습니다.
+  - 정리 전 `.git`: 약 57MB.
+- 현재 Git 트리에는 `d1-backups/`와 `r2-backups/`가 없고, 두 경로 모두 `.gitignore`에 등록되어 있습니다. 현재 추적 중인 파일에서 운영 백업이나 대용량 미디어도 발견되지 않았습니다.
+- 과거 커밋에는 D1/R2 백업 blob이 남아 있지만, 이를 제거하려면 Git 이력 재작성과 원격 강제 푸시가 필요합니다. 기존 clone과 작업 브랜치에 영향을 주므로 이번 작업에서는 이력을 변경하지 않았습니다.
+- 표준 `git gc`를 실행해 loose object를 pack으로 압축하고 오래된 unreachable object를 정리했습니다.
+  - `.git`: 약 57MB -> 41MB
+  - 전체 작업 폴더: 약 692MB -> 676MB
+  - 정리 후 loose object 0개, pack 2개/40.42MiB, garbage 0개
+
+### 검증
+- `git count-objects -vH`: loose object와 garbage 0개.
+- `git fsck --full`: 유효한 commit/blob 참조 손상 없음. Git 기본 유예 기간 안의 dangling tree 6개는 복구 가능성을 위해 유지됐으며 용량 영향은 미미합니다.
+- `git status --short`: 정리 직후 source 변경 없음.
+- 현재 HEAD의 가장 큰 추적 파일은 생성된 Worker 타입 선언, lockfile, 프로필 이미지 수준이며 백업 파일은 없습니다.
+
+### 남은 확인
+- GitHub 저장소 용량을 더 줄여야 하는 명확한 운영상 이유가 생길 때만 과거 백업 blob 제거를 별도 작업으로 검토합니다. 이 작업은 모든 clone에 영향을 주는 이력 재작성이라 사용자 명시 승인 없이 실행하지 않습니다.
+- 다음 유지보수 순서는 D1 장애를 starter content로 조용히 대체하는 `src/lib/content.ts`의 운영 관측성을 개선하는 것입니다.
+
 ## 2026-07-21 Admin CSS Module Split
 
 ### 요구사항

@@ -97,6 +97,14 @@ after(async () => {
   await server?.close();
 });
 
+test("health endpoint verifies the required D1 content schema without caching", async () => {
+  const response = await app.fetch(`${APP_ORIGIN}/api/health`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { status: "ok", database: "available" });
+});
+
 test("admin login rejects invalid credentials and issues a signed session cookie for valid credentials", async () => {
   const invalidResponse = await app.fetch(`${APP_ORIGIN}/api/admin/login`, {
     method: "POST",
@@ -155,6 +163,7 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
 
   const firstPublicResponse = await app.fetch(`${APP_ORIGIN}/work/${initialPayload.slug}`);
   assert.equal(firstPublicResponse.status, 200);
+  assert.equal(firstPublicResponse.headers.get("x-portfolio-content-source"), "database");
   assert.match(await firstPublicResponse.text(), /Integration Work Draft/);
 
   const updatedPayload = {
@@ -445,5 +454,31 @@ test("admin CSS imports render the shell and work editor layout", async () => {
     assert.equal(editorState.previewOverflow, "hidden");
   } finally {
     await browser.close();
+  }
+});
+
+test("D1 read failures expose degraded content without caching the fallback response", async () => {
+  const disableWorksResponse = await setup.fetch("http://setup.test/", {
+    method: "POST",
+    body: "ALTER TABLE works RENAME TO works_unavailable"
+  });
+  assert.equal(disableWorksResponse.status, 200, await disableWorksResponse.text());
+
+  const healthResponse = await app.fetch(`${APP_ORIGIN}/api/health`);
+  assert.equal(healthResponse.status, 503);
+  assert.equal(healthResponse.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await healthResponse.json(), { status: "degraded", database: "unavailable" });
+
+  for (let requestIndex = 0; requestIndex < 2; requestIndex += 1) {
+    const response = await app.fetch(`${APP_ORIGIN}/work/rush-hour-app`);
+    const html = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("x-portfolio-content-source"), "fallback");
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal(response.headers.get("cdn-cache-control"), "no-store");
+    assert.equal(response.headers.get("cloudflare-cdn-cache-control"), "no-store");
+    assert.equal(response.headers.get("x-portfolio-cache"), null);
+    assert.match(html, /Rush Hour App UI/);
   }
 });
