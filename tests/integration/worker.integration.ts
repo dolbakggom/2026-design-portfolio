@@ -391,3 +391,59 @@ test("featured work dots activate the matching full-screen panel", async () => {
     await browser.close();
   }
 });
+
+test("admin CSS imports render the shell and work editor layout", async () => {
+  const browser = await chromium.launch({
+    executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    headless: true
+  });
+
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.goto(`${harnessOrigin}/admin`, { waitUntil: "domcontentloaded" });
+    await page.getByLabel("Username").fill(ADMIN_USERNAME);
+    await page.getByLabel("Password").fill(ADMIN_PASSWORD);
+    await page.getByRole("button", { name: "Login" }).click();
+    await page.waitForSelector(".admin-sidebar");
+
+    const shellState = await page.evaluate(() => {
+      const shell = document.querySelector<HTMLElement>(".admin-shell");
+      const sidebar = document.querySelector<HTMLElement>(".admin-sidebar");
+      return {
+        shellDisplay: shell ? getComputedStyle(shell).display : "",
+        shellColumns: shell ? getComputedStyle(shell).gridTemplateColumns : "",
+        sidebarPosition: sidebar ? getComputedStyle(sidebar).position : "",
+        horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
+      };
+    });
+
+    assert.equal(shellState.shellDisplay, "grid");
+    assert.notEqual(shellState.shellColumns, "none");
+    assert.equal(shellState.sidebarPosition, "sticky");
+    assert.ok(shellState.horizontalOverflow <= 1);
+
+    await page.getByRole("button", { name: "Works" }).click();
+    await page.waitForSelector(".admin-work-card");
+    await page.locator(".admin-work-card").first().click();
+    await page.waitForSelector(".work-preview-panel");
+
+    const editorState = await page.evaluate(() => {
+      const layout = document.querySelector<HTMLElement>(".works-editor-layout");
+      const editor = document.querySelector<HTMLElement>(".work-editor");
+      const preview = document.querySelector<HTMLElement>(".work-preview-panel");
+      return {
+        layoutDisplay: layout ? getComputedStyle(layout).display : "",
+        layoutColumns: layout ? getComputedStyle(layout).gridTemplateColumns : "",
+        editorOverflow: editor ? getComputedStyle(editor).overflowY : "",
+        previewOverflow: preview ? getComputedStyle(preview).overflow : ""
+      };
+    });
+
+    assert.equal(editorState.layoutDisplay, "grid");
+    assert.match(editorState.layoutColumns, /px/);
+    assert.equal(editorState.editorOverflow, "auto");
+    assert.equal(editorState.previewOverflow, "hidden");
+  } finally {
+    await browser.close();
+  }
+});

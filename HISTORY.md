@@ -36,6 +36,39 @@
 
 ---
 
+## 2026-07-21 Admin CSS Module Split
+
+### 요구사항
+- 1,600줄 이상인 `src/styles/admin.css`를 shell, form, work editor/preview, responsive 책임 단위로 분리합니다.
+- CSS cascade와 모든 관리자 화면의 기존 시각 결과를 유지합니다.
+
+### 구현
+- `src/styles/admin.css`
+  - charset과 다섯 partial import만 유지하는 7줄 진입점으로 변경했습니다.
+- `src/styles/admin/shell.css`
+  - 로그인, sidebar, 공통 버튼, toast와 topbar 등 관리자 shell 스타일을 담당합니다.
+- `src/styles/admin/forms.css`
+  - panel, form field, profile link, timeline과 공통 action 스타일을 담당합니다.
+- `src/styles/admin/works-editor.css`
+  - Works 목록, 기본/미디어/블록 에디터, rich-text toolbar와 sticky action 스타일을 담당합니다.
+- `src/styles/admin/preview.css`
+  - 편집기 splitter, 실시간 preview hero와 상세 블록 스타일을 담당합니다.
+- `src/styles/admin/responsive.css`
+  - 1320px/980px/660px 반응형 규칙과 모바일 drawer를 담당합니다.
+- 선언 순서는 기존 파일 순서 그대로 유지했습니다. 기존 `admin.css` 본문과 다섯 partial 연결 결과의 SHA-256이 `6dd85da6a6dfc875e3be7dcc7a6a9d5230fcc7961d10eb049e95c8bfe2285fb1`로 일치합니다.
+- `tests/integration/worker.integration.ts`
+  - 실제 관리자 로그인 후 desktop shell, sidebar, Works 목록, editor와 preview의 computed layout을 확인하는 브라우저 회귀 테스트를 추가했습니다.
+
+### 검증
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `node --test tests/*.test.ts`: 55 tests / 0 failures.
+- `npm run test:integration`: 7 tests / 0 failures. 관리자 CSS shell/editor 렌더링을 포함해 확인했습니다.
+- `git diff --check`: 통과.
+
+### 남은 확인
+- `admin.css`는 1,640줄에서 7줄 진입점으로 줄었고 가장 큰 partial도 `works-editor.css` 533줄입니다.
+- 다음 유지보수 순서는 저장소 크기와 backup 추적 상태를 다시 점검해 R2/D1 운영 백업이 Git에 남아 있지 않은지 확인하는 것입니다.
+
 ## 2026-07-21 Home Featured Controller Split
 
 ### 요구사항
