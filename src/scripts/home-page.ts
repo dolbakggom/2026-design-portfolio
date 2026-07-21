@@ -1,4 +1,5 @@
 import { getReducedMotionTarget, shouldLoadMotion, type MotionIntent } from "../lib/motion-loader";
+import { initHomeFeatured } from "./home/home-featured";
 import { initHomeIdentity } from "./home/home-identity";
 import { createHomeTypewriter } from "./home/home-typewriter";
 import { initHomeWorkSection } from "./home/home-work";
@@ -38,15 +39,12 @@ const initHomePage = () => {
   const homeScrollAnimations: gsap.core.Animation[] = [];
   let initialScrollFrame = 0;
   let initialScrollTimeout = 0;
-  let featuredBlurTimeout = 0;
   let viewportSyncFrame = 0;
   let viewportRefreshTimeout = 0;
   let lastSyncedViewportHeight = 0;
   let deferredImageObserver: IntersectionObserver | null = null;
-  let activeFeaturedIndex = -1;
   let updateScrollGeometryCache = () => {};
   let cachedWorkTop = Number.POSITIVE_INFINITY;
-  let cachedFeaturedTop = Number.POSITIVE_INFINITY;
   let cachedPanelHeight = window.innerHeight;
   let routeDebounceTimeout = 0;
   let pendingRoute: string | null = null;
@@ -66,9 +64,6 @@ const initHomePage = () => {
     if (initialScrollTimeout) {
       window.clearTimeout(initialScrollTimeout);
     }
-    if (featuredBlurTimeout) {
-      window.clearTimeout(featuredBlurTimeout);
-    }
     window.cancelAnimationFrame(viewportSyncFrame);
     if (viewportRefreshTimeout) {
       window.clearTimeout(viewportRefreshTimeout);
@@ -78,6 +73,7 @@ const initHomePage = () => {
     }
     cleanupTypewriter();
     identityController.cleanup();
+    featuredController.cleanup();
     deferredImageObserver?.disconnect();
     document.documentElement.style.removeProperty("--home-viewport-height");
     ScrollTrigger.removeEventListener("refreshInit", updateScrollGeometryCache);
@@ -204,18 +200,25 @@ if (introTypeTarget && !reduceMotion) {
 
 const introSection = document.querySelector<HTMLElement>(".intro-section");
 const workSection = document.querySelector<HTMLElement>("#work");
-const featuredPanels = gsap.utils.toArray<HTMLElement>("[data-featured-panel]");
-const featuredDots = gsap.utils.toArray<HTMLElement>("[data-featured-dot]");
-const featuredStage = document.querySelector<HTMLElement>(".featured-stage");
-const featuredSection = document.querySelector<HTMLElement>("#featured-work:not(.is-empty)");
 const gallerySection = document.querySelector<HTMLElement>(".gallery-section");
 
 const getWorkTop = () => cachedWorkTop;
-const getFeaturedTop = () => cachedFeaturedTop;
 const getPanelHeight = () => cachedPanelHeight;
 cachedWorkTop = workSection?.offsetTop ?? Number.POSITIVE_INFINITY;
-cachedFeaturedTop = featuredSection?.offsetTop ?? Number.POSITIVE_INFINITY;
 cachedPanelHeight = introSection?.offsetHeight || window.innerHeight;
+const featuredController = initHomeFeatured({
+  gsap,
+  ScrollTrigger,
+  reduceMotion,
+  signal: pageSignal,
+  getPanelHeight,
+  scrollToPosition,
+  clearHomeRoute,
+  updateScrollTriggers,
+  registerAnimation: (animation) => homeScrollAnimations.push(animation),
+  registerTrigger: (trigger) => homeScrollTriggers.push(trigger)
+});
+const featuredSection = featuredController.section;
 const identityController = initHomeIdentity({
   gsap,
   ScrollTrigger,
@@ -236,8 +239,8 @@ const { identity, identityStage } = identityController;
 
 updateScrollGeometryCache = () => {
   cachedWorkTop = workSection?.offsetTop ?? Number.POSITIVE_INFINITY;
-  cachedFeaturedTop = featuredSection?.offsetTop ?? Number.POSITIVE_INFINITY;
   cachedPanelHeight = introSection?.offsetHeight || window.innerHeight;
+  featuredController.updateGeometry();
   identityController.updateGeometry();
 };
 const supportsLargeViewportHeight = typeof CSS !== "undefined" && CSS.supports?.("height", "100lvh") === true;
@@ -266,55 +269,6 @@ updateScrollGeometryCache();
 ScrollTrigger.addEventListener("refreshInit", updateScrollGeometryCache);
 ScrollTrigger.addEventListener("refresh", updateScrollGeometryCache);
 
-const setActiveFeatured = (activeIndex: number) => {
-  const nextIndex = featuredPanels.length
-    ? Math.min(featuredPanels.length - 1, Math.max(0, activeIndex))
-    : -1;
-
-  if (nextIndex === activeFeaturedIndex) return;
-
-  activeFeaturedIndex = nextIndex;
-  featuredPanels.forEach((panel, index) => {
-    panel.classList.toggle("is-active", index === nextIndex);
-    panel.setAttribute("aria-hidden", index === nextIndex ? "false" : "true");
-    panel.querySelectorAll<HTMLAnchorElement>("a").forEach((link) => {
-      if (index === nextIndex) {
-        link.removeAttribute("tabindex");
-      } else {
-        link.setAttribute("tabindex", "-1");
-      }
-    });
-  });
-  featuredDots.forEach((dot, index) => {
-    dot.classList.toggle("is-active", index === nextIndex);
-    dot.setAttribute("aria-pressed", index === nextIndex ? "true" : "false");
-  });
-};
-
-const getFeaturedIndexTop = (index: number) => {
-  const count = Math.max(1, featuredPanels.length);
-  const clampedIndex = gsap.utils.clamp(0, count - 1, index);
-  return getFeaturedTop() + getPanelHeight() * clampedIndex;
-};
-
-featuredDots.forEach((dot) => {
-  dot.addEventListener("click", () => {
-    const targetIndex = Number(dot.dataset.featuredTarget ?? 0);
-    featuredStage?.classList.add("is-dot-jumping");
-    scrollToPosition(getFeaturedIndexTop(targetIndex), "auto");
-    setActiveFeatured(targetIndex);
-    clearHomeRoute();
-    updateScrollTriggers();
-
-    if (featuredBlurTimeout) {
-      window.clearTimeout(featuredBlurTimeout);
-    }
-    featuredBlurTimeout = window.setTimeout(() => {
-      featuredStage?.classList.remove("is-dot-jumping");
-    }, reduceMotion ? 0 : 180);
-  }, { signal: pageSignal });
-});
-
 const scrollToIntroFromFloatingButton = () => {
   scrollToPosition(0, reduceMotion ? "auto" : "smooth");
   replaceRoute("/", { immediate: true });
@@ -323,17 +277,12 @@ const scrollToIntroFromFloatingButton = () => {
 scrollToTopHandler = scrollToIntroFromFloatingButton;
 portfolioWindow.__portfolioScrollToTop = scrollToIntroFromFloatingButton;
 
-const syncFeaturedScrollHeight = () => {
-  if (!featuredSection) return;
-  featuredSection.style.setProperty("--featured-scroll-height", `${(Math.max(1, featuredPanels.length) + 2) * getPanelHeight()}px`);
-};
-
 const refreshHomeScrollLayout = (force = false) => {
   const viewportChanged = syncHomeViewportHeight();
   updateScrollGeometryCache();
   if (!force && !viewportChanged) return;
 
-  syncFeaturedScrollHeight();
+  featuredController.syncScrollHeight();
   updateScrollGeometryCache();
   identityController.queueTimelineFromScroll();
   portfolioWindow.__portfolioLenis?.resize?.();
@@ -344,7 +293,7 @@ const refreshHomeScrollLayout = (force = false) => {
   }
   viewportRefreshTimeout = window.setTimeout(() => {
     syncHomeViewportHeight();
-    syncFeaturedScrollHeight();
+    featuredController.syncScrollHeight();
     updateScrollGeometryCache();
     identityController.queueTimelineFromScroll();
     portfolioWindow.__portfolioLenis?.resize?.();
@@ -357,25 +306,6 @@ const queueHomeScrollLayoutRefresh = (force = false) => {
   viewportSyncFrame = window.requestAnimationFrame(() => refreshHomeScrollLayout(force));
 };
 
-syncFeaturedScrollHeight();
-
-setActiveFeatured(0);
-
-if (featuredSection && featuredPanels.length) {
-  homeScrollTriggers.push(ScrollTrigger.create({
-    trigger: featuredSection,
-    start: "top top",
-    end: () => `bottom-=${getPanelHeight() * 2}px bottom`,
-    scrub: true,
-    invalidateOnRefresh: true,
-    onUpdate: (self) => {
-      const progress = gsap.utils.clamp(0, 0.999999, self.progress);
-      const index = Math.min(featuredPanels.length - 1, Math.floor(progress * featuredPanels.length));
-      setActiveFeatured(index);
-    }
-  }));
-}
-
 if (identityStage) {
   homeScrollAnimations.push(gsap.fromTo(
     identityStage,
@@ -385,24 +315,6 @@ if (identityStage) {
       ease: "none",
       scrollTrigger: {
         trigger: "#work",
-        start: "top bottom",
-        end: "top top",
-        scrub: true,
-        invalidateOnRefresh: true
-      }
-    }
-  ));
-}
-
-if (featuredStage && gallerySection) {
-  homeScrollAnimations.push(gsap.fromTo(
-    featuredStage,
-    { "--featured-gallery-dim": 0 },
-    {
-      "--featured-gallery-dim": 0.86,
-      ease: "none",
-      scrollTrigger: {
-        trigger: gallerySection,
         start: "top bottom",
         end: "top top",
         scrub: true,

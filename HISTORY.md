@@ -36,6 +36,35 @@
 
 ---
 
+## 2026-07-21 Home Featured Controller Split
+
+### 요구사항
+- 대표 작업물 패널 활성화, dot 이동, 스크롤 높이와 Gallery 진입 dim 효과를 Featured 전용 컨트롤러로 분리합니다.
+- 대표 작업물 전환 시 링크 접근성 상태와 기존 스크롤 위치 계산을 유지합니다.
+
+### 구현
+- `src/scripts/home/home-featured.ts`
+  - 대표 작업물 section/stage/panel/dot DOM과 활성 인덱스 및 section 위치 캐시를 소유합니다.
+  - 스크롤 진행률에 따른 패널 활성화, dot 클릭 이동, `aria-hidden`/`aria-pressed`/링크 `tabindex` 동기화를 관리합니다.
+  - viewport 변경 시 featured scroll height와 geometry를 갱신하고 Gallery 진입 dim GSAP 애니메이션을 등록합니다.
+  - dot 점프 blur timeout을 Astro 페이지 cleanup에서 해제합니다.
+- `src/scripts/home-page.ts`
+  - Featured 내부 상태와 이벤트를 제거하고 `syncScrollHeight`, `updateGeometry`, `cleanup` API만 전체 수명 주기에 연결했습니다.
+  - 파일 크기는 563줄에서 475줄로 줄었습니다. 초기 1,119줄과 비교하면 644줄이 역할별 모듈로 이동했습니다.
+- `tests/integration/worker.integration.ts`
+  - 대표 작업물 2개를 생성한 뒤 두 번째 dot 클릭 시 활성 패널과 모든 ARIA 상태가 일치하는 브라우저 회귀 테스트를 추가했습니다.
+  - 화면 밖 요소의 Playwright actionability 대기를 제거해 해당 테스트를 약 13초에서 0.9초로 줄였습니다.
+
+### 검증
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `node --test tests/*.test.ts`: 55 tests / 0 failures.
+- `npm run test:integration`: 6 tests / 0 failures. Featured dot/panel 전환을 포함해 확인했습니다.
+- `git diff --check`: 통과.
+
+### 남은 확인
+- 홈 모션 엔트리는 475줄로 축소되어 Intro, route, viewport refresh를 조정하는 상위 orchestration 역할에 가까워졌습니다.
+- 다음 큰 유지보수 대상은 1,600줄 이상인 `src/styles/admin.css`를 shell, form, work editor/preview, responsive 단위로 분리하는 작업입니다.
+
 ## 2026-07-21 Home Identity Controller Split
 
 ### 요구사항
