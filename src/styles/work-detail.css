@@ -93,17 +93,33 @@
   border-bottom: 1px solid transparent;
   pointer-events: none;
   transition:
-    background 180ms ease,
-    border-color 180ms ease,
-    backdrop-filter 180ms ease,
-    -webkit-backdrop-filter 180ms ease;
+    border-color 180ms ease;
 }
 
-.work-detail-cover[data-title-hidden="true"] .work-detail-topbar {
-  background: rgba(244, 244, 244, 0.72);
+.work-detail-topbar::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: "";
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px) saturate(110%);
+  -webkit-backdrop-filter: blur(18px) saturate(110%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.work-detail-cover[data-title-hidden="true"] + .work-detail-topbar {
   border-bottom-color: rgba(0, 0, 0, 0.04);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+}
+
+.work-detail-cover[data-title-hidden="true"] + .work-detail-topbar::before {
+  opacity: 1;
+}
+
+.work-detail-topbar > * {
+  position: relative;
+  z-index: 1;
 }
 
 .work-back-link {
@@ -137,19 +153,19 @@
   white-space: nowrap;
 }
 
-.work-detail-cover[data-title-hidden="true"] .work-topbar-title {
+.work-detail-cover[data-title-hidden="true"] + .work-detail-topbar .work-topbar-title {
   opacity: 1;
   transform: translateY(0);
 }
 
-.work-detail-cover[data-cover-tone="dark"] .work-back-link {
+.work-detail-cover[data-cover-tone="dark"] + .work-detail-topbar .work-back-link {
   color: var(--color-white);
   text-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
 }
 
-.work-detail-cover[data-cover-tone="light"] .work-back-link,
-.work-detail-cover[data-title-hidden="true"] .work-back-link,
-.work-detail-cover[data-cover-scrolled="true"] .work-back-link {
+.work-detail-cover[data-cover-tone="light"] + .work-detail-topbar .work-back-link,
+.work-detail-cover[data-title-hidden="true"] + .work-detail-topbar .work-back-link,
+.work-detail-cover[data-cover-scrolled="true"] + .work-detail-topbar .work-back-link {
   color: var(--color-ink);
   text-shadow: 0 12px 32px rgba(255, 255, 255, 0.34);
 }
@@ -401,4 +417,3 @@
 .not-found-actions a:focus-visible {
   color: var(--color-acid);
 }
-

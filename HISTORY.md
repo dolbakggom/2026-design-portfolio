@@ -36,6 +36,26 @@
 
 ---
 
+## 2026-07-21 Work Detail Topbar Backdrop Blur
+
+### 요구사항
+- 작업물 상세 페이지를 스크롤할 때 나타나는 고정 상단 바에 흰색 반투명 배경과 은은한 뒤 배경 블러를 복원합니다.
+
+### 구현
+- `src/pages/work/[slug].astro`
+  - 고정 상단 바를 cover 내부에서 바로 다음 sibling으로 이동했습니다. 상단 바가 cover의 흰 fade layer가 아니라 실제 스크롤 콘텐츠를 backdrop으로 샘플링합니다.
+- `src/styles/work-detail.css`
+  - 상단 바 전용 `::before` 배경 레이어에 흰색 78%, `blur(18px) saturate(110%)`를 적용했습니다.
+  - Safari용 `-webkit-backdrop-filter`와 기존 180ms 등장 전환을 유지했습니다.
+  - 버튼과 제목은 블러 레이어 위에 렌더링되도록 stacking order를 명시했습니다.
+
+### 검증
+- 운영 `hexalabs` 상세 페이지에 수정 DOM/CSS를 임시 주입한 Chrome 시각 검사에서 이미지 위 blur 합성을 확인했습니다.
+- computed style: `background rgba(255, 255, 255, 0.78)`, `backdrop-filter blur(18px) saturate(1.1)`, opacity 1.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `node --test --test-name-pattern='admin login|saved work blocks' tests/integration/worker.integration.ts`: 관련 2 tests / 0 failures.
+- `git diff --check`: 통과.
+
 ## 2026-07-21 Public Content Degraded-State Observability
 
 ### 요구사항
