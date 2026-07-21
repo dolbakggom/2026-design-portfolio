@@ -36,7 +36,7 @@
 
 ---
 
-## 2026-07-21 Admin Screen Component Split
+## 2026-07-21 Admin Screen and Controller Split
 
 ### 요구사항
 - 유지보수 개선의 다음 순서로 비대해진 `AdminApp.tsx`를 화면과 컨트롤러 책임 단위로 분리합니다.
@@ -50,8 +50,11 @@
   - 작업물 기본 정보, 미디어 업로드, 지연 로딩 블록 에디터, 실시간 미리보기와 드래그 가능한 분할 바를 하나의 화면 컴포넌트로 분리했습니다.
   - 에디터 로딩 오류 경계도 편집 화면과 함께 이동했습니다.
 - `src/components/admin/AdminApp.tsx`
-  - 화면 JSX를 새 패널에 위임하고 인증, API 요청, 저장 상태, 내비게이션과 편집기 스크롤 복원 같은 orchestration을 유지했습니다.
-  - 파일 크기는 1,111줄에서 771줄로 줄었습니다.
+  - 화면 JSX를 새 패널에 위임하고 `useAdminController`가 제공하는 상태와 이벤트만 조립하도록 정리했습니다.
+  - 파일 크기는 최초 1,111줄에서 화면 분리 후 771줄, 컨트롤러 분리 후 229줄로 줄었습니다.
+- `src/components/admin/useAdminController.ts`
+  - 인증, API 요청, 저장 상태, 공개 캐시 결과 알림, 업로드, 작업물 정렬, 이탈 확인, 편집기 스크롤 복원과 미리보기 크기 조절을 전용 훅으로 옮겼습니다.
+  - 화면 컴포넌트에는 렌더링에 필요한 상태와 이벤트 함수만 반환합니다.
 
 ### 검증
 - `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
@@ -60,7 +63,8 @@
 - `git diff --check`: 통과.
 
 ### 남은 확인
-- `AdminApp.tsx`에는 상태와 API orchestration이 아직 집중되어 있습니다. 다음 대규모 관리자 기능을 추가하기 전 `useAdminController` 계열 훅으로 분리하면 테스트와 변경 범위를 더 좁힐 수 있습니다.
+- `useAdminController.ts`는 현재 644줄입니다. 관리자 기능이 크게 늘어날 때 Profile/Timeline/Works 도메인 훅으로 추가 분리할 수 있지만, 현 단계에서는 서로 연결된 저장·이탈 상태를 한곳에서 관리하는 편이 안전합니다.
+- 다음 대형 유지보수 대상은 1,100줄 이상인 `src/scripts/home-page.ts`의 섹션별 모션 컨트롤러 분리입니다.
 
 ## 2026-07-14 Responsive Images, Deferred Motion, and Astro 7
 
