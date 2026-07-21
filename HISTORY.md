@@ -36,6 +36,32 @@
 
 ---
 
+## 2026-07-21 Admin Screen Component Split
+
+### 요구사항
+- 유지보수 개선의 다음 순서로 비대해진 `AdminApp.tsx`를 화면과 컨트롤러 책임 단위로 분리합니다.
+- 기존 관리자 저장, 업로드, 정렬, 실시간 미리보기와 편집기 분할 크기 조절 동작은 유지합니다.
+
+### 구현
+- `src/components/admin/AdminPanels.tsx`
+  - Profile, Timeline, Works 목록 화면을 `ProfilePanel`, `TimelinePanel`, `WorksListPanel`로 분리했습니다.
+  - 입력 상태와 저장/삭제/드래그 콜백은 부모에서 전달해 기존 데이터 흐름을 유지했습니다.
+- `src/components/admin/WorkEditorPanel.tsx`
+  - 작업물 기본 정보, 미디어 업로드, 지연 로딩 블록 에디터, 실시간 미리보기와 드래그 가능한 분할 바를 하나의 화면 컴포넌트로 분리했습니다.
+  - 에디터 로딩 오류 경계도 편집 화면과 함께 이동했습니다.
+- `src/components/admin/AdminApp.tsx`
+  - 화면 JSX를 새 패널에 위임하고 인증, API 요청, 저장 상태, 내비게이션과 편집기 스크롤 복원 같은 orchestration을 유지했습니다.
+  - 파일 크기는 1,111줄에서 771줄로 줄었습니다.
+
+### 검증
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `node --test tests/*.test.ts`: 55 tests / 0 failures.
+- `npm run test:integration`: 4 tests / 0 failures. 관리자 로그인, D1 저장 후 공개 렌더링, R2 업로드, 모바일 스크롤 흐름을 확인했습니다.
+- `git diff --check`: 통과.
+
+### 남은 확인
+- `AdminApp.tsx`에는 상태와 API orchestration이 아직 집중되어 있습니다. 다음 대규모 관리자 기능을 추가하기 전 `useAdminController` 계열 훅으로 분리하면 테스트와 변경 범위를 더 좁힐 수 있습니다.
+
 ## 2026-07-14 Responsive Images, Deferred Motion, and Astro 7
 
 ### 요구사항

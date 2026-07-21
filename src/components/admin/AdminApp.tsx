@@ -1,22 +1,15 @@
-import { Component, Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, DragEvent, PointerEvent, ReactNode, SyntheticEvent } from "react";
-import type { Profile, TimelineItem, WorkBlock, WorkItem } from "../../types";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent, PointerEvent, SyntheticEvent } from "react";
+import type { Profile, TimelineItem, WorkItem } from "../../types";
 import {
   AdminIcon,
-  ProfileLinkIcon,
-  WorkLivePreview,
   emptyProfile,
-  getWorkCategories,
   lessSuccessfulPublication,
   navItems,
   normalizeImageForUpload,
   reorderById,
   requestJson,
-  sanitizeSlugInput,
   slugify,
-  toggleWorkCategory,
-  workCategoryOptions,
-  workMediaFields,
   workSnapshot,
   workSnapshots,
   type AssetResponse,
@@ -26,29 +19,9 @@ import {
   type WorkAssetKind,
   type WorkScreen
 } from "./AdminSupport";
+import { ProfilePanel, TimelinePanel, WorksListPanel } from "./AdminPanels";
+import WorkEditorPanel from "./WorkEditorPanel";
 import "../../styles/admin.css";
-
-const BlockEditor = lazy(() => import("./BlockEditor"));
-
-class EditorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="admin-editor-loading error">
-          에디터를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 export default function AdminApp() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -380,6 +353,11 @@ export default function AdminApp() {
     setSelectedWorkId(id);
     setWorkScreen("editor");
     window.history.pushState({ adminWorkEditor: id }, "", window.location.href);
+  };
+
+  const openWorkFromCard = (id: string) => {
+    if (workDragMoved.current) return;
+    openWorkEditor(id);
   };
 
   const saveWork = async (work: WorkItem) => {
@@ -739,369 +717,51 @@ export default function AdminApp() {
         </header>
 
         {activeTab === "profile" ? (
-          <div className="admin-profile-grid">
-            <section className="admin-panel">
-              <div className="field-grid">
-                <label>
-                  Headline
-                  <input value={profile.headline} onChange={(event) => setProfile({ ...profile, headline: event.target.value })} />
-                </label>
-                <label>
-                  Name
-                  <input value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} />
-                </label>
-                <label>
-                  Profile Image
-                  <input type="file" accept="image/*" disabled={profileImageUploading} onChange={(event) => uploadProfileImage(event.target.files?.[0])} />
-                </label>
-                <label className="full-field">
-                  Intro
-                  <textarea value={profile.intro} onChange={(event) => setProfile({ ...profile, intro: event.target.value })} />
-                </label>
-                <label className="full-field">
-                  Bio
-                  <textarea value={profile.bio} rows={6} onChange={(event) => setProfile({ ...profile, bio: event.target.value })} />
-                </label>
-              </div>
-            </section>
-
-            <section className="admin-panel">
-              <div className="link-editor" style={{ marginTop: 0 }}>
-                <header>
-                  <h3>Links</h3>
-                </header>
-                {profile.links.map((link, index) => (
-                  <div className="link-fields" key={`profile-link-${index}`}>
-                    <span className="link-icon" aria-hidden="true">
-                      <ProfileLinkIcon label={link.label} url={link.url} />
-                    </span>
-                    <input
-                      aria-label="Displayed text"
-                      placeholder="Displayed text"
-                      value={link.label}
-                      onChange={(event) => {
-                        const links = [...profile.links];
-                        links[index] = { ...link, label: event.target.value };
-                        setProfile({ ...profile, links });
-                      }}
-                    />
-                    <input
-                      aria-label="Click action"
-                      placeholder="mailto:, tel:, https://"
-                      value={link.url}
-                      onChange={(event) => {
-                        const links = [...profile.links];
-                        links[index] = { ...link, url: event.target.value };
-                        setProfile({ ...profile, links });
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <div className="action-row sticky-actions">
-              <button type="button" className="primary-action" onClick={saveProfile} disabled={profileImageUploading}>
-                {profileImageUploading ? "Uploading..." : "Save profile"}
-              </button>
-            </div>
-          </div>
+          <ProfilePanel
+            profile={profile}
+            imageUploading={profileImageUploading}
+            onChange={setProfile}
+            onImageUpload={(file) => void uploadProfileImage(file)}
+            onSave={() => void saveProfile()}
+          />
         ) : null}
 
         {activeTab === "timeline" ? (
-          <section className="timeline-cards-layout">
-            <div className="panel-actions" style={{ marginBottom: "20px" }}>
-              <button type="button" onClick={addTimelineItem}>
-                Add career item
-              </button>
-            </div>
-            <div className="timeline-editor-list" style={{ display: "grid", gap: "20px", marginTop: 0 }}>
-              {[...timeline]
-                .sort((a, b) => String(a.period || "").localeCompare(String(b.period || "")))
-                .map((item) => (
-                <article className="admin-panel admin-timeline-card" key={item.id}>
-                  <div className="field-grid">
-                    <label>
-                      Period
-                      <input value={item.period} onChange={(event) => setTimeline(timeline.map((row) => (row.id === item.id ? { ...row, period: event.target.value } : row)))} />
-                    </label>
-                    <label>
-                      Title
-                      <input value={item.title} onChange={(event) => setTimeline(timeline.map((row) => (row.id === item.id ? { ...row, title: event.target.value } : row)))} />
-                    </label>
-                    <label>
-                      Organization
-                      <input
-                        value={item.organization}
-                        onChange={(event) => setTimeline(timeline.map((row) => (row.id === item.id ? { ...row, organization: event.target.value } : row)))}
-                      />
-                    </label>
-                  </div>
-                  <div className="action-row" style={{ marginTop: "16px" }}>
-                    <button type="button" className="danger" onClick={() => deleteTimelineItem(item.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="action-row sticky-actions">
-              <button type="button" className="primary-action" onClick={saveTimeline}>
-                Save career
-              </button>
-            </div>
-          </section>
+          <TimelinePanel
+            timeline={timeline}
+            onChange={setTimeline}
+            onAdd={() => void addTimelineItem()}
+            onDelete={(id) => void deleteTimelineItem(id)}
+            onSave={() => void saveTimeline()}
+          />
         ) : null}
 
         {activeTab === "works" ? (
           workScreen === "list" ? (
-            <section className={`works-list-view ${draggedWorkId ? "is-ordering" : ""}`}>
-              {works.length ? (
-                <div className="work-grid admin-work-grid">
-                  {works.map((work) => {
-                    const tileStyle = work.thumbnail?.url ? ({ "--tile-image": `url("${work.thumbnail.url}")` } as CSSProperties) : undefined;
-                    const isDragging = draggedWorkId === work.id;
-                    const isDragOver = dragOverWorkId === work.id && draggedWorkId !== work.id;
-
-                    return (
-                      <article
-                        key={work.id}
-                        className={`work-tile admin-work-card ${isDragging ? "is-dragging" : ""} ${isDragOver ? "is-drag-over" : ""}`}
-                        draggable
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`${work.title} 편집`}
-                        onClick={() => {
-                          if (workDragMoved.current) return;
-                          openWorkEditor(work.id);
-                        }}
-                        onDragStart={(event) => startWorkDrag(event, work.id)}
-                        onDragOver={(event) => moveDraggedWork(event, work.id)}
-                        onDrop={finishWorkDrag}
-                        onDragEnd={finishWorkDrag}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter" && event.key !== " ") return;
-                          event.preventDefault();
-                          openWorkEditor(work.id);
-                        }}
-                      >
-                        <div
-                          className={`work-tile-media ${work.thumbnail?.url ? "has-image" : ""}`}
-                          style={tileStyle}
-                          aria-label={work.thumbnail?.alt ?? work.title}
-                          role="img"
-                        />
-                        <div className="admin-work-card-copy">
-                          <h3>{work.title}</h3>
-                          <span>{work.category}</span>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <section className="admin-panel empty-panel">작업물이 없습니다. Add work로 새 작업물을 추가하세요.</section>
-              )}
-            </section>
+            <WorksListPanel
+              works={works}
+              draggedWorkId={draggedWorkId}
+              dragOverWorkId={dragOverWorkId}
+              onOpen={openWorkFromCard}
+              onDragStart={startWorkDrag}
+              onDragOver={moveDraggedWork}
+              onDragFinish={finishWorkDrag}
+            />
           ) : (
-            <section className="works-editor-layout" style={{ "--work-preview-width": `${workPreviewWidth}px` } as CSSProperties}>
-              {selectedWork ? (
-                <>
-                  <section className="work-editor" aria-label="Work editor" ref={workEditorRef}>
-                    <section className="admin-panel work-editor-card">
-                      <header className="work-editor-card-header">
-                        <div>
-                          <p>Basic</p>
-                          <h3>작업물 기본 정보</h3>
-                        </div>
-                      </header>
-                      <div className="field-grid">
-                        <label>
-                          Title
-                          <input
-                            value={selectedWork.title}
-                            onChange={(event) =>
-                              updateWorkLocal(selectedWork.id, {
-                                title: event.target.value
-                              })
-                            }
-                          />
-                        </label>
-                        <label>
-                          Slug
-                          <input
-                            value={selectedWork.slug}
-                            onChange={(event) => updateWorkLocal(selectedWork.id, { slug: sanitizeSlugInput(event.target.value) })}
-                            onBlur={(event) => updateWorkLocal(selectedWork.id, { slug: slugify(event.target.value) })}
-                          />
-                        </label>
-                        <div className="category-check-group">
-                          <span>Category</span>
-                          <div className="category-check-options">
-                            {workCategoryOptions.map((category) => (
-                              <label key={category}>
-                                <input
-                                  type="checkbox"
-                                  checked={getWorkCategories(selectedWork.category).includes(category)}
-                                  onChange={(event) => updateWorkLocal(selectedWork.id, { category: toggleWorkCategory(selectedWork.category, category, event.target.checked) })}
-                                />
-                                {category}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                        <label>
-                          Year
-                          <input value={selectedWork.year} onChange={(event) => updateWorkLocal(selectedWork.id, { year: event.target.value })} />
-                        </label>
-                        <label>
-                          Client
-                          <input value={selectedWork.client} onChange={(event) => updateWorkLocal(selectedWork.id, { client: event.target.value })} />
-                        </label>
-                        <label>
-                          Role
-                          <input value={selectedWork.role} onChange={(event) => updateWorkLocal(selectedWork.id, { role: event.target.value })} />
-                        </label>
-                        <label className="full-field">
-                          Summary
-                          <textarea value={selectedWork.summary} onChange={(event) => updateWorkLocal(selectedWork.id, { summary: event.target.value })} />
-                        </label>
-                      </div>
-
-                      <div className="toggle-row">
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={selectedWork.featured}
-                            onChange={(event) => updateWorkLocal(selectedWork.id, { featured: event.target.checked })}
-                          />
-                          Featured
-                        </label>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={selectedWork.published}
-                            onChange={(event) => updateWorkLocal(selectedWork.id, { published: event.target.checked })}
-                          />
-                          Published
-                        </label>
-                      </div>
-                    </section>
-
-                    <section className="admin-panel work-editor-card">
-                      <header className="work-editor-card-header">
-                        <div>
-                          <p>Images</p>
-                          <h3>썸네일 설정</h3>
-                        </div>
-                      </header>
-                      <div className="media-grid">
-                        {workMediaFields.map((field) => {
-                          const media = selectedWork[field.kind];
-
-                          return (
-                            <section className="media-field" key={field.kind} style={{ "--media-aspect": field.aspect } as CSSProperties}>
-                              <header>
-                                <div>
-                                  <strong>{field.label}</strong>
-                                  <p>{field.hint}</p>
-                                </div>
-                                <button type="button" className="danger" disabled={!media?.url} onClick={() => clearWorkAsset(field.kind)}>
-                                  Remove
-                                </button>
-                              </header>
-                              <div className="media-preview">
-                                {media?.url ? <img src={media.url} alt={media.alt ?? selectedWork.title} /> : <span>No image</span>}
-                              </div>
-                              <label
-                                className="media-upload-zone"
-                                onDragOver={(event: DragEvent<HTMLLabelElement>) => {
-                                  event.preventDefault();
-                                  event.dataTransfer.dropEffect = "copy";
-                                }}
-                                onDrop={(event: DragEvent<HTMLLabelElement>) => {
-                                  event.preventDefault();
-                                  void uploadWorkAsset(field.kind, event.dataTransfer.files?.[0]);
-                                }}
-                              >
-                                <input
-                                  className="media-upload-input"
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(event) => {
-                                    const input = event.currentTarget;
-                                    void uploadWorkAsset(field.kind, input.files?.[0]).finally(() => {
-                                      input.value = "";
-                                    });
-                                  }}
-                                />
-                                <span className="media-upload-icon" aria-hidden="true">
-                                  <svg viewBox="0 0 24 24">
-                                    <path d="M12 16V5" />
-                                    <path d="M8 9l4-4 4 4" />
-                                    <path d="M5 16v2.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V16" />
-                                  </svg>
-                                </span>
-                                <span className="media-upload-text">클릭하거나 파일을 이곳으로 드래그하세요</span>
-                                <span className="media-upload-note">이미지는 업로드 후 Save를 눌러야 게시됩니다.</span>
-                              </label>
-                            </section>
-                          );
-                        })}
-                      </div>
-                    </section>
-
-                    <section className="admin-panel work-editor-card">
-                      <header className="work-editor-card-header">
-                        <div>
-                          <p>Body</p>
-                          <h3>본문 에디터</h3>
-                        </div>
-                      </header>
-                      <EditorBoundary>
-                        <Suspense fallback={<div className="admin-editor-loading">Loading editor...</div>}>
-                          <BlockEditor
-                            blocks={selectedWork.blocks ?? []}
-                            onUpload={uploadAsset}
-                            onChange={(blocks: WorkBlock[]) => updateWorkLocal(selectedWork.id, { blocks })}
-                          />
-                        </Suspense>
-                      </EditorBoundary>
-                    </section>
-
-                    <div className="action-row work-editor-actions">
-                      <button type="button" className="danger" onClick={deleteSelectedWork}>
-                        Delete work
-                      </button>
-                    </div>
-                  </section>
-                  <div
-                    aria-label="Resize live preview"
-                    aria-orientation="vertical"
-                    aria-valuemax={1160}
-                    aria-valuemin={260}
-                    aria-valuenow={workPreviewWidth}
-                    className="work-splitter"
-                    role="separator"
-                    tabIndex={0}
-                    onKeyDown={(event) => {
-                      if (event.key === "ArrowLeft") {
-                        event.preventDefault();
-                        resizeWorkPreview(workPreviewWidth + 32);
-                      }
-                      if (event.key === "ArrowRight") {
-                        event.preventDefault();
-                        resizeWorkPreview(workPreviewWidth - 32);
-                      }
-                    }}
-                    onPointerDown={startWorkPreviewResize}
-                  />
-                  <WorkLivePreview work={selectedWork} />
-                </>
-              ) : (
-                <section className="admin-panel empty-panel">No work selected.</section>
-              )}
-            </section>
+            <WorkEditorPanel
+              work={selectedWork}
+              previewWidth={workPreviewWidth}
+              editorRef={workEditorRef}
+              onUpdate={(patch) => {
+                if (selectedWork) updateWorkLocal(selectedWork.id, patch);
+              }}
+              onUploadAsset={uploadWorkAsset}
+              onClearAsset={clearWorkAsset}
+              onUploadBlockAsset={uploadAsset}
+              onDelete={() => void deleteSelectedWork()}
+              onResize={resizeWorkPreview}
+              onResizeStart={startWorkPreviewResize}
+            />
           )
         ) : null}
       </section>
