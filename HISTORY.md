@@ -36,6 +36,33 @@
 
 ---
 
+## 2026-07-21 Work Detail Visible Glass Layer And Responsive Profile Caption
+
+### 요구사항
+- 작업물 상세 고정 상단 바에 속성만 존재하는 수준이 아니라 눈으로 분명히 구분되는 뒤 배경 blur를 적용합니다.
+- About 프로필 이미지의 `취미로 기타를 치고 있습니다.` 캡션이 실제 화면에서 사라지는 문제를 해결합니다.
+
+### 원인
+- 운영 Chrome에서 기존 상단 바의 `backdrop-filter: blur(18px)`는 정상 계산됐지만 paper 배경이 66%로 덮여 blur 전후 픽셀 차이가 거의 보이지 않았습니다.
+- 프로필 캡션은 `1180px` 이하 responsive CSS에서 의도적으로 `display: none` 처리돼 DevTools를 열거나 작은 화면에서 사라졌습니다.
+
+### 구현
+- `src/styles/work-detail.css`
+  - 상단 바의 버튼·제목과 유리 배경을 `::before` 레이어로 분리했습니다.
+  - 활성 유리 레이어는 paper 38%, `blur(36px) saturate(112%)`를 사용해 뒤 콘텐츠는 확실히 흐리고 상단 바 콘텐츠는 선명하게 유지합니다.
+- `src/styles/responsive.css`
+  - 캡션 숨김을 제거하고 1180px 이하에서는 24px, 760px 이하에서는 16px의 우하단 여백과 반응형 글자 크기를 적용했습니다.
+- `tests/css-build-compatibility.test.ts`
+  - 유리 레이어 구조와 responsive 캡션 숨김 재발을 막는 회귀 테스트를 추가했습니다.
+
+### 검증
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- 로컬 production preview + Chrome 1440px: 활성 `::before`에 `rgba(244, 244, 244, 0.38)`, `blur(36px) saturate(1.12)` 계산 및 실제 배경 흐림 확인.
+- 운영 R2 이미지를 사용하는 Chrome 1100px와 390px: 캡션 `display: block`, 이미지 우하단 배치와 연락처 비중첩 확인.
+
+### 남은 주의점
+- 배포 전 운영 페이지에는 이전 CSS가 유지됩니다. 새 commit 배포 후 Cloudflare HTML/asset cache가 갱신된 상태에서 확인해야 합니다.
+
 ## 2026-07-21 Preserve Backdrop Filter Through Production Build
 
 ### 요구사항

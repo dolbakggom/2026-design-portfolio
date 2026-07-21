@@ -111,7 +111,11 @@
   }
 
   .profile-media figcaption {
-    display: none;
+    right: 24px;
+    bottom: 24px;
+    max-width: calc(100% - 48px);
+    font-size: 14px;
+    text-align: right;
   }
 
   .timeline-items {
@@ -192,6 +196,13 @@
 }
 
 @media (max-width: 760px) {
+  .profile-media figcaption {
+    right: 16px;
+    bottom: 16px;
+    max-width: calc(100% - 32px);
+    font-size: 12px;
+  }
+
   .floating-top-button {
     width: 48px;
     height: 48px;

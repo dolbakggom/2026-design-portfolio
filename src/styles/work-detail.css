@@ -89,23 +89,36 @@
   gap: 18px;
   align-items: center;
   padding-inline: max(24px, calc((100vw - min(1180px, calc(100vw - 48px))) / 2));
-  background: rgba(244, 244, 244, 0);
+  isolation: isolate;
+  background: transparent;
   border-bottom: 1px solid transparent;
-  -webkit-backdrop-filter: blur(0.01px) saturate(100.01%);
-  backdrop-filter: blur(0.01px) saturate(100.01%);
   pointer-events: none;
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    -webkit-backdrop-filter 180ms ease,
-    backdrop-filter 180ms ease;
+    border-color 220ms ease;
+}
+
+.work-detail-topbar::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: rgba(244, 244, 244, 0);
+  -webkit-backdrop-filter: blur(0.01px) saturate(100.01%);
+  backdrop-filter: blur(0.01px) saturate(100.01%);
+  transition:
+    background-color 220ms ease,
+    -webkit-backdrop-filter 220ms ease,
+    backdrop-filter 220ms ease;
 }
 
 .work-detail-cover[data-title-hidden="true"] + .work-detail-topbar {
-  background: rgba(244, 244, 244, 0.66);
   border-bottom-color: rgba(0, 0, 0, 0.04);
-  -webkit-backdrop-filter: blur(18px) saturate(110%);
-  backdrop-filter: blur(18px) saturate(110%);
+}
+
+.work-detail-cover[data-title-hidden="true"] + .work-detail-topbar::before {
+  background: rgba(244, 244, 244, 0.38);
+  -webkit-backdrop-filter: blur(36px) saturate(112%);
+  backdrop-filter: blur(36px) saturate(112%);
 }
 
 .work-back-link {

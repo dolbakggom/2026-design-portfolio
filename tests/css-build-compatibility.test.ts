@@ -25,3 +25,17 @@ test("work detail backdrop transition avoids identity values collapsed into empt
   assert.doesNotMatch(css, /backdrop-filter:\s*blur\(0(?:px)?\)/);
   assert.doesNotMatch(css, /backdrop-filter:[^;]*saturate\(100%\)/);
 });
+
+test("work detail glass layer keeps blur visually separate from topbar content", async () => {
+  const css = await readFile("src/styles/work-detail.css", "utf8");
+
+  assert.match(css, /\.work-detail-topbar::before\s*\{[^}]*backdrop-filter:/s);
+  assert.match(css, /data-title-hidden="true"\]\s*\+\s*\.work-detail-topbar::before\s*\{[^}]*background:\s*rgba\(244,\s*244,\s*244,\s*0\.38\)[^}]*blur\(36px\)/s);
+});
+
+test("profile media caption remains visible at responsive widths", async () => {
+  const css = await readFile("src/styles/responsive.css", "utf8");
+
+  assert.doesNotMatch(css, /\.profile-media figcaption\s*\{[^}]*display:\s*none/s);
+  assert.match(css, /\.profile-media figcaption\s*\{[^}]*right:\s*24px[^}]*bottom:\s*24px/s);
+});
