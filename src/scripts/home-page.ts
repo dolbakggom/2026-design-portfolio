@@ -1,5 +1,6 @@
-import { getRovingTabIndex } from "../lib/keyboard-navigation";
 import { getReducedMotionTarget, shouldLoadMotion, type MotionIntent } from "../lib/motion-loader";
+import { createHomeTypewriter } from "./home/home-typewriter";
+import { initHomeWorkSection } from "./home/home-work";
 
 type GsapModule = typeof import("gsap").default;
 type ScrollTriggerModule = typeof import("gsap/ScrollTrigger").ScrollTrigger;
@@ -25,6 +26,13 @@ const initHomePage = () => {
   activeHomeShell = shell;
   const pageController = new AbortController();
   const pageSignal = pageController.signal;
+  const {
+    cleanup: cleanupTypewriter,
+    fillElement: fillTypeElement,
+    prepareElement: prepareTypeElement,
+    typeElement,
+    typeText
+  } = createHomeTypewriter();
   const homeScrollTriggers: ScrollTrigger[] = [];
   const homeScrollAnimations: gsap.core.Animation[] = [];
   let initialScrollFrame = 0;
@@ -50,7 +58,6 @@ const initHomePage = () => {
   let cachedTimelineCardProgresses: number[] = [];
   let routeDebounceTimeout = 0;
   let pendingRoute: string | null = null;
-  const typewriterTimers: number[] = [];
   const portfolioWindow = window as Window & {
     __portfolioLenis?: { resize?: () => void };
     __portfolioScrollToTop?: () => void;
@@ -78,7 +85,7 @@ const initHomePage = () => {
     if (routeDebounceTimeout) {
       window.clearTimeout(routeDebounceTimeout);
     }
-    typewriterTimers.forEach((timer) => window.clearTimeout(timer));
+    cleanupTypewriter();
     deferredImageObserver?.disconnect();
     document.documentElement.style.removeProperty("--home-viewport-height");
     ScrollTrigger.removeEventListener("refreshInit", updateScrollGeometryCache);
@@ -184,85 +191,6 @@ const clearHomeRoute = () => {
   if (pendingRoute || ["/about", "/career", "/work"].includes(window.location.pathname)) {
     replaceRoute("/");
   }
-};
-
-const typeText = (target: HTMLElement, value: string, speed = 58, done?: () => void) => {
-  target.textContent = "";
-  const chars = value.split("");
-  chars.forEach((char, index) => {
-    const timer = window.setTimeout(() => {
-      target.textContent += char;
-      if (index === chars.length - 1) done?.();
-    }, speed * index);
-    typewriterTimers.push(timer);
-  });
-};
-
-const textCopies = new Map<HTMLElement, { node: Text; text: string }[]>();
-let typeRunCounter = 0;
-
-const prepareTypeElement = (element: HTMLElement | null) => {
-  if (!element || textCopies.has(element)) return;
-
-  const copies: { node: Text; text: string }[] = [];
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => node.textContent?.trim()
-      ? NodeFilter.FILTER_ACCEPT
-      : NodeFilter.FILTER_REJECT
-  });
-
-  let node = walker.nextNode();
-  while (node) {
-    const textNode = node as Text;
-    copies.push({ node: textNode, text: textNode.textContent ?? "" });
-    node = walker.nextNode();
-  }
-
-  textCopies.set(element, copies);
-  copies.forEach(({ node: textNode }) => {
-    textNode.textContent = "";
-  });
-  element.dataset.typed = "false";
-};
-
-const fillTypeElement = (element: HTMLElement | null) => {
-  if (!element) return;
-  const copies = textCopies.get(element);
-  if (!copies) return;
-
-  copies.forEach(({ node: textNode, text }) => {
-    textNode.textContent = text;
-  });
-  element.dataset.typeRun = String(++typeRunCounter);
-  element.dataset.typed = "true";
-};
-
-const typeElement = (element: HTMLElement | null, speed = 24) => {
-  if (!element || element.dataset.typed === "true") return;
-
-  const copies = textCopies.get(element);
-  if (!copies) return;
-
-  if (speed <= 0) {
-    fillTypeElement(element);
-    return;
-  }
-
-  element.dataset.typed = "true";
-  const runId = String(++typeRunCounter);
-  element.dataset.typeRun = runId;
-  let cursor = 0;
-  copies.forEach(({ node: textNode, text }) => {
-    textNode.textContent = "";
-    text.split("").forEach((_, charIndex) => {
-      const timer = window.setTimeout(() => {
-        if (element.dataset.typeRun !== runId) return;
-        textNode.textContent = text.slice(0, charIndex + 1);
-      }, cursor * speed);
-      typewriterTimers.push(timer);
-      cursor += 1;
-    });
-  });
 };
 
 const introLogo = document.querySelector<HTMLElement>(".intro-logo");
@@ -874,170 +802,7 @@ window.addEventListener("orientationchange", () => {
 }, { signal: pageSignal });
 window.setTimeout(() => refreshHomeScrollLayout(true), 250);
 
-const updateFeaturedContrast = () => {
-  document.querySelectorAll<HTMLElement>(".featured-work").forEach((card) => {
-    const img = card.querySelector<HTMLImageElement>(".work-visual img");
-    if (!img) {
-      card.dataset.textTone = "light";
-      return;
-    }
-
-    const sampleImage = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        const size = 32;
-        canvas.width = size;
-        canvas.height = size;
-        const context = canvas.getContext("2d", { willReadFrequently: true });
-        if (!context) return;
-
-        context.drawImage(img, 0, 0, size, size);
-        const pixels = context.getImageData(0, 0, size, size).data;
-        let total = 0;
-        let count = 0;
-
-        for (let index = 0; index < pixels.length; index += 4) {
-          const alpha = pixels[index + 3] / 255;
-          if (alpha < 0.2) continue;
-          const red = pixels[index];
-          const green = pixels[index + 1];
-          const blue = pixels[index + 2];
-          total += (0.2126 * red + 0.7152 * green + 0.0722 * blue) * alpha;
-          count += alpha;
-        }
-
-        const luminance = count ? total / count : 0;
-        card.dataset.textTone = luminance > 148 ? "dark" : "light";
-      } catch {
-        card.dataset.textTone = "light";
-      }
-    };
-
-    if (img.complete && img.naturalWidth) {
-      sampleImage();
-    } else {
-      img.addEventListener("load", sampleImage, { once: true, signal: pageSignal });
-      img.addEventListener("error", () => {
-        card.dataset.textTone = "light";
-      }, { once: true, signal: pageSignal });
-    }
-  });
-};
-
-updateFeaturedContrast();
-
-const filterButtons = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
-const galleryPanel = document.querySelector<HTMLElement>("#work-gallery-grid");
-const galleryStatus = document.querySelector<HTMLElement>("[data-gallery-status]");
-const tiles = Array.from(document.querySelectorAll<HTMLElement>("[data-category]"));
-
-const animateGalleryFilter = (filter: string) => {
-  const previousRects = new Map<HTMLElement, DOMRect>();
-
-  tiles.forEach((tile) => {
-    if (!tile.hidden) {
-      previousRects.set(tile, tile.getBoundingClientRect());
-    }
-  });
-
-  const matchesFilter = (tile: HTMLElement) => {
-    const categories = (tile.dataset.category ?? "").split(",").map((category) => category.trim());
-    return filter === "ALL" || categories.includes(filter);
-  };
-
-  const exitingTiles = tiles.filter((tile) => !tile.hidden && !matchesFilter(tile));
-
-  exitingTiles.forEach((tile) => {
-    const rect = tile.getBoundingClientRect();
-    const clone = tile.cloneNode(true) as HTMLElement;
-    clone.classList.add("gallery-filter-clone");
-    Object.assign(clone.style, {
-      position: "fixed",
-      left: "0",
-      top: "0",
-      width: `${rect.width}px`,
-      height: `${rect.height}px`,
-      margin: "0",
-      zIndex: "20",
-      pointerEvents: "none",
-      willChange: "transform, opacity"
-    });
-    document.body.appendChild(clone);
-    gsap.set(clone, { x: rect.left, y: rect.top, force3D: true });
-    gsap.to(clone, {
-      autoAlpha: 0,
-      scale: 0.96,
-      y: rect.top + 10,
-      duration: 0.32,
-      ease: "power2.out",
-      onComplete: () => clone.remove()
-    });
-  });
-
-  tiles.forEach((tile) => {
-    const shouldShow = matchesFilter(tile);
-    tile.hidden = !shouldShow;
-
-    if (shouldShow && !previousRects.has(tile)) {
-      gsap.set(tile, { autoAlpha: 0, scale: 0.97, y: 14 });
-    }
-  });
-
-  tiles.forEach((tile) => {
-    if (tile.hidden) return;
-
-    const previousRect = previousRects.get(tile);
-    const nextRect = tile.getBoundingClientRect();
-
-    if (previousRect) {
-      const deltaX = previousRect.left - nextRect.left;
-      const deltaY = previousRect.top - nextRect.top;
-
-      if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
-        gsap.fromTo(
-          tile,
-          { x: deltaX, y: deltaY },
-          { x: 0, y: 0, duration: 0.48, ease: "power3.out", overwrite: true }
-        );
-      }
-    } else {
-      gsap.to(tile, { autoAlpha: 1, scale: 1, y: 0, duration: 0.42, ease: "power3.out", overwrite: true });
-    }
-  });
-};
-
-filterButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const filter = button.dataset.filter ?? "ALL";
-    if (button.classList.contains("is-active")) return;
-
-    filterButtons.forEach((item) => {
-      const isSelected = item === button;
-      item.classList.toggle("is-active", isSelected);
-      item.setAttribute("aria-selected", isSelected ? "true" : "false");
-      item.tabIndex = isSelected ? 0 : -1;
-    });
-    if (button.id) {
-      galleryPanel?.setAttribute("aria-labelledby", button.id);
-    }
-    animateGalleryFilter(filter);
-    const visibleCount = tiles.filter((tile) => !tile.hidden).length;
-    if (galleryStatus) {
-      galleryStatus.textContent = `${filter === "ALL" ? "전체" : filter} 작업물 ${visibleCount}개`;
-    }
-  }, { signal: pageSignal });
-
-  button.addEventListener("keydown", (event) => {
-    const currentIndex = Array.from(filterButtons).indexOf(button);
-    const nextIndex = getRovingTabIndex(currentIndex, event.key, filterButtons.length);
-    if (nextIndex === null) return;
-
-    event.preventDefault();
-    const nextButton = filterButtons[nextIndex];
-    nextButton?.focus();
-    nextButton?.click();
-  }, { signal: pageSignal });
-});
+initHomeWorkSection({ gsap, signal: pageSignal });
 
 };
 

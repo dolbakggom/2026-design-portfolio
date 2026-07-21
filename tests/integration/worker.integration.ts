@@ -295,3 +295,43 @@ test("mobile about and career routes initialize visibly and keep wheel scrolling
     await browser.close();
   }
 });
+
+test("work gallery filters update tiles and support roving keyboard navigation", async () => {
+  const browser = await chromium.launch({
+    executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    headless: true
+  });
+
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.goto(`${harnessOrigin}/work`, { waitUntil: "networkidle" });
+
+    const uiUxTab = page.locator('[data-filter="UI/UX"]');
+    await uiUxTab.click();
+    await page.waitForFunction(() => document.querySelector('[data-filter="UI/UX"]')?.getAttribute("aria-selected") === "true");
+
+    const uiUxState = await page.evaluate(() => {
+      const visibleTiles = Array.from(document.querySelectorAll<HTMLElement>("#work-gallery-grid [data-category]")).filter((tile) => !tile.hidden);
+      const tab = document.querySelector<HTMLElement>('[data-filter="UI/UX"]');
+      return {
+        labelledBy: document.querySelector("#work-gallery-grid")?.getAttribute("aria-labelledby"),
+        selectedId: tab?.id,
+        status: document.querySelector("[data-gallery-status]")?.textContent,
+        visibleCount: visibleTiles.length,
+        categories: visibleTiles.map((tile) => tile.dataset.category ?? "")
+      };
+    });
+
+    assert.equal(uiUxState.labelledBy, uiUxState.selectedId);
+    assert.match(uiUxState.status ?? "", /^UI\/UX 작업물 \d+개$/);
+    assert.ok(uiUxState.visibleCount > 0);
+    assert.ok(uiUxState.categories.every((category) => category.split(",").map((value) => value.trim()).includes("UI/UX")));
+
+    await uiUxTab.focus();
+    await uiUxTab.press("ArrowRight");
+    await page.waitForFunction(() => document.querySelector('[data-filter="BI/BX"]')?.getAttribute("aria-selected") === "true");
+    assert.equal(await page.locator('[data-filter="BI/BX"]').getAttribute("tabindex"), "0");
+  } finally {
+    await browser.close();
+  }
+});

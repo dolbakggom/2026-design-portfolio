@@ -36,6 +36,35 @@
 
 ---
 
+## 2026-07-21 Home Motion Module Split
+
+### 요구사항
+- 유지보수 개선의 다음 순서로 1,100줄 이상인 `src/scripts/home-page.ts`를 섹션과 컨트롤러 책임 단위로 분리합니다.
+- Intro 타입라이터, 대표 작업물 명암 판정, WORK 갤러리 필터의 기존 동작과 Astro 페이지 전환 시 정리를 유지합니다.
+
+### 구현
+- `src/scripts/home/home-typewriter.ts`
+  - 일반 문자열 타이핑, 중첩 마크업 텍스트 복원/타이핑, 실행 세대 구분과 타이머 정리를 전용 컨트롤러로 분리했습니다.
+  - 홈 페이지 cleanup에서 모든 타이핑 타이머와 보관한 텍스트 참조를 해제합니다.
+- `src/scripts/home/home-work.ts`
+  - 대표 작업물 이미지의 자동 흑백 텍스트 대비 계산과 WORK 갤러리 FLIP 필터 애니메이션을 분리했습니다.
+  - 카테고리 탭의 클릭, `ArrowLeft`/`ArrowRight`/`Home`/`End` 키보드 이동과 live status 갱신을 함께 관리합니다.
+  - 필터 대상은 `#work-gallery-grid` 내부 작업물 타일로 한정했습니다.
+- `src/scripts/home-page.ts`
+  - 새 컨트롤러를 초기화하고 page AbortSignal 및 cleanup 수명 주기에 연결했습니다.
+  - 파일 크기는 1,119줄에서 884줄로 줄었습니다.
+- `tests/integration/worker.integration.ts`
+  - 실제 브라우저에서 UI/UX 필터 결과, ARIA 연결, 상태 메시지와 방향키 탭 이동을 검증하는 회귀 테스트를 추가했습니다.
+
+### 검증
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `node --test tests/*.test.ts`: 55 tests / 0 failures.
+- `npm run test:integration`: 5 tests / 0 failures. 기존 로그인/D1/R2/모바일 스크롤과 새 WORK 필터 흐름을 확인했습니다.
+- `git diff --check`: 통과.
+
+### 남은 확인
+- `home-page.ts`에는 About/Career 스크롤 좌표, 타임라인 진행률, featured panel 전환과 route 동기화가 연결되어 있습니다. 다음 분리 단계는 공유 geometry API를 먼저 정의한 뒤 Identity와 Featured 컨트롤러를 분리하는 것입니다.
+
 ## 2026-07-21 Admin Screen and Controller Split
 
 ### 요구사항
