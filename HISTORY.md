@@ -36,6 +36,32 @@
 
 ---
 
+## 2026-07-21 Home Identity Controller Split
+
+### 요구사항
+- `home-page.ts`에 남은 About/Career 스크롤 좌표, 전환 타임라인과 Career 카드 포커스 로직을 독립 컨트롤러로 분리합니다.
+- `/about`, `/career` 직접 진입, 모바일 단계 전환, Career 카드 클릭과 기존 스크롤 속도를 유지합니다.
+
+### 구현
+- `src/scripts/home/home-identity.ts`
+  - About 로고/본문 등장과 About→Career 전환 GSAP 타임라인을 소유합니다.
+  - Identity 및 Career 스크롤 좌표, 카드별 중심 진행률, 포커스 스타일과 활성 ARIA 상태 계산을 한곳으로 옮겼습니다.
+  - Career 카드 클릭 이동, 직접 진입 상태, 모바일 Career 목록 표시 시점과 animation frame cleanup을 관리합니다.
+  - 외부에는 `updateGeometry`, `getCareerEntryTop`, `getIdentityScrollForProgress`, `playAboutIntro`, `showCareerInitial` 등 제한된 API만 제공합니다.
+- `src/scripts/home-page.ts`
+  - Identity 내부 DOM과 상태를 제거하고 전용 컨트롤러를 전체 ScrollTrigger/resize/route 수명 주기에 연결했습니다.
+  - ScrollTrigger 생성 전 Work/패널 좌표 캐시를 먼저 채워 초기 start/end 계산 순서를 보존했습니다.
+  - 파일 크기는 884줄에서 563줄로 줄었습니다.
+
+### 검증
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `node --test tests/*.test.ts`: 55 tests / 0 failures.
+- `npm run test:integration`: 5 tests / 0 failures. `/about`, `/career`, 모바일 휠 이동과 Career 활성 항목을 포함해 확인했습니다.
+- `git diff --check`: 통과.
+
+### 남은 확인
+- `home-page.ts`의 다음 독립 영역은 featured panel 활성화, dot 이동, 스크롤 높이와 Gallery 진입 dim 처리를 묶은 Featured 컨트롤러입니다.
+
 ## 2026-07-21 Home Motion Module Split
 
 ### 요구사항
