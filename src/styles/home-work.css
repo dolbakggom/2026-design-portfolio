@@ -43,8 +43,8 @@
   background: rgba(0, 0, 0, var(--featured-gallery-dim));
   opacity: calc(var(--featured-gallery-dim) + var(--featured-jump-blur-opacity));
   pointer-events: none;
-  backdrop-filter: blur(var(--featured-jump-blur-size));
   -webkit-backdrop-filter: blur(var(--featured-jump-blur-size));
+  backdrop-filter: blur(var(--featured-jump-blur-size));
   transition: opacity 180ms ease;
 }
 
@@ -111,8 +111,8 @@
   content: "";
   opacity: 0;
   pointer-events: none;
-  backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   transition: opacity 740ms ease;
 }
 
@@ -156,8 +156,8 @@
   z-index: 2;
   content: "";
   pointer-events: none;
-  backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
   mask-image: linear-gradient(to bottom right, #000 0%, #000 24%, rgba(0, 0, 0, 0.72) 42%, rgba(0, 0, 0, 0.24) 62%, transparent 78%);
   -webkit-mask-image: linear-gradient(to bottom right, #000 0%, #000 24%, rgba(0, 0, 0, 0.72) 42%, rgba(0, 0, 0, 0.24) 62%, transparent 78%);
 }
@@ -540,4 +540,3 @@
     transform: translateX(0);
   }
 }
-

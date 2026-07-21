@@ -36,6 +36,35 @@
 
 ---
 
+## 2026-07-21 Preserve Backdrop Filter Through Production Build
+
+### 요구사항
+- source CSS와 직접 주입 검사에서는 보이지만 배포된 작업물 상세 상단 바에서는 blur가 적용되지 않는 문제를 해결합니다.
+
+### 원인
+- source에서 표준 `backdrop-filter` 뒤에 `-webkit-backdrop-filter`를 선언해 Astro/Vite CSS 최적화가 두 속성을 중복으로 판단했습니다.
+- production bundle에는 Safari prefix만 남고 Chrome이 사용하는 표준 속성은 제거되어 computed style이 `none`이 됐습니다.
+- `blur(0)`과 `saturate(100%)`도 optimizer가 빈 함수로 축약해 기본 transition 값이 무효화됐습니다.
+
+### 구현
+- `src/styles/work-detail.css`
+  - prefix 선언을 먼저, 표준 선언을 마지막에 두어 production bundle에 두 속성이 모두 남도록 했습니다.
+  - transition 시작값은 시각 차이가 없는 `blur(0.01px) saturate(100.01%)`로 변경해 빈 함수 최적화를 방지했습니다.
+- `src/styles/home-work.css`, `src/styles/responsive.css`, `src/styles/admin/shell.css`, `src/styles/admin/responsive.css`
+  - 같은 build 제거 문제가 재발하지 않도록 모든 backdrop-filter pair의 순서를 동일하게 수정했습니다.
+- `tests/css-build-compatibility.test.ts`
+  - prefix가 표준 선언 뒤로 이동하거나 filter identity 값이 다시 사용되면 실패하는 회귀 테스트를 추가했습니다.
+
+### 검증
+- 수정 전 production computed style: 활성 상태에서도 `backdrop-filter: none`.
+- 수정 후 `dist/server/entry.mjs`:
+  - 기본 상태에 `backdrop-filter: blur(.01px) saturate(100.01%)` 보존.
+  - 활성 상태에 `backdrop-filter: blur(18px) saturate(110%)` 보존.
+  - 두 상태 모두 `-webkit-backdrop-filter`도 함께 보존.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `npm run test:unit`: 60 tests / 0 failures.
+- `git diff --check`: 통과.
+
 ## 2026-07-21 Work Detail Direct Backdrop Filter
 
 ### 요구사항
