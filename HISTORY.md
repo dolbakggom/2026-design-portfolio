@@ -36,6 +36,32 @@
 
 ---
 
+## 2026-07-21 Work Detail Arrow, Content Width, and Image Ratio
+
+### 요구사항
+- Featured Work CTA와 같은 sweep 애니메이션을 작업물 상세 상단 바의 뒤로가기 화살표에도 적용합니다.
+- 880px로 안쪽에 제한된 상세 본문 컨테이너를 1180px main content 폭과 맞춥니다.
+- 단일 이미지 블록은 원본 비율을 유지하고, 갤러리 블록만 1:1 crop을 사용하도록 구분합니다.
+
+### 구현
+- `src/pages/work/[slug].astro`, `src/styles/work-detail.css`
+  - 뒤로가기 화살표를 별도 span으로 감싸고 Featured 화살표와 같은 520ms sweep을 좌측 이동 방향으로 적용했습니다.
+  - 키보드 `focus-visible`에서도 동일한 피드백을 제공하고 reduced-motion 전역 규칙을 따릅니다.
+  - `.work-blocks`를 100% 폭과 좌측 정렬로 변경해 1180px `.work-detail`과 같은 경계를 사용합니다. heading/copy/quote의 개별 680/880/1080/100% 폭 옵션은 유지합니다.
+  - 단일 `.work-block-image img`의 강제 480px 높이와 cover crop을 제거하고 `height:auto`, `min-height:0`, `object-fit:contain`으로 원본 비율을 유지합니다.
+  - `.work-block-gallery-item`의 `aspect-ratio:1/1`, `object-fit:cover`는 그대로 유지했습니다.
+- `src/styles/admin/preview.css`
+  - 관리자 실시간 미리보기의 단일 이미지도 public page와 동일하게 원본 비율을 유지합니다. 갤러리 미리보기는 계속 1:1입니다.
+
+### 검증
+- 운영 `hexalabs` 페이지에 변경 DOM/CSS를 임시 적용한 Chrome 검사:
+  - main width 1180px, block container width 1180px, left offset 0px.
+  - 단일 이미지 render size 1180 × 413.45px로 저장된 가로 비율을 유지.
+  - hover 시 animation name `work-back-arrow-sweep` 확인.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `node --test --test-name-pattern='admin login|saved work blocks' tests/integration/worker.integration.ts`: 관련 2 tests / 0 failures.
+- `git diff --check`: 통과.
+
 ## 2026-07-21 Work Detail Topbar Backdrop Blur
 
 ### 요구사항

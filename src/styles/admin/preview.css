@@ -235,11 +235,18 @@
   margin: 0;
 }
 
-.preview-block-image img,
+.preview-block-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  object-fit: contain;
+  background: var(--color-ink);
+}
+
 .preview-block-image div {
   width: 100%;
   min-height: 220px;
-  object-fit: cover;
   background: var(--color-ink);
 }
 
@@ -265,4 +272,3 @@
   margin: 0;
   color: var(--color-muted);
 }
-
