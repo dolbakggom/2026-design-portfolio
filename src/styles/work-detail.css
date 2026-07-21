@@ -89,37 +89,23 @@
   gap: 18px;
   align-items: center;
   padding-inline: max(24px, calc((100vw - min(1180px, calc(100vw - 48px))) / 2));
-  background: transparent;
+  background: rgba(244, 244, 244, 0);
   border-bottom: 1px solid transparent;
+  backdrop-filter: blur(0) saturate(100%);
+  -webkit-backdrop-filter: blur(0) saturate(100%);
   pointer-events: none;
   transition:
-    border-color 180ms ease;
-}
-
-.work-detail-topbar::before {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  content: "";
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(18px) saturate(110%);
-  -webkit-backdrop-filter: blur(18px) saturate(110%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 180ms ease;
+    background-color 180ms ease,
+    border-color 180ms ease,
+    backdrop-filter 180ms ease,
+    -webkit-backdrop-filter 180ms ease;
 }
 
 .work-detail-cover[data-title-hidden="true"] + .work-detail-topbar {
+  background: rgba(244, 244, 244, 0.66);
   border-bottom-color: rgba(0, 0, 0, 0.04);
-}
-
-.work-detail-cover[data-title-hidden="true"] + .work-detail-topbar::before {
-  opacity: 1;
-}
-
-.work-detail-topbar > * {
-  position: relative;
-  z-index: 1;
+  backdrop-filter: blur(18px) saturate(110%);
+  -webkit-backdrop-filter: blur(18px) saturate(110%);
 }
 
 .work-back-link {

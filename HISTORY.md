@@ -36,6 +36,22 @@
 
 ---
 
+## 2026-07-21 Work Detail Direct Backdrop Filter
+
+### 요구사항
+- 작업물 상세 상단 바의 blur가 일부 브라우저에서 보이지 않는 문제를 수정합니다.
+
+### 구현
+- `src/styles/work-detail.css`
+  - 별도 `::before` 합성 레이어를 제거하고 `.work-detail-topbar` 자체에 `backdrop-filter`와 `-webkit-backdrop-filter`를 직접 적용했습니다.
+  - 기본 상태는 투명 배경과 `blur(0)`, 활성 상태는 paper 66%와 `blur(18px) saturate(110%)`로 전환됩니다.
+  - 흰색 레이어의 불투명도를 낮춰 뒤 콘텐츠의 blur가 시각적으로 구분되게 했습니다.
+
+### 검증
+- 운영 `hexalabs` 페이지에 새 CSS를 임시 적용한 Chrome computed style에서 `background rgba(244, 244, 244, 0.66)`과 `backdrop-filter blur(18px) saturate(1.1)`을 확인했습니다.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `git diff --check`: 통과.
+
 ## 2026-07-21 Work Detail Arrow, Content Width, and Image Ratio
 
 ### 요구사항
