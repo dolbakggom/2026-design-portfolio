@@ -7,4 +7,6 @@ export const getWorkFallback = <T extends { slug: string }>(
   return works.find((work) => work.slug === slug) ?? null;
 };
 
-export const hasImageLoadFailed = (complete: boolean, naturalWidth: number) => complete && naturalWidth === 0;
+export const hasImageLoadFailed = (complete: boolean, naturalWidth: number, deferred = false) => (
+  !deferred && complete && naturalWidth === 0
+);

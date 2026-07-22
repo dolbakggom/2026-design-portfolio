@@ -36,6 +36,39 @@
 
 ---
 
+## 2026-07-22 About Caption Deferred Image Recovery
+
+### 요구사항
+- `/about` 사진 캡션이 운영 메인 스크롤 흐름에서 보이지 않는 문제를 처음부터 다시 추적하고 해결합니다.
+
+### 원인
+- `/about` 직접 진입에서는 프로필 이미지가 즉시 로드되어 캡션이 보였지만, 메인 `/`에서는 프로필 이미지가 `data-deferred-src`로 지연 로드됩니다.
+- 공용 이미지 오류 감지 코드가 아직 `src`가 없는 지연 이미지를 `complete && naturalWidth === 0`으로 판단해 이미지 프레임에 `is-image-unavailable`을 붙였습니다.
+- 이후 사진은 정상 로드됐지만 실패 클래스와 접근성 속성이 복구되지 않았고, 해당 실패 클래스가 캡션을 계속 숨겼습니다.
+- 사진의 grayscale/brightness/blur가 `<figure>` 전체에 적용되어 캡션까지 함께 흐려지고 어두워지는 구조도 가시성을 낮췄습니다.
+
+### 구현
+- `src/lib/public-resilience.ts`, `src/layouts/PublicLayout.astro`
+  - `data-deferred-src`가 남은 이미지는 실제 로드 전 실패 판정에서 제외합니다.
+  - 이미지 `load` 성공 시 실패 클래스, hidden 상태, fallback용 role/aria-label을 복구합니다.
+- `src/components/HomePage.astro`, `src/styles/home-identity.css`, `src/styles/responsive.css`
+  - 사진 효과 전용 `.profile-media-visual` 레이어를 추가하고 캡션을 그 레이어의 형제로 분리했습니다.
+  - 사진 필터와 overlay는 visual 레이어에만 적용하고 캡션은 선명한 78% white와 text shadow로 독립 렌더링합니다.
+  - desktop/mobile 및 reduced-motion 상태에서도 기존 사진 전환과 fallback 동작을 유지합니다.
+- `tests/public-resilience.test.ts`, `tests/css-build-compatibility.test.ts`
+  - 지연 이미지 오판 방지와 사진 효과/캡션 레이어 분리를 검증하는 회귀 테스트를 추가했습니다.
+
+### 검증
+- 새 로컬 production preview를 별도 `4399` 포트에서 실행해 오래된 Worker cache와 분리했습니다.
+- Chrome 1440px `/about` 직접 진입: 캡션 `display: block`, `filter: none`, color 78% white 확인.
+- Chrome 390px `/about` 직접 진입: 캡션 우하단 표시 및 연락처 비중첩 확인.
+- Chrome 1440px 메인 `/` 인트로 완료 후 wheel 1회 About 진입: 캡션 `display: block`, 실제 screenshot 표시 확인.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare production build complete.
+- `npm run test:unit`: 63 tests passed.
+
+### 남은 주의점
+- 운영 반영은 이 변경을 commit/push한 뒤 새 Cloudflare 배포가 완료되어야 확인할 수 있습니다.
+
 ## 2026-07-21 Work Detail Visible Glass Layer And Responsive Profile Caption
 
 ### 요구사항

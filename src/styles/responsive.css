@@ -90,20 +90,26 @@
     min-height: var(--home-panel-height);
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .profile-media-visual {
     filter: grayscale(0.35) contrast(1.08) brightness(0.74) blur(var(--profile-media-enter-blur)) !important;
   }
 
   .identity-section.is-career .profile-media {
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .identity-section.is-career .profile-media-visual {
     filter: grayscale(0.45) contrast(1.12) brightness(0.62) blur(var(--profile-media-enter-blur)) !important;
   }
 
-  .profile-media::before {
+  .profile-media-visual::before {
     display: none;
   }
 
-  .profile-media::after {
+  .profile-media-visual::after {
     inset: 0;
     background:
       linear-gradient(180deg, rgba(0, 0, 0, 0.48), rgba(0, 0, 0, 0.28) 42%, rgba(0, 0, 0, 0.58)),
@@ -301,7 +307,8 @@
   .intro-logo,
   .identity-copy-panel,
   .profile-contact,
-  .profile-media {
+  .profile-media,
+  .profile-media-visual {
     opacity: 1 !important;
     filter: none !important;
     transform: none !important;
@@ -366,7 +373,8 @@
 html.motion-load-failed .intro-logo,
 html.motion-load-failed .identity-copy-panel,
 html.motion-load-failed .profile-contact,
-html.motion-load-failed .profile-media {
+html.motion-load-failed .profile-media,
+html.motion-load-failed .profile-media-visual {
   opacity: 1 !important;
   visibility: visible !important;
   filter: none !important;

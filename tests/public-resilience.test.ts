@@ -20,4 +20,5 @@ test("only completed images without intrinsic width are treated as failed", () =
   assert.equal(hasImageLoadFailed(false, 0), false);
   assert.equal(hasImageLoadFailed(true, 1200), false);
   assert.equal(hasImageLoadFailed(true, 0), true);
+  assert.equal(hasImageLoadFailed(true, 0, true), false);
 });

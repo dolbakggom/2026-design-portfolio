@@ -111,22 +111,24 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
         </div>
 
         <div class="identity-side">
-          <figure class="profile-media" data-profile-media data-image-frame>
-            <img
-              src={deferPortrait ? undefined : portraitSrc}
-              data-deferred-src={deferPortrait ? portraitSrc : undefined}
-              srcset={deferPortrait ? undefined : portraitSource.srcset}
-              data-deferred-srcset={deferPortrait ? portraitSource.srcset : undefined}
-              sizes="(max-width: 760px) 100vw, 50vw"
-              alt={profile.portrait?.alt ?? profile.name}
-              width={portraitWidth}
-              height={portraitHeight}
-              loading={deferPortrait ? "lazy" : "eager"}
-              decoding="async"
-              fetchpriority={deferPortrait ? "low" : "high"}
-              data-public-image
-            />
-            {deferPortrait ? <noscript><img src={portraitSrc} srcset={portraitSource.srcset} sizes="(max-width: 760px) 100vw, 50vw" alt={profile.portrait?.alt ?? profile.name} width={portraitWidth} height={portraitHeight} /></noscript> : null}
+          <figure class="profile-media" data-profile-media>
+            <div class="profile-media-visual" data-image-frame>
+              <img
+                src={deferPortrait ? undefined : portraitSrc}
+                data-deferred-src={deferPortrait ? portraitSrc : undefined}
+                srcset={deferPortrait ? undefined : portraitSource.srcset}
+                data-deferred-srcset={deferPortrait ? portraitSource.srcset : undefined}
+                sizes="(max-width: 760px) 100vw, 50vw"
+                alt={profile.portrait?.alt ?? profile.name}
+                width={portraitWidth}
+                height={portraitHeight}
+                loading={deferPortrait ? "lazy" : "eager"}
+                decoding="async"
+                fetchpriority={deferPortrait ? "low" : "high"}
+                data-public-image
+              />
+              {deferPortrait ? <noscript><img src={portraitSrc} srcset={portraitSource.srcset} sizes="(max-width: 760px) 100vw, 50vw" alt={profile.portrait?.alt ?? profile.name} width={portraitWidth} height={portraitHeight} /></noscript> : null}
+            </div>
             <figcaption>취미로 기타를 치고 있습니다.</figcaption>
           </figure>
 

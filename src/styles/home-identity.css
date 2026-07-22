@@ -321,16 +321,24 @@ html:not(.intro-complete) .site-shell[data-initial-section="intro"] [data-type-c
   margin: 0;
   overflow: hidden;
   background: var(--color-ink);
+  transition:
+    opacity 520ms ease,
+    transform 520ms ease;
+  will-change: transform, opacity;
+}
+
+.profile-media-visual {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--color-ink);
   filter:
     grayscale(var(--profile-media-grayscale))
     contrast(var(--profile-media-contrast))
     brightness(var(--profile-media-brightness))
     blur(var(--profile-media-enter-blur));
-  transition:
-    opacity 520ms ease,
-    transform 520ms ease,
-    filter 520ms ease;
-  will-change: transform, opacity;
+  transition: filter 520ms ease;
+  will-change: filter;
 }
 
 .identity-section.is-career .profile-media {
@@ -342,27 +350,27 @@ html:not(.intro-complete) .site-shell[data-initial-section="intro"] [data-type-c
   transform: scale(1.04);
 }
 
-.profile-media::before,
-.profile-media::after {
+.profile-media-visual::before,
+.profile-media-visual::after {
   position: absolute;
   content: "";
   pointer-events: none;
 }
 
-.profile-media::before {
+.profile-media-visual::before {
   display: none;
   inset: 0;
   z-index: 1;
   background: rgba(0, 0, 0, var(--profile-career-dim));
 }
 
-.profile-media::after {
+.profile-media-visual::after {
   inset: 55% 0 0;
   z-index: 2;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.78));
 }
 
-.profile-media img {
+.profile-media-visual img {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -376,22 +384,23 @@ html:not(.intro-complete) .site-shell[data-initial-section="intro"] [data-type-c
   position: absolute;
   right: 36px;
   bottom: 36px;
-  z-index: 3;
+  z-index: 4;
   margin: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 20px;
   font-weight: 500;
   line-height: 1.3;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.72);
 }
 
-.profile-media.is-image-unavailable {
+.profile-media-visual.is-image-unavailable {
   background:
     linear-gradient(135deg, rgba(8, 200, 64, 0.2), transparent 36%),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 48px),
     var(--color-ink);
 }
 
-.profile-media.is-image-unavailable figcaption {
+.profile-media-visual.is-image-unavailable + figcaption {
   display: none;
 }
 
@@ -600,4 +609,3 @@ html.home-scroll .timeline-items {
   z-index: 2;
   margin-top: calc(-2 * var(--home-panel-height));
 }
-

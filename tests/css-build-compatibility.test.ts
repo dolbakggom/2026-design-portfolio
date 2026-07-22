@@ -39,3 +39,12 @@ test("profile media caption remains visible at responsive widths", async () => {
   assert.doesNotMatch(css, /\.profile-media figcaption\s*\{[^}]*display:\s*none/s);
   assert.match(css, /\.profile-media figcaption\s*\{[^}]*right:\s*24px[^}]*bottom:\s*24px/s);
 });
+
+test("profile media effects are isolated from the caption", async () => {
+  const markup = await readFile("src/components/HomePage.astro", "utf8");
+  const css = await readFile("src/styles/home-identity.css", "utf8");
+
+  assert.match(markup, /<div class="profile-media-visual" data-image-frame>[\s\S]*?<\/div>\s*<figcaption>/);
+  assert.match(css, /\.profile-media-visual\s*\{[^}]*filter:/s);
+  assert.match(css, /\.profile-media figcaption\s*\{[^}]*text-shadow:/s);
+});

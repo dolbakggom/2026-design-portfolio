@@ -137,11 +137,21 @@ const { skipTarget = "#main-content" } = props;
           }
         };
 
-        if (hasImageLoadFailed(image.complete, image.naturalWidth)) {
+        const restoreImage = () => {
+          frame.classList.remove("is-image-unavailable");
+          frame.removeAttribute("role");
+          frame.removeAttribute("aria-label");
+          image.hidden = false;
+          image.removeAttribute("aria-hidden");
+        };
+
+        const isWaitingForDeferredSource = image.hasAttribute("data-deferred-src");
+        if (hasImageLoadFailed(image.complete, image.naturalWidth, isWaitingForDeferredSource)) {
           showFallback();
           return;
         }
 
+        image.addEventListener("load", restoreImage, { signal: controller.signal });
         image.addEventListener("error", showFallback, { once: true, signal: controller.signal });
       });
 
