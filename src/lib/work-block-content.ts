@@ -51,7 +51,7 @@ const mediaItemSchema = z.object({
 const headingContentSchema = z.object({
   text: z.string().max(500).default(""),
   lineHeight: textStyleShape.lineHeight.default("1.3"),
-  blockWidth: textStyleShape.blockWidth.default("880px"),
+  blockWidth: textStyleShape.blockWidth.default("100%"),
   align: textStyleShape.align.default("left")
 });
 
@@ -59,7 +59,7 @@ const paragraphContentSchema = z.object({
   html: z.string().max(100_000).transform(sanitizeRichTextHtml).default("<p></p>"),
   lineHeight: textStyleShape.lineHeight.default("1.7"),
   paragraphGap: paragraphGapSchema.default("18px"),
-  blockWidth: textStyleShape.blockWidth.default("880px"),
+  blockWidth: textStyleShape.blockWidth.default("100%"),
   align: textStyleShape.align.default("left")
 });
 
@@ -67,7 +67,7 @@ const quoteContentSchema = z.object({
   html: z.string().max(100_000).transform(sanitizeRichTextHtml).default("<blockquote></blockquote>"),
   lineHeight: textStyleShape.lineHeight.default("1.5"),
   paragraphGap: paragraphGapSchema.default("18px"),
-  blockWidth: textStyleShape.blockWidth.default("880px"),
+  blockWidth: textStyleShape.blockWidth.default("100%"),
   align: textStyleShape.align.default("left")
 });
 
@@ -79,17 +79,43 @@ const galleryContentSchema = z.object({
   images: z.array(mediaItemSchema).max(24).default([])
 });
 
+const isPublicWebsiteUrl = (value: string) => {
+  if (value === "") return true;
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+};
+
+const websiteContentSchema = z.object({
+  url: z.string().max(2000).refine(isPublicWebsiteUrl, "Unsupported website URL").default(""),
+  title: z.string().max(240).default(""),
+  description: z.string().max(1000).default(""),
+  domain: z.string().max(253).default(""),
+  imageAssetId: z.string().max(160).nullable().optional(),
+  imageUrl: z.string().max(1200).refine(isSafeMediaUrl, "Unsupported media URL").default(""),
+  imageAlt: z.string().max(500).default(""),
+  imageMime: z.string().max(120).nullable().optional(),
+  imageWidth: dimensionSchema,
+  imageHeight: dimensionSchema
+});
+
+const dividerContentSchema = z.object({});
+
 const blockBaseShape = {
   id: z.string().max(160).optional(),
   sortOrder: z.number().int().min(0).optional()
 };
 
 const fallbackContent = {
-  heading: { text: "", lineHeight: "1.3", blockWidth: "880px", align: "left" },
-  paragraph: { html: "<p></p>", lineHeight: "1.7", paragraphGap: "18px", blockWidth: "880px", align: "left" },
+  heading: { text: "", lineHeight: "1.3", blockWidth: "100%", align: "left" },
+  paragraph: { html: "<p></p>", lineHeight: "1.7", paragraphGap: "18px", blockWidth: "100%", align: "left" },
   image: { url: "", alt: "", caption: "" },
   gallery: { images: [] },
-  quote: { html: "<blockquote></blockquote>", lineHeight: "1.5", paragraphGap: "18px", blockWidth: "880px", align: "left" }
+  quote: { html: "<blockquote></blockquote>", lineHeight: "1.5", paragraphGap: "18px", blockWidth: "100%", align: "left" },
+  website: { url: "", title: "", description: "", domain: "", imageUrl: "", imageAlt: "" },
+  divider: {}
 } as const satisfies Record<WorkBlockType, Record<string, unknown>>;
 
 export const workBlockSchema = z.discriminatedUnion("type", [
@@ -97,7 +123,9 @@ export const workBlockSchema = z.discriminatedUnion("type", [
   z.object({ ...blockBaseShape, type: z.literal("paragraph"), content: paragraphContentSchema.default(fallbackContent.paragraph) }),
   z.object({ ...blockBaseShape, type: z.literal("image"), content: imageContentSchema.default(fallbackContent.image) }),
   z.object({ ...blockBaseShape, type: z.literal("gallery"), content: galleryContentSchema.default(() => ({ images: [] })) }),
-  z.object({ ...blockBaseShape, type: z.literal("quote"), content: quoteContentSchema.default(fallbackContent.quote) })
+  z.object({ ...blockBaseShape, type: z.literal("quote"), content: quoteContentSchema.default(fallbackContent.quote) }),
+  z.object({ ...blockBaseShape, type: z.literal("website"), content: websiteContentSchema.default(fallbackContent.website) }),
+  z.object({ ...blockBaseShape, type: z.literal("divider"), content: dividerContentSchema.default(fallbackContent.divider) })
 ]);
 
 const contentSchemas = {
@@ -105,7 +133,9 @@ const contentSchemas = {
   paragraph: paragraphContentSchema,
   image: imageContentSchema,
   gallery: galleryContentSchema,
-  quote: quoteContentSchema
+  quote: quoteContentSchema,
+  website: websiteContentSchema,
+  divider: dividerContentSchema
 } satisfies Record<WorkBlockType, z.ZodType>;
 
 const asRecord = (value: unknown): Record<string, unknown> =>
@@ -146,7 +176,7 @@ export const normalizeStoredWorkBlockContent = (type: WorkBlockType, content: un
     return {
       text: safeString(value.text, 500),
       lineHeight: safeOption(lineHeightSchema, value.lineHeight, "1.3"),
-      blockWidth: safeOption(blockWidthSchema, value.blockWidth, "880px"),
+      blockWidth: safeOption(blockWidthSchema, value.blockWidth, "100%"),
       align: safeOption(alignSchema, value.align, "left")
     };
   }
@@ -160,7 +190,7 @@ export const normalizeStoredWorkBlockContent = (type: WorkBlockType, content: un
       html: sanitizeRichTextHtml(rawHtml),
       lineHeight: safeOption(lineHeightSchema, value.lineHeight, isQuote ? "1.5" : "1.7"),
       paragraphGap: safeOption(paragraphGapSchema, value.paragraphGap, "18px"),
-      blockWidth: safeOption(blockWidthSchema, value.blockWidth, "880px"),
+      blockWidth: safeOption(blockWidthSchema, value.blockWidth, "100%"),
       align: safeOption(alignSchema, value.align, "left")
     };
   }
@@ -171,6 +201,29 @@ export const normalizeStoredWorkBlockContent = (type: WorkBlockType, content: un
       caption: safeString(value.caption, 1200)
     };
   }
+
+  if (type === "website") {
+    const candidateUrl = safeString(value.url, 2000);
+    const candidateImageUrl = safeString(value.imageUrl, 1200);
+    return {
+      url: isPublicWebsiteUrl(candidateUrl) ? candidateUrl : "",
+      title: safeString(value.title, 240),
+      description: safeString(value.description, 1000),
+      domain: safeString(value.domain, 253),
+      ...(value.imageAssetId === null
+        ? { imageAssetId: null }
+        : safeString(value.imageAssetId, 160)
+          ? { imageAssetId: safeString(value.imageAssetId, 160) }
+          : {}),
+      imageUrl: isSafeMediaUrl(candidateImageUrl) ? candidateImageUrl : "",
+      imageAlt: safeString(value.imageAlt, 500),
+      ...(safeString(value.imageMime, 120) ? { imageMime: safeString(value.imageMime, 120) } : {}),
+      ...(safeDimension(value.imageWidth) ? { imageWidth: safeDimension(value.imageWidth) } : {}),
+      ...(safeDimension(value.imageHeight) ? { imageHeight: safeDimension(value.imageHeight) } : {})
+    };
+  }
+
+  if (type === "divider") return {};
 
   const images = Array.isArray(value.images)
     ? value.images

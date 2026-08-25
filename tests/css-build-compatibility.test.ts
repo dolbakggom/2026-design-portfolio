@@ -48,3 +48,25 @@ test("profile media effects are isolated from the caption", async () => {
   assert.match(css, /\.profile-media-visual\s*\{[^}]*filter:/s);
   assert.match(css, /\.profile-media figcaption\s*\{[^}]*text-shadow:/s);
 });
+
+test("every work heading receives additional top spacing in public and live preview layouts", async () => {
+  const publicCss = await readFile("src/styles/work-detail.css", "utf8");
+  const previewCss = await readFile("src/styles/admin/preview.css", "utf8");
+
+  assert.match(publicCss, /\.work-block-heading\s*\{[^}]*margin:\s*24px 0 0;/s);
+  assert.match(previewCss, /\.preview-block-heading\s*\{[^}]*margin:\s*12px 0 0;/s);
+  assert.doesNotMatch(publicCss, /\.work-block-heading:(?:first-child|first-of-type)/);
+});
+
+test("work project navigation keeps its full-width circular acid reveal", async () => {
+  const css = await readFile("src/styles/work-detail.css", "utf8");
+  const component = await readFile("src/components/WorkProjectNavigation.astro", "utf8");
+
+  assert.match(css, /\.work-project-navigation\s*\{[^}]*width:\s*100vw;[^}]*height:\s*320px;/s);
+  assert.match(css, /\.work-project-navigation-tint\s*\{[^}]*background:\s*var\(--color-acid\);[^}]*clip-path:\s*circle\(0 at var\(--project-reveal-x\) var\(--project-reveal-y\)\);/s);
+  assert.doesNotMatch(css, /\.work-project-navigation-tint\s*\{[^}]*mix-blend-mode:/s);
+  assert.match(css, /\.work-project-navigation-copy\.is-reveal-copy\s*\{[^}]*color:\s*var\(--color-ink\);[^}]*clip-path:\s*circle\(0 at var\(--project-reveal-x\) var\(--project-reveal-y\)\);/s);
+  assert.match(component, /class="work-project-navigation-copy is-reveal-copy" aria-hidden="true"/);
+  assert.match(css, /\.work-project-navigation-link:hover \.work-project-navigation-tint[^}]*clip-path:\s*circle\(150% at var\(--project-reveal-x\) var\(--project-reveal-y\)\);/s);
+  assert.match(component, /addEventListener\("pointermove"[\s\S]*--project-reveal-x[\s\S]*--project-reveal-y/);
+});

@@ -2,11 +2,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const databaseName = process.argv[2] ?? "portfolio-db";
-const outputPath = process.argv[3] ?? "d1-backups/remote-prod-2026-05-27.sql";
+const argumentsWithoutMode = process.argv.slice(2).filter((argument) => !["--local", "--remote"].includes(argument));
+const locationFlag = process.argv.includes("--local") ? "--local" : "--remote";
+const databaseName = argumentsWithoutMode[0] ?? "portfolio-db";
+const outputPath = argumentsWithoutMode[1] ?? "d1-backups/remote-prod-2026-05-27.sql";
 
 const tables = [
   { name: "assets", orderBy: "created_at, id" },
+  { name: "asset_variants", orderBy: "asset_id, width" },
   { name: "profile", orderBy: "id" },
   { name: "timeline_items", orderBy: "sort_order, created_at, id" },
   { name: "works", orderBy: "sort_order, created_at, id" },
@@ -17,7 +20,7 @@ const tables = [
 const runWranglerJson = (command) => {
   const result = spawnSync(
     "npx",
-    ["wrangler", "d1", "execute", databaseName, "--remote", "--command", command, "--json"],
+    ["wrangler", "d1", "execute", databaseName, locationFlag, "--command", command, "--json"],
     { encoding: "utf8" }
   );
 
@@ -45,6 +48,7 @@ const lines = [
   'DELETE FROM "works";',
   'DELETE FROM "timeline_items";',
   'DELETE FROM "profile";',
+  'DELETE FROM "asset_variants";',
   'DELETE FROM "assets";',
   'DELETE FROM "d1_migrations";'
 ];

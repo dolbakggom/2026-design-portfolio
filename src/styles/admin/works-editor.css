@@ -336,16 +336,30 @@
 }
 
 .block-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 16;
   display: grid;
   justify-content: stretch;
   justify-items: start;
   gap: 12px;
+  margin-inline: -12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+  -webkit-backdrop-filter: blur(16px) saturate(112%);
+  backdrop-filter: blur(16px) saturate(112%);
 }
 
 .block-add-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.block-add-actions button {
+  flex: 0 0 auto;
 }
 
 .block-width-control {
@@ -364,6 +378,17 @@
   display: grid;
   gap: 14px;
   margin-top: 14px;
+}
+
+.divider-edit-preview {
+  padding: 16px 0;
+}
+
+.divider-edit-preview span {
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: var(--admin-border);
 }
 
 .editor-block {
@@ -510,6 +535,82 @@ button.block-drag-handle svg {
   margin-top: 6px;
 }
 
+.website-block-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.website-block-editor label {
+  display: grid;
+  gap: 7px;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.website-block-editor textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+
+.website-fetch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.website-fetch-row button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.website-fetch-status {
+  margin: -4px 0 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.website-fetch-status.is-success {
+  color: #39734a;
+}
+
+.website-fetch-status.is-error {
+  color: #a35d58;
+}
+
+.website-image-preview {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--radius-sm);
+  background: #171717;
+}
+
+.website-image-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  max-height: 420px;
+  object-fit: cover;
+}
+
+.website-image-preview span {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
 .sticky-actions {
   position: sticky;
   bottom: 24px;
@@ -530,4 +631,3 @@ button.block-drag-handle svg {
   place-items: center;
   color: var(--color-muted);
 }
-

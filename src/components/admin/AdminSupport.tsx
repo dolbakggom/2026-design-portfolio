@@ -352,7 +352,7 @@ export const previewBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.
   ({
     "--preview-line-height": contentOption(block, "lineHeight", ["1.3", "1.5", "1.7", "1.9"], defaults.lineHeight),
     "--preview-paragraph-gap": contentOption(block, "paragraphGap", ["0px", "10px", "18px", "28px"], defaults.paragraphGap),
-    "--preview-block-width": contentOption(block, "blockWidth", ["680px", "880px", "1080px", "100%"], "880px"),
+    "--preview-block-width": contentOption(block, "blockWidth", ["680px", "880px", "1080px", "100%"], "100%"),
     textAlign: contentOption(block, "align", ["left", "center"], "left") as CSSProperties["textAlign"]
   }) as CSSProperties;
 
@@ -393,8 +393,8 @@ export function WorkLivePreview({ work }: { work: WorkItem }) {
               </div>
             ) : null}
             <div>
-              <dt>Role</dt>
-              <dd>{work.role || "Design"}</dd>
+              <dt>Tools</dt>
+              <dd>{work.role || "—"}</dd>
             </div>
             <div>
               <dt>Status</dt>
@@ -448,6 +448,44 @@ export function WorkLivePreview({ work }: { work: WorkItem }) {
                       return <img key={`${image.url}-${index}`} src={image.url} alt={"alt" in image && typeof image.alt === "string" ? image.alt : ""} />;
                     })}
                   </div>
+                );
+              }
+
+              if (block.type === "divider") {
+                return <hr className="preview-block-divider" key={block.id} />;
+              }
+
+              if (block.type === "website") {
+                const href = contentText(block, "url");
+                const domain = contentText(block, "domain", "website");
+                const title = contentText(block, "title", domain);
+                return (
+                  <a
+                    className="preview-block-website"
+                    href={href || undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    key={block.id}
+                    onClick={(event) => {
+                      if (!href) event.preventDefault();
+                    }}
+                  >
+                    <span className={`preview-block-website-media ${contentText(block, "imageUrl") ? "" : "is-empty"}`} aria-hidden="true">
+                      {contentText(block, "imageUrl") ? <img src={contentText(block, "imageUrl")} alt="" /> : null}
+                    </span>
+                    <span className="preview-block-website-copy">
+                      <span className="preview-block-website-domain">{domain}</span>
+                      <strong>{title}</strong>
+                      {contentText(block, "description") ? <span>{contentText(block, "description")}</span> : null}
+                      <span className="preview-block-website-action">
+                        사이트 바로가기
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                          <path d="M5 12h14" />
+                          <path d="m13 6 6 6-6 6" />
+                        </svg>
+                      </span>
+                    </span>
+                  </a>
                 );
               }
 

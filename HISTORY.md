@@ -36,6 +36,220 @@
 
 ---
 
+## 2026-08-25 Local Content Production Deployment
+
+### 요구사항
+- 현재 로컬 D1/R2 콘텐츠와 코드 변경 전체를 운영 사이트 기준으로 배포합니다.
+
+### 데이터 승격
+- 운영 D1을 `../backups/d1/remote-before-deploy-2026-08-25.sql`로 먼저 백업했습니다.
+- 기존 전체 R2 백업 `../backups/r2/remote-prod-2026-08-19/`을 확인하고, 운영 R2는 삭제 없이 로컬에서 참조하는 고유 object 466개를 검증 후 업로드했습니다.
+- `scripts/export-d1-via-execute.mjs`에 `--local`/`--remote` 모드를 추가하고, `scripts/promote-r2-assets.mjs`를 추가해 D1 dump가 참조하는 원본·variant object를 모두 사전검증한 뒤 운영 R2로 승격할 수 있게 했습니다.
+- 운영 D1에 `0006_website_work_block.sql`, `0007_divider_work_block.sql`을 적용한 뒤 로컬 덤프 `../backups/d1/local-to-deploy-2026-08-25.sql`을 승격했습니다.
+- Wrangler 원격 import는 SQL `BEGIN TRANSACTION`/`COMMIT`을 허용하지 않으므로 해당 두 문장만 제거한 임시 D1 import 파일을 사용했습니다. 첫 시도는 실행 전에 거부되어 운영 DB가 자동으로 원상복구됐고, 변환 후 745 queries가 정상 처리됐습니다.
+
+### 운영 콘텐츠 결과
+- profile 1, timeline_items 8, works 7, work_blocks 148, assets 135, asset_variants 430, migrations 7로 로컬과 운영이 일치합니다.
+- 로컬 기준에 없는 기존 운영 작업물 `a2z-homepage`는 제거됐습니다.
+- `PRAGMA foreign_key_check` 결과 오류가 없습니다.
+
+### 검증
+- `npm run test:unit`: 72 tests passed.
+- `npm run test:integration`: 9 integration tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- 운영 배포 후 `/api/health`, 공개 홈, 7개 작업물 상세와 미디어 응답을 다시 확인합니다.
+
+## 2026-08-23 Work Navigation Design Study
+
+### 요구사항
+- Rush Hour 작업물 상세 본문 하단에서 이전·다음 프로젝트로 이동하는 내비게이션 시안 4개를 별도 로컬 페이지로 비교합니다.
+
+### 구현
+- `/preview/work-navigation`에 실제 로컬 Rush Hour 표지, 기본 정보, 본문 블록을 재사용하고 4가지 하단 내비게이션을 연속 배치했습니다.
+- 에디토리얼 분할, 이미지 듀얼 패널, 다음 프로젝트 강조, 프로젝트 인덱스 방식으로 구성했으며 실제 인접 프로젝트 링크와 콘텐츠를 사용합니다.
+- 인접 프로젝트 이미지가 없을 때 시안 검토가 가능하도록 Rush Hour 표지를 임시 시각 자료로 사용합니다.
+- 비교 페이지는 개발 환경에서만 열리며 운영 빌드에서는 HTTP 404를 반환합니다.
+
+### 검증
+- `npm run build`: 0 errors, 0 warnings, 0 hints.
+- 로컬 브라우저: 4개 시안 렌더링, 이미지 실패 0, 데스크톱/390px 모바일 가로 overflow 0.
+- 선택안 적용 후 `npm test`: 단위 70개, 통합 9개 통과. 회귀 테스트 추가 후 `npm run test:unit`: 71개 통과. 실제 Rush Hour 최신 렌더에서 전체 폭 1280px, 높이 260px, overflow 0 및 앞뒤 프로젝트 연결을 확인했습니다.
+- 원형 hover는 포인터 좌표가 CSS 변수로 전달되고 `clip-path: circle(150%)`까지 확장되는 상태를 확인했습니다.
+
+### 후속
+- 사용자가 2번 Full image panels 시안을 선택했습니다.
+- 실제 `/work/[slug]` 하단에 관리자 WORK 정렬 순서 기반의 이전·다음 순환 탐색을 적용하고, 선택이 끝난 비교용 페이지와 전용 CSS는 제거했습니다.
+- 내비게이션은 `100vw` 좌우 전체 폭, 데스크톱 높이 260px이며 모바일에서는 220px 패널 두 개가 세로로 배치됩니다.
+- 포인터 위치에서 시작하는 원형 `clip-path`가 확장되며 이미지에 메인 `--color-acid` 컬러가 입혀지고, 키보드 포커스에서는 중앙 기준으로 같은 전환을 제공합니다.
+- 후속 조정으로 녹색 레이어의 blend mode를 제거해 이미지 위를 불투명한 `#08c840` 단색이 완전히 덮도록 변경했습니다.
+- 데스크톱 높이를 320px로 늘리고 제목 행간과 메타 간격을 확대했습니다. 크기 위계는 제목 > Previous/Next > 카테고리·연도로 고정했습니다.
+- Previous/Next 화살표에 상세 상단바와 같은 sweep 애니메이션을 방향별로 적용했습니다.
+- 후속 검증: `npm run build` 0 errors/warnings/hints, `npm run test:unit` 71개 통과. 1280px 화면에서 내비게이션 1280×320px, overflow 0, tint `rgb(8, 200, 64)`/`mix-blend-mode: normal`, 방향 화살표 520ms sweep을 확인했습니다.
+- 사용자 정정에 따라 Work Detail 최상단 커버의 paper 색상 하단 그라데이션은 원래대로 복구했습니다.
+- 제거 대상은 하단 이전·다음 프로젝트 패널의 검정 세로 그라데이션이었습니다. 이를 균일한 검정 오버레이로 교체하고, 단색 녹색 reveal을 그 위 레이어로 올려 hover 전체가 정확한 `#08c840`으로 보이게 수정했습니다.
+- 녹색 원과 동일한 `clip-path`를 쓰는 검정 텍스트 복제 레이어를 추가했습니다. 원이 지나간 부분의 제목, Previous/Next, 카테고리·연도, 화살표만 검정으로 바뀌고 나머지는 흰색으로 남아 배경과 전경 대비가 공간적으로 함께 전환됩니다.
+- 쿼리스트링이 있는 로컬 URL에서만 최신 내비게이션이 보이고 일반 Work URL에는 이전 HTML이 남던 원인을 확인했습니다. 미들웨어의 10분 Cloudflare Cache API가 Astro 개발 서버에서도 동작해 기존 HTML을 반환하고 있었습니다.
+- 공개 HTML Cache API는 이제 `import.meta.env.PROD`에서만 사용합니다. 운영의 10분 TTL/purge 정책은 유지하고, `npm run dev`에서는 모든 Work Detail이 쿼리스트링 없이 즉시 최신 렌더를 반환합니다.
+- 검증: `npm run test:unit` 72개 통과, `npm run build` 0 errors/warnings/hints. 쿼리스트링 없는 Rush Hour, HEXA LABS, 평택대학교 Work Detail에서 내비게이션과 동기화된 텍스트 reveal 레이어가 모두 렌더링되는 것을 확인했습니다.
+
+## 2026-08-23 Divider Work Block
+
+### 요구사항
+- 작업물 본문 에디터에 콘텐츠 구획을 나누는 구분선 블록을 추가합니다.
+
+### 구현
+- `Divider`를 정식 작업물 블록 타입으로 추가하고 에디터 툴바, 편집 카드, 실시간 미리보기, 공개 상세 페이지에서 동일하게 지원합니다.
+- 공개 페이지와 미리보기에서는 의미 있는 `<hr>` 요소를 1px 중립색 선으로 렌더링합니다.
+- 기존 데이터에 영향을 주지 않고 D1 제약 조건을 확장하는 `migrations/0007_divider_work_block.sql`을 추가했습니다.
+- 저장 후 D1 블록이 공개 페이지의 구분선으로 렌더링되는 통합 테스트와 콘텐츠 정규화 단위 테스트를 추가했습니다.
+
+### 중요 파일
+- `src/components/admin/BlockEditor.tsx`
+- `src/components/admin/AdminSupport.tsx`
+- `src/components/WorkBlocks.astro`
+- `src/lib/work-block-content.ts`
+- `migrations/0007_divider_work_block.sql`
+
+### 검증
+- `npm run db:migrate:local`: `0007_divider_work_block.sql` 적용 성공.
+- `npm run test:unit`: 70개 통과.
+- `npm run test:integration`: 빌드 0 errors/warnings/hints, 통합 테스트 9개 통과.
+
+### 배포 주의
+- 배포 환경에서 새 Website/Divider 블록을 저장하기 전에 원격 D1에 `0006`, `0007`을 적용해야 합니다.
+- `README.md`에 운영 백업 → 전체 테스트 → `npm run db:migrate:remote` → Worker 배포 → `/api/health` → 관리자 저장/공개 렌더링 확인 순서의 배포 체크리스트를 추가했습니다.
+
+## 2026-08-19 Website Detail Block
+
+### 요구사항
+- 작업물 상세 본문에 실제 운영 사이트로 이동하는 `website` 블록을 추가합니다.
+- 검토한 네 시안 중 검은 배경의 4번 CTA 시안을 사용하고, 사이트 대표 이미지는 대상 사이트 설정에서 자동으로 가져옵니다.
+- 사이트 제목과 설명은 자동 수집 후 관리자가 블록에서 자유롭게 수정할 수 있어야 합니다.
+
+### 구현
+- `migrations/0006_website_work_block.sql`, `src/types.ts`, `src/db/schema.ts`, `src/lib/work-block-content.ts`
+  - D1 `work_blocks.type`에 `website`를 추가하고 URL, 제목, 설명, 도메인, R2 대표 이미지 정보를 검증·정규화합니다.
+- `src/lib/website-metadata.ts`, `src/pages/api/admin/website-metadata.ts`
+  - 관리자 전용 API가 `og:title`, `og:description`, `og:image`를 우선 수집하고 일반 title/description으로 fallback합니다.
+  - 대표 이미지는 외부 hotlink 대신 R2 `website/` 경로로 가져오며 assets metadata를 D1에 저장합니다.
+  - HTTP(S)만 허용하고 credentials, localhost, private/link-local IP, 내부 도메인, 과도한 redirect/응답 크기를 차단합니다.
+- `src/components/admin/BlockEditor.tsx`, `src/components/admin/AdminSupport.tsx`
+  - Website 블록 추가, URL 기반 정보 불러오기, custom title/description 편집, 대표 이미지 상태와 실시간 미리보기를 추가했습니다.
+- `src/components/WorkBlocks.astro`, public/admin CSS
+  - 검은 배경의 copy/image 분할 CTA를 데스크톱에 적용하고 모바일에서는 세로로 전환합니다.
+  - hover/focus 시 초록색 CTA와 화살표 이동, 대표 이미지 확대 효과를 적용했습니다.
+- `src/scripts/home/home-featured.ts`
+  - 통합 검수에서 발견된 Featured dot 클릭 상태와 ScrollTrigger 갱신의 순서 경쟁을 제거해 클릭한 패널 상태가 안정적으로 유지되게 했습니다.
+
+### 검증
+- `npm run test:unit`: 67 tests passed.
+- `npm run build`: Astro check 0 errors, Cloudflare server build complete.
+- `npm run test:integration`: 9 integration tests passed.
+- local D1 migration `0006_website_work_block.sql`: 6 commands applied, `PRAGMA foreign_key_check` 오류 없음.
+- 실제 `dolbakggom.com`에서 Open Graph title/description과 `/og-image.png`를 읽고 PNG 17,529 bytes를 정상 검증했습니다.
+- 임시 local D1 블록으로 1440px/390px 공개 렌더링을 확인했습니다. 최종 모바일 card/media width가 모두 358px, 가로 overflow 0, 대표 이미지 natural width 2560px임을 확인한 뒤 임시 블록을 삭제했습니다.
+
+### 남은 주의점
+- 운영 배포 전 `npm run db:migrate:remote`로 `0006_website_work_block.sql`을 운영 D1에 먼저 적용해야 Website 블록 저장이 가능합니다.
+- 일부 사이트가 Open Graph 이미지를 제공하지 않거나 bot 요청을 차단하면 제목·설명만 채워지고 관리자에 대표 이미지 경고가 표시됩니다. 기존 블록 이미지가 있으면 실패 시 유지됩니다.
+
+### 후속 시각 조정
+- Website 블록의 액션 문구를 `Visit website`에서 `사이트 바로가기`로 변경하고 글자와 화살표 크기를 키웠습니다.
+- 좌우 분할 이미지를 제거하고 대표 이미지를 블록 전체 배경으로 확장했습니다.
+- 이미지에 강한 blur, 낮은 saturation/brightness, 검은 gradient overlay를 적용해 전면 제목과 설명의 대비를 유지합니다.
+- 공개 페이지와 관리자 실시간 미리보기에 동일한 시각 구조를 반영했습니다.
+
+### Tools 메타데이터 라벨
+- 기존 작업물 데이터의 `role` 값이 Figma, Illustrator 등 사용 도구로 채워지는 실제 용도에 맞춰 공개 상세, 관리자 에디터, 실시간 미리보기의 표시 라벨을 `Tools`로 변경했습니다.
+- 관리자 입력에는 쉼표 구분 도구 예시를 추가하고, 빈 값 fallback은 의미가 다른 `Design` 대신 `—`로 변경했습니다.
+- 운영 데이터와 API 호환성을 위해 내부 `role` 필드명과 D1 column은 유지합니다.
+- 통합 테스트에 공개 `Tools` 라벨/값과 관리자 입력/실시간 미리보기 라벨 검증을 추가했습니다. `npm test` 결과 unit 67개와 integration 9개가 모두 통과했습니다.
+- 실제 local `/work/roii-hmi`를 1440px/390px로 확인해 `Tools` 1개, `Role` 0개, 기존 값 `Figma, Adobe Illustrator`, 가로 overflow 0을 확인했습니다.
+
+## 2026-08-20 Sticky Body Block Toolbar
+
+### 요구사항
+- 작업물 본문이 길어져도 Heading, Paragraph, Image, Gallery, Quote, Website 블록 추가 버튼을 다시 찾기 쉽도록 상단에 따라오는 기능을 추가합니다.
+
+### 구현
+- `src/styles/admin/works-editor.css`
+  - `.block-toolbar`를 본문 에디터 범위 안의 sticky toolbar로 변경했습니다.
+  - 반투명 흰색 배경, backdrop blur, 구분선과 약한 그림자로 아래 콘텐츠와 구분합니다.
+  - toolbar는 본문 블록 영역이 끝날 때 함께 해제되며 각 버튼 크기는 스크롤 중에도 유지됩니다.
+- `src/styles/admin/responsive.css`
+  - 모바일에서는 work editor의 내부 overflow를 해제하고 viewport page scroll 기준으로 8px 여백을 두고 따라오게 했습니다.
+
+### 검증
+- 통합 테스트가 본문 목록을 1600px로 확장하고 editor scroll을 이동한 뒤 toolbar의 computed position이 `sticky`, top이 `0px`, editor 상단과의 실제 offset이 1px 이내인지 확인합니다.
+- `npm run test:integration`: 9 tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+
+## 2026-08-20 Full-Width Text Block Defaults
+
+### 요구사항
+- Content width를 `100%`로 사용 중인데 새 Paragraph 등 텍스트 블록이 `880px`로 생성되어 매번 다시 설정해야 하는 문제를 해결합니다.
+
+### 구현
+- Heading, Paragraph, Quote의 schema·저장 정규화·공개 렌더러·관리자 미리보기 기본 폭을 `880px`에서 `100%`로 변경했습니다.
+- 관리자에서 새 텍스트 블록을 추가하면 고정 기본값 대신 현재 Content width 선택값을 상속합니다.
+- 기존에 `680px`, `880px`, `1080px`로 명시 저장된 블록 값은 변경하지 않습니다.
+
+### 검증
+- width가 없는 Heading, Paragraph, Quote payload가 모두 `100%`로 정규화되는 단위 테스트를 추가했습니다.
+- 관리자에서 Paragraph를 실제 추가한 뒤 실시간 미리보기의 width가 `100%`인지 확인하는 통합 테스트를 추가했습니다.
+- 전체 검수 중 Lenis의 즉시 이동 완료 콜백이 Featured dot 활성 상태를 간헐적으로 덮는 기존 경쟁 조건을 재현해, 클릭 직후와 스크롤 완료 시점 모두 선택한 패널을 확정하도록 보강했습니다.
+- `npm run test:unit`: 68 tests passed.
+- `npm run test:integration`: 9 tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+
+## 2026-08-23 Work Heading Top Spacing
+
+### 요구사항
+- 작업물 상세의 모든 Heading 위쪽을 아래쪽보다 더 띄우고, 첫 번째 Heading도 같은 규칙을 적용합니다.
+
+### 구현
+- 공개 상세 Heading에 `margin-top: 24px`를 추가했습니다. 공통 block gap `34px`와 합쳐 위쪽은 총 `58px`, 아래쪽은 기존 `34px`입니다.
+- 관리자 축소 실시간 미리보기에는 비율에 맞춰 Heading 위쪽 `12px`를 추가했습니다.
+- 첫 번째 Heading을 제외하는 selector를 사용하지 않아 모든 Heading에 동일하게 적용됩니다.
+
+### 검증
+- 공개 및 관리자 미리보기의 Heading top margin과 첫 번째 Heading 예외 selector 부재를 확인하는 회귀 테스트를 추가했습니다.
+- `npm run test:unit`: 69 tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+
+## 2026-08-19 Production Content Synced To Local
+
+### 요구사항
+- 운영 사이트에서 작성한 최신 콘텐츠를 로컬 D1/R2로 동기화하고, 이후 로컬에서 콘텐츠를 함께 작성·검수할 수 있게 합니다.
+
+### 원인과 상태
+- 동기화 전 로컬은 `works 7`, `work_blocks 13`, `assets 30`, `asset_variants 0`이었습니다.
+- 운영은 `works 8`, `work_blocks 5`, `assets 41`, `asset_variants 136`이었고, 2026-08-19에 추가된 `ptubootcamp` 작업물이 로컬에 없었습니다.
+- 기존 D1 export 스크립트는 `asset_variants`를 누락했고 R2 sync 스크립트는 원본 `assets.r2_key`만 복사했습니다.
+
+### 구현 및 동기화
+- `scripts/export-d1-via-execute.mjs`
+  - `asset_variants` 조회/INSERT와 안전한 삭제 순서를 추가했습니다.
+- `scripts/sync-r2-assets.mjs`
+  - INSERT column을 이름 기준으로 해석하고 `assets`와 `asset_variants`의 모든 R2 key를 수집하도록 개선했습니다.
+  - 중복 key를 제거한 뒤 MIME을 유지하며 remote R2에서 local R2로 복사합니다.
+- 백업
+  - `../backups/d1/local-before-sync-2026-08-19.sql`
+  - `../backups/d1/remote-prod-2026-08-19.sql`
+  - `../backups/r2/remote-prod-2026-08-19/` (169 objects, 96MB)
+- 운영 덤프를 local D1에 적용하고 고유 R2 object 169개를 local R2로 복사했습니다.
+- README에 Git 배포와 D1/R2 콘텐츠 배포가 별개라는 점, 권장 콘텐츠 편집·승격 흐름을 추가했습니다.
+
+### 검증
+- 동기화 후 local D1: `profile 1`, `timeline_items 8`, `works 8`, `work_blocks 5`, `assets 41`, `asset_variants 136`.
+- `PRAGMA foreign_key_check`: 오류 없음.
+- 로컬 `/`, `/admin`, `/work/ptubootcamp`: 모두 HTTP 200.
+- `ptubootcamp` 대표 이미지 local media route: HTTP 200, `image/webp`, 203176 bytes.
+
+### 남은 주의점
+- 로컬 관리자에서 저장한 콘텐츠는 `git push`만으로 운영 D1/R2에 반영되지 않습니다.
+- 콘텐츠 작성 완료 후 운영 D1/R2를 다시 백업하고 로컬 검수본을 명시적으로 승격해야 합니다. 이 작업은 다음 콘텐츠 검수 완료 시 수행합니다.
+
 ## 2026-07-22 About Caption Deferred Image Recovery
 
 ### 요구사항

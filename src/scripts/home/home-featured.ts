@@ -76,10 +76,13 @@ export const initHomeFeatured = ({
     dot.addEventListener("click", () => {
       const targetIndex = Number(dot.dataset.featuredTarget ?? 0);
       stage?.classList.add("is-dot-jumping");
-      scrollToPosition(getIndexTop(targetIndex), "auto");
-      setActive(targetIndex);
+      const activateTarget = () => {
+        updateScrollTriggers();
+        setActive(targetIndex);
+      };
+      scrollToPosition(getIndexTop(targetIndex), "auto", activateTarget);
       clearHomeRoute();
-      updateScrollTriggers();
+      activateTarget();
 
       if (blurTimeout) window.clearTimeout(blurTimeout);
       blurTimeout = window.setTimeout(() => {

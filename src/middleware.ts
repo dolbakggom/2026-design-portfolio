@@ -55,6 +55,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   const isPublicCacheCandidate =
+    import.meta.env.PROD &&
     context.request.method === "GET" &&
     !requestUrl.search &&
     isPublicHtmlRoute(requestUrl);

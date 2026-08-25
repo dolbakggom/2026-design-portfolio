@@ -20,27 +20,42 @@ type Props = {
   onUpload: (file: File, alt?: string) => Promise<UploadedAsset>;
 };
 
+type WebsiteMetadataResponse = {
+  metadata: {
+    url: string;
+    domain: string;
+    title: string;
+    description: string;
+  };
+  asset: UploadedAsset & { mime: string } | null;
+  imageWarning: string;
+};
+
 const lineHeightOptions = ["1.3", "1.5", "1.7", "1.9"];
 const paragraphGapOptions = ["0px", "10px", "18px", "28px"];
 const blockWidthOptions = ["680px", "880px", "1080px", "100%"];
 const alignOptions = ["left", "center"];
 const textBlockTypes = new Set<WorkBlockType>(["heading", "paragraph", "quote"]);
 
-const newBlock = (type: WorkBlockType): WorkBlock => ({
+const newBlock = (type: WorkBlockType, blockWidth = "100%"): WorkBlock => ({
   id: crypto.randomUUID(),
   type,
   content:
     type === "heading"
-      ? { text: "New heading", lineHeight: "1.3", blockWidth: "880px", align: "left" }
+      ? { text: "New heading", lineHeight: "1.3", blockWidth, align: "left" }
       : type === "image"
         ? { url: "", alt: "", caption: "" }
         : type === "gallery"
           ? { images: [] }
+          : type === "divider"
+            ? {}
+          : type === "website"
+            ? { url: "", title: "", description: "", domain: "", imageUrl: "", imageAlt: "" }
           : {
               html: type === "quote" ? "<blockquote>New quote</blockquote>" : "<p>New paragraph</p>",
               lineHeight: type === "quote" ? "1.5" : "1.7",
               paragraphGap: "18px",
-              blockWidth: "880px",
+              blockWidth,
               align: "left"
             },
   sortOrder: 0
@@ -136,10 +151,12 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
   const [draggedBlockId, setDraggedBlockId] = useState("");
   const [dragOverBlockId, setDragOverBlockId] = useState("");
   const [dragEnabledId, setDragEnabledId] = useState("");
+  const [websiteLoadingId, setWebsiteLoadingId] = useState("");
+  const [websiteStatus, setWebsiteStatus] = useState<Record<string, { tone: "success" | "error"; text: string }>>({});
 
   const normalized = blocks.map((block, index) => ({ ...block, sortOrder: index + 1 }));
   const textBlocks = normalized.filter((block) => textBlockTypes.has(block.type));
-  const editorWidth = textBlocks[0] ? optionFromBlock(textBlocks[0], "blockWidth", blockWidthOptions, "880px") : "880px";
+  const editorWidth = textBlocks[0] ? optionFromBlock(textBlocks[0], "blockWidth", blockWidthOptions, "100%") : "100%";
 
   const updateBlock = (updated: WorkBlock) => {
     onChange(normalized.map((block) => (block.id === updated.id ? updated : block)));
@@ -161,7 +178,7 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
   };
 
   const addBlock = (type: WorkBlockType) => {
-    onChange([...normalized, newBlock(type)]);
+    onChange([...normalized, newBlock(type, editorWidth)]);
   };
 
   const updateEditorWidth = (value: string) => {
@@ -236,6 +253,58 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
     });
   };
 
+  const fetchWebsiteForBlock = async (block: WorkBlock) => {
+    const rawUrl = textFromBlock(block, "url").trim();
+    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
+    setWebsiteLoadingId(block.id);
+    setWebsiteStatus((current) => ({ ...current, [block.id]: { tone: "success", text: "사이트 정보를 불러오는 중입니다." } }));
+
+    try {
+      const response = await fetch("/api/admin/website-metadata", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      const data = (await response.json().catch(() => ({}))) as WebsiteMetadataResponse & { error?: string };
+      if (!response.ok) throw new Error(data.error || "사이트 정보를 불러오지 못했습니다.");
+
+      updateBlock({
+        ...block,
+        content: {
+          ...block.content,
+          url: data.metadata.url,
+          domain: data.metadata.domain,
+          title: data.metadata.title || data.metadata.domain,
+          description: data.metadata.description,
+          ...(data.asset
+            ? {
+                imageAssetId: data.asset.id,
+                imageUrl: data.asset.url,
+                imageAlt: data.asset.alt,
+                imageMime: data.asset.mime,
+                imageWidth: data.asset.width,
+                imageHeight: data.asset.height
+              }
+            : {})
+        }
+      });
+      setWebsiteStatus((current) => ({
+        ...current,
+        [block.id]: {
+          tone: data.imageWarning ? "error" : "success",
+          text: data.imageWarning || "사이트 제목, 설명과 대표 이미지를 불러왔습니다."
+        }
+      }));
+    } catch (error) {
+      setWebsiteStatus((current) => ({
+        ...current,
+        [block.id]: { tone: "error", text: error instanceof Error ? error.message : "사이트 정보를 불러오지 못했습니다." }
+      }));
+    } finally {
+      setWebsiteLoadingId("");
+    }
+  };
+
   return (
     <div className="block-editor">
       <div className="block-toolbar">
@@ -254,6 +323,12 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
           </button>
           <button type="button" onClick={() => addBlock("quote")}>
             Quote
+          </button>
+          <button type="button" onClick={() => addBlock("divider")}>
+            Divider
+          </button>
+          <button type="button" onClick={() => addBlock("website")}>
+            Website
           </button>
         </div>
         <label className="block-width-control">
@@ -355,6 +430,12 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
 
             {block.type === "paragraph" || block.type === "quote" ? <RichTextBlock block={block} onChange={updateBlock} /> : null}
 
+            {block.type === "divider" ? (
+              <div className="divider-edit-preview" aria-label="구분선 미리보기">
+                <span />
+              </div>
+            ) : null}
+
             {block.type === "image" ? (
               <div className="media-edit-row">
                 {textFromBlock(block, "url") ? <img src={textFromBlock(block, "url")} alt={textFromBlock(block, "alt")} /> : null}
@@ -406,6 +487,59 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
                   })}
                 </div>
                 <input type="file" accept="image/*" onChange={(event) => uploadForBlock(block, event.target.files?.[0])} />
+              </div>
+            ) : null}
+
+            {block.type === "website" ? (
+              <div className="website-block-editor">
+                <div className="website-fetch-row">
+                  <label>
+                    Website URL
+                    <input
+                      type="url"
+                      placeholder="https://example.com"
+                      value={textFromBlock(block, "url")}
+                      onChange={(event) => updateContent(block, "url", event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={websiteLoadingId === block.id}
+                    onClick={() => void fetchWebsiteForBlock(block)}
+                  >
+                    {websiteLoadingId === block.id ? "불러오는 중" : "사이트 정보 불러오기"}
+                  </button>
+                </div>
+                {websiteStatus[block.id] ? (
+                  <p className={`website-fetch-status is-${websiteStatus[block.id].tone}`} role="status">
+                    {websiteStatus[block.id].text}
+                  </p>
+                ) : null}
+                {textFromBlock(block, "imageUrl") ? (
+                  <div className="website-image-preview">
+                    <img src={textFromBlock(block, "imageUrl")} alt={textFromBlock(block, "imageAlt")} />
+                    <span>사이트 대표 이미지</span>
+                  </div>
+                ) : null}
+                <label>
+                  Custom title
+                  <input
+                    value={textFromBlock(block, "title")}
+                    placeholder="사이트 제목"
+                    maxLength={240}
+                    onChange={(event) => updateContent(block, "title", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Custom description
+                  <textarea
+                    value={textFromBlock(block, "description")}
+                    placeholder="사이트를 소개하는 설명"
+                    maxLength={1000}
+                    rows={4}
+                    onChange={(event) => updateContent(block, "description", event.target.value)}
+                  />
+                </label>
               </div>
             ) : null}
           </article>

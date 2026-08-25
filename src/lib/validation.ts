@@ -54,6 +54,16 @@ export const workSchema = z.object({
   blocks: z.array(workBlockSchema).max(100).default([])
 });
 
+export const websiteMetadataSchema = z.object({
+  url: z.string().min(1).max(2000).refine((value) => {
+    try {
+      return ["http:", "https:"].includes(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  }, "Only HTTP and HTTPS website URLs are supported")
+});
+
 export const loginSchema = z.object({
   username: z.string().min(1).max(120),
   password: z.string().min(1).max(1024)

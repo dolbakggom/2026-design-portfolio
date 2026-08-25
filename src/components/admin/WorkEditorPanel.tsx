@@ -105,8 +105,12 @@ export default function WorkEditorPanel({
                   <input value={work.client} onChange={(event) => onUpdate({ client: event.target.value })} />
                 </label>
                 <label>
-                  Role
-                  <input value={work.role} onChange={(event) => onUpdate({ role: event.target.value })} />
+                  Tools
+                  <input
+                    value={work.role}
+                    placeholder="Figma, Illustrator, Photoshop"
+                    onChange={(event) => onUpdate({ role: event.target.value })}
+                  />
                 </label>
                 <label className="full-field">
                   Summary

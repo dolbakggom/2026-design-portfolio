@@ -1,0 +1,80 @@
+---
+import { buildResponsiveImageSource } from "../lib/responsive-images";
+import type { WorkItem } from "../types";
+
+interface Props {
+  previousWork: WorkItem | null;
+  nextWork: WorkItem | null;
+}
+
+const { previousWork, nextWork } = Astro.props;
+const imageOf = (work: WorkItem | null) => work?.featuredThumbnail?.url ? work.featuredThumbnail : work?.thumbnail?.url ? work.thumbnail : work?.hero?.url ? work.hero : null;
+const previousImage = imageOf(previousWork);
+const nextImage = imageOf(nextWork);
+const previousSource = buildResponsiveImageSource(previousImage);
+const nextSource = buildResponsiveImageSource(nextImage);
+---
+
+{
+  previousWork && nextWork ? (
+    <nav class="work-project-navigation" aria-label="이전 및 다음 프로젝트">
+      <a class:list={["work-project-navigation-link", !previousImage?.url && "is-image-unavailable"]} href={`/work/${previousWork.slug}`} data-project-navigation-link>
+        <span class="work-project-navigation-media" aria-hidden="true">
+          {previousImage?.url ? (
+            <img src={previousSource.src} srcset={previousSource.srcset} sizes="(max-width: 760px) 100vw, 50vw" alt="" width={previousImage.width ?? undefined} height={previousImage.height ?? undefined} loading="lazy" decoding="async" data-public-image />
+          ) : null}
+        </span>
+        <span class="work-project-navigation-tint" aria-hidden="true" />
+        <span class="work-project-navigation-shade" aria-hidden="true" />
+        <span class="work-project-navigation-copy">
+          <span class="work-project-navigation-direction"><span class="work-project-navigation-arrow is-previous" aria-hidden="true">←</span> Previous</span>
+          <strong>{previousWork.title}</strong>
+          <span class="work-project-navigation-meta">{previousWork.category} · {previousWork.year}</span>
+        </span>
+        <span class="work-project-navigation-copy is-reveal-copy" aria-hidden="true">
+          <span class="work-project-navigation-direction"><span class="work-project-navigation-arrow is-previous">←</span> Previous</span>
+          <strong>{previousWork.title}</strong>
+          <span class="work-project-navigation-meta">{previousWork.category} · {previousWork.year}</span>
+        </span>
+      </a>
+
+      <a class:list={["work-project-navigation-link", !nextImage?.url && "is-image-unavailable"]} href={`/work/${nextWork.slug}`} data-project-navigation-link>
+        <span class="work-project-navigation-media" aria-hidden="true">
+          {nextImage?.url ? (
+            <img src={nextSource.src} srcset={nextSource.srcset} sizes="(max-width: 760px) 100vw, 50vw" alt="" width={nextImage.width ?? undefined} height={nextImage.height ?? undefined} loading="lazy" decoding="async" data-public-image />
+          ) : null}
+        </span>
+        <span class="work-project-navigation-tint" aria-hidden="true" />
+        <span class="work-project-navigation-shade" aria-hidden="true" />
+        <span class="work-project-navigation-copy">
+          <span class="work-project-navigation-direction">Next <span class="work-project-navigation-arrow is-next" aria-hidden="true">→</span></span>
+          <strong>{nextWork.title}</strong>
+          <span class="work-project-navigation-meta">{nextWork.category} · {nextWork.year}</span>
+        </span>
+        <span class="work-project-navigation-copy is-reveal-copy" aria-hidden="true">
+          <span class="work-project-navigation-direction">Next <span class="work-project-navigation-arrow is-next">→</span></span>
+          <strong>{nextWork.title}</strong>
+          <span class="work-project-navigation-meta">{nextWork.category} · {nextWork.year}</span>
+        </span>
+      </a>
+    </nav>
+  ) : null
+}
+
+<script>
+  const initProjectNavigationReveal = () => {
+    document.querySelectorAll<HTMLElement>("[data-project-navigation-link]").forEach((link) => {
+      if (link.dataset.revealReady === "true") return;
+      link.dataset.revealReady = "true";
+
+      link.addEventListener("pointermove", (event) => {
+        const rect = link.getBoundingClientRect();
+        link.style.setProperty("--project-reveal-x", `${event.clientX - rect.left}px`);
+        link.style.setProperty("--project-reveal-y", `${event.clientY - rect.top}px`);
+      });
+    });
+  };
+
+  document.addEventListener("astro:page-load", initProjectNavigationReveal);
+  initProjectNavigationReveal();
+</script>

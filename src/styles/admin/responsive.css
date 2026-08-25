@@ -21,6 +21,14 @@
     overflow: visible;
   }
 
+  .work-editor {
+    overflow: visible;
+  }
+
+  .block-toolbar {
+    top: 8px;
+  }
+
   .admin-shell,
   .admin-shell.is-sidebar-collapsed,
   .admin-shell.is-mobile-drawer-open,
@@ -225,6 +233,27 @@
   .media-upload-note {
     max-width: 100%;
     font-size: 0.72rem;
+  }
+
+  .website-fetch-row {
+    grid-template-columns: 1fr;
+  }
+
+  .website-fetch-row button {
+    width: 100%;
+  }
+
+  .preview-block-website-copy {
+    min-height: 360px;
+    padding: 24px;
+  }
+
+  .preview-block-website-media {
+    inset: -18px;
+  }
+
+  .preview-block-website-media::after {
+    background: rgba(0, 0, 0, 0.54);
   }
 
   /* Links panel editor mobile optimization (2-columns: icon | inputs stacked) */

@@ -136,7 +136,7 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
     summary: "Integration save flow",
     client: "Test Client",
     year: "2026",
-    role: "Design",
+    role: "Figma, Illustrator",
     featured: false,
     published: true,
     blocks: [
@@ -176,7 +176,8 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
         type: "paragraph",
         content: { html: "<p>Saved D1 block is publicly rendered.</p>", textAlign: "left", lineHeight: "1.7" },
         sortOrder: 2
-      }
+      },
+      { id: "integration-divider", type: "divider", content: {}, sortOrder: 3 }
     ]
   };
 
@@ -193,6 +194,9 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
   assert.match(html, /Integration Work Published/);
   assert.match(html, /Published Heading/);
   assert.match(html, /Saved D1 block is publicly rendered\./);
+  assert.match(html, /class="work-block-divider"/);
+  assert.match(html, /<dt>Tools<\/dt>/);
+  assert.match(html, /Figma, Illustrator/);
   assert.doesNotMatch(html, /Draft block content/);
 });
 
@@ -435,16 +439,53 @@ test("admin CSS imports render the shell and work editor layout", async () => {
     await page.waitForSelector(".admin-work-card");
     await page.locator(".admin-work-card").first().click();
     await page.waitForSelector(".work-preview-panel");
+    await page.waitForSelector(".block-toolbar");
 
-    const editorState = await page.evaluate(() => {
+    const toolsInput = page.getByLabel("Tools");
+    await toolsInput.waitFor();
+    assert.equal(await toolsInput.getAttribute("placeholder"), "Figma, Illustrator, Photoshop");
+    assert.equal(await page.locator(".preview-hero dt", { hasText: "Tools" }).count(), 1);
+
+    const previewCopyCount = await page.locator(".preview-block-copy").count();
+    await page.getByRole("button", { name: "Paragraph", exact: true }).click();
+    await page.waitForFunction(
+      (previousCount) => document.querySelectorAll(".preview-block-copy").length > previousCount,
+      previewCopyCount
+    );
+    assert.equal(
+      await page.locator(".preview-block-copy").last().evaluate((node) => node.style.getPropertyValue("--preview-block-width")),
+      "100%"
+    );
+
+    const previewDividerCount = await page.locator(".preview-block-divider").count();
+    await page.getByRole("button", { name: "Divider", exact: true }).click();
+    await page.waitForFunction(
+      (previousCount) => document.querySelectorAll(".preview-block-divider").length > previousCount,
+      previewDividerCount
+    );
+
+    const editorState = await page.evaluate(async () => {
       const layout = document.querySelector<HTMLElement>(".works-editor-layout");
       const editor = document.querySelector<HTMLElement>(".work-editor");
       const preview = document.querySelector<HTMLElement>(".work-preview-panel");
+      const toolbar = document.querySelector<HTMLElement>(".block-toolbar");
+      const blockList = document.querySelector<HTMLElement>(".block-list");
+
+      if (editor && toolbar && blockList) {
+        blockList.style.minHeight = "1600px";
+        const toolbarOffset = toolbar.getBoundingClientRect().top - editor.getBoundingClientRect().top;
+        editor.scrollTop += toolbarOffset + 80;
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      }
+
       return {
         layoutDisplay: layout ? getComputedStyle(layout).display : "",
         layoutColumns: layout ? getComputedStyle(layout).gridTemplateColumns : "",
         editorOverflow: editor ? getComputedStyle(editor).overflowY : "",
-        previewOverflow: preview ? getComputedStyle(preview).overflow : ""
+        previewOverflow: preview ? getComputedStyle(preview).overflow : "",
+        toolbarPosition: toolbar ? getComputedStyle(toolbar).position : "",
+        toolbarTop: toolbar ? getComputedStyle(toolbar).top : "",
+        stickyOffset: editor && toolbar ? toolbar.getBoundingClientRect().top - editor.getBoundingClientRect().top : Number.NaN
       };
     });
 
@@ -452,6 +493,9 @@ test("admin CSS imports render the shell and work editor layout", async () => {
     assert.match(editorState.layoutColumns, /px/);
     assert.equal(editorState.editorOverflow, "auto");
     assert.equal(editorState.previewOverflow, "hidden");
+    assert.equal(editorState.toolbarPosition, "sticky");
+    assert.equal(editorState.toolbarTop, "0px");
+    assert.ok(Math.abs(editorState.stickyOffset) <= 1, `sticky toolbar offset: ${editorState.stickyOffset}`);
   } finally {
     await browser.close();
   }

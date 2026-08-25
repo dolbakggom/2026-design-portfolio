@@ -75,6 +75,54 @@ test("work media blocks reject executable or off-site image URLs", () => {
   );
 });
 
+test("website blocks accept public links and only portfolio-hosted preview images", () => {
+  const parsed = workSchema.parse({
+    ...validWork,
+    blocks: [
+      {
+        type: "website",
+        content: {
+          url: "https://example.com/project",
+          title: "Custom project title",
+          description: "Custom project description",
+          domain: "example.com",
+          imageAssetId: "asset-website",
+          imageUrl: "/media/website/2026/08/preview.webp",
+          imageAlt: "Website preview"
+        }
+      }
+    ]
+  });
+
+  assert.equal(parsed.blocks[0]?.type, "website");
+  assert.equal(parsed.blocks[0]?.content.title, "Custom project title");
+  assert.equal(
+    workSchema.safeParse({
+      ...validWork,
+      blocks: [{ type: "website", content: { url: "javascript:alert(1)", imageUrl: "" } }]
+    }).success,
+    false
+  );
+  assert.equal(
+    workSchema.safeParse({
+      ...validWork,
+      blocks: [{ type: "website", content: { url: "https://example.com", imageUrl: "https://example.com/og.jpg" } }]
+    }).success,
+    false
+  );
+});
+
+test("divider blocks normalize to empty content", () => {
+  const parsed = workSchema.parse({
+    ...validWork,
+    blocks: [{ type: "divider", content: { unexpected: "discarded" } }]
+  });
+
+  assert.equal(parsed.blocks[0]?.type, "divider");
+  assert.deepEqual(parsed.blocks[0]?.content, {});
+  assert.deepEqual(normalizeStoredWorkBlockContent("divider", { legacy: true }), {});
+});
+
 test("stored block normalization preserves safe legacy copy while repairing malformed options", () => {
   assert.deepEqual(
     normalizeStoredWorkBlockContent("paragraph", {
@@ -86,10 +134,23 @@ test("stored block normalization preserves safe legacy copy while repairing malf
       html: "<p>Legacy <strong>copy</strong></p>",
       lineHeight: "1.7",
       paragraphGap: "18px",
-      blockWidth: "880px",
+      blockWidth: "100%",
       align: "left"
     }
   );
+});
+
+test("new text block payloads default to full content width", () => {
+  const parsed = workSchema.parse({
+    ...validWork,
+    blocks: [
+      { type: "heading", content: { text: "Full heading" } },
+      { type: "paragraph", content: { html: "<p>Full paragraph</p>" } },
+      { type: "quote", content: { html: "<blockquote>Full quote</blockquote>" } }
+    ]
+  });
+
+  assert.deepEqual(parsed.blocks.map((block) => block.content.blockWidth), ["100%", "100%", "100%"]);
 });
 
 test("work payloads cap block and gallery collection sizes", () => {

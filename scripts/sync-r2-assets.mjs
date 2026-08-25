@@ -44,18 +44,35 @@ const parseSqlValues = (line) => {
   return values;
 };
 
+const parseInsert = (line) => {
+  const match = line.match(/^INSERT INTO "([^"]+)" \(([^)]+)\) VALUES\(/);
+  if (!match) return null;
+
+  const columns = match[2].split(",").map((column) => column.trim().replaceAll('"', ""));
+  const values = parseSqlValues(line);
+  return {
+    table: match[1],
+    row: Object.fromEntries(columns.map((column, index) => [column, values[index]]))
+  };
+};
+
 const dump = readFileSync(dumpPath, "utf8");
-const assets = dump
+const assetMap = new Map();
+
+dump
   .split("\n")
-  .filter((line) => line.startsWith('INSERT INTO "assets"'))
-  .map((line) => {
-    const values = parseSqlValues(line);
-    return {
-      key: values[1],
-      mime: values[3] || "application/octet-stream"
-    };
-  })
-  .filter((asset) => typeof asset.key === "string" && asset.key.length > 0);
+  .map(parseInsert)
+  .filter((insert) => insert && ["assets", "asset_variants"].includes(insert.table))
+  .forEach(({ row }) => {
+    const key = row.r2_key;
+    if (typeof key !== "string" || !key.length) return;
+    assetMap.set(key, {
+      key,
+      mime: row.mime || "application/octet-stream"
+    });
+  });
+
+const assets = [...assetMap.values()];
 
 if (!assets.length) {
   throw new Error("No R2 asset keys found in D1 export.");

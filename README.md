@@ -35,6 +35,19 @@ npm run dev
 - Build command: `npm run build`
 - Deploy command: `npx wrangler deploy`
 
+### Deployment Checklist
+
+Run production releases in this order so code, D1 block types, and public rendering stay compatible:
+
+1. Back up the production D1 and R2 content.
+2. Run `npm test` and confirm the build and integration suite pass.
+3. Run `npm run db:migrate:remote` and confirm every pending migration succeeds. This currently includes the Website and Divider block migrations (`0006`, `0007`) on environments where they have not yet been applied.
+4. Run `npx wrangler deploy`.
+5. Confirm `https://dolbakggom.com/api/health` returns HTTP 200 with the database content source.
+6. In production `/admin`, open an existing work and verify Website/Divider blocks can be added and saved, then confirm the corresponding public `/work/[slug]` page.
+
+Do not deploy the editor code before its pending D1 migrations. Git deployment updates application code only; local D1/R2 content is promoted separately as described below.
+
 Regenerate Cloudflare binding/runtime types after changing `wrangler.toml`:
 
 ```bash
@@ -46,6 +59,8 @@ Public routes keep rendering starter content when D1 is unavailable. These fallb
 ```bash
 npx wrangler tail --search portfolio.content.read_failed
 ```
+
+The 10-minute public HTML cache runs only in production builds. `npm run dev` bypasses it so local content and UI changes appear immediately without cache-busting query parameters.
 
 The event contains only the route scope, optional work slug, and a normalized error name/message. It does not include D1 rows, request bodies, or secret values.
 
@@ -70,6 +85,20 @@ Repository snapshots are kept outside Git in the parent project folder:
 ```
 
 Do not restore binary R2 snapshots into this repository. `d1-backups/` and `r2-backups/` are ignored to prevent accidental reintroduction.
+
+## Content Workflow
+
+Portfolio content is stored in D1 and R2, not in Git. A code commit or `git push` does not publish content edited in the local admin.
+
+Use this workflow for substantial content editing:
+
+1. Back up the local D1 database.
+2. Pull production D1 and every referenced R2 original/variant into the local Wrangler state.
+3. Edit and review through the local `/admin` and public routes.
+4. Before publishing, back up production again and explicitly promote the reviewed local D1/R2 state.
+5. Commit and push only source-code or documentation changes.
+
+`scripts/export-d1-via-execute.mjs` exports all content tables, including `asset_variants`. `scripts/sync-r2-assets.mjs` reads that dump and copies both original and responsive variant objects from remote R2 to local R2. Treat local-to-production promotion as a separate, deliberate operation; do not couple it to every Git deployment.
 
 ## Tests
 

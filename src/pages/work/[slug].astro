@@ -2,7 +2,8 @@
 import PublicLayout from "../../layouts/PublicLayout.astro";
 import NotFoundPage from "../../components/NotFoundPage.astro";
 import WorkBlocks from "../../components/WorkBlocks.astro";
-import { getWorkBySlugResult } from "../../lib/content";
+import WorkProjectNavigation from "../../components/WorkProjectNavigation.astro";
+import { getHomeContentResult, getWorkBySlugResult } from "../../lib/content";
 import { applyPublicContentStatus } from "../../lib/content-response";
 import { buildResponsiveImageSource } from "../../lib/responsive-images";
 import { createWorkStructuredData } from "../../lib/seo";
@@ -12,7 +13,13 @@ export const prerender = false;
 const { slug } = Astro.params;
 const contentResult = slug ? await getWorkBySlugResult(slug) : { data: null, source: "database" as const };
 const work = contentResult.data;
-applyPublicContentStatus(Astro.response.headers, contentResult.source);
+const navigationResult = work ? await getHomeContentResult() : null;
+const orderedWorks = navigationResult?.data.works.filter((item) => item.published).sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
+const currentWorkIndex = work ? orderedWorks.findIndex((item) => item.slug === work.slug) : -1;
+const previousWork = currentWorkIndex >= 0 && orderedWorks.length > 1 ? orderedWorks[(currentWorkIndex - 1 + orderedWorks.length) % orderedWorks.length] : null;
+const nextWork = currentWorkIndex >= 0 && orderedWorks.length > 1 ? orderedWorks[(currentWorkIndex + 1) % orderedWorks.length] : null;
+const publicContentSource = contentResult.source === "fallback" || navigationResult?.source === "fallback" ? "fallback" : "database";
+applyPublicContentStatus(Astro.response.headers, publicContentSource);
 const coverImage = work?.featuredThumbnail?.url ? work.featuredThumbnail : work?.thumbnail?.url ? work.thumbnail : null;
 const coverSource = buildResponsiveImageSource(coverImage);
 const yearDateTime = work?.year?.match(/\d{4}/)?.[0] ?? "2026";
@@ -85,12 +92,13 @@ if (!work) {
               <dd><time datetime={yearDateTime}>{work.year || "2026"}</time></dd>
             </div>
             <div>
-              <dt>Role</dt>
-              <dd>{work.role || "Design"}</dd>
+              <dt>Tools</dt>
+              <dd>{work.role || "—"}</dd>
             </div>
           </dl>
         </header>
         <WorkBlocks blocks={work.blocks ?? []} />
+        <WorkProjectNavigation previousWork={previousWork} nextWork={nextWork} />
       </main>
     ) : (
       <NotFoundPage

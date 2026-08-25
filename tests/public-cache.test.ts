@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import {
   createPublicHtmlCacheKeys,
@@ -55,4 +56,10 @@ test("cache deletion reports skipped outside the Cloudflare cache runtime", asyn
   const result = await deletePublicHtmlCache(new Request("https://dolbakggom.com/admin"), ["/"]);
 
   assert.deepEqual(result, { ok: false, skipped: true });
+});
+
+test("development middleware bypasses the public HTML cache", async () => {
+  const middleware = await readFile("src/middleware.ts", "utf8");
+
+  assert.match(middleware, /const isPublicCacheCandidate\s*=\s*import\.meta\.env\.PROD\s*&&/s);
 });

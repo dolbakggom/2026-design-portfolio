@@ -184,10 +184,18 @@
 }
 
 .preview-block-heading {
-  margin: 0;
+  margin: 12px 0 0;
   font-size: 1.8rem;
   font-weight: 700;
   line-height: var(--preview-line-height, 1.3);
+}
+
+.preview-block-divider {
+  width: 100%;
+  height: 1px;
+  margin: 6px 0;
+  border: 0;
+  background: var(--color-line);
 }
 
 .preview-block-copy {
@@ -266,6 +274,102 @@
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
+}
+
+.preview-block-website {
+  position: relative;
+  min-height: 340px;
+  display: block;
+  overflow: hidden;
+  background: var(--color-ink);
+  color: #fff;
+  text-decoration: none;
+}
+
+.preview-block-website-copy {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 28px;
+}
+
+.preview-block-website-domain {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.7rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.preview-block-website-copy > strong {
+  max-width: 15ch;
+  margin-top: auto;
+  font-size: clamp(1.75rem, 4vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.04;
+  overflow-wrap: anywhere;
+}
+
+.preview-block-website-copy > span:not(.preview-block-website-domain):not(.preview-block-website-action) {
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.preview-block-website-action {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 24px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.preview-block-website-action svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.preview-block-website-media {
+  position: absolute;
+  inset: -18px;
+  z-index: 0;
+  overflow: hidden;
+  background: #171717;
+}
+
+.preview-block-website-media::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.3)),
+    rgba(0, 0, 0, 0.12);
+}
+
+.preview-block-website-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(10px) saturate(0.88) brightness(0.92);
+  transform: scale(1.1);
+}
+
+.preview-block-website-media.is-empty {
+  background:
+    linear-gradient(135deg, rgba(8, 200, 64, 0.2), transparent 42%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 36px),
+    #171717;
 }
 
 .preview-empty {
