@@ -57,7 +57,11 @@
 - `npm run test:unit`: 72 tests passed.
 - `npm run test:integration`: 9 integration tests passed.
 - `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
-- 운영 배포 후 `/api/health`, 공개 홈, 7개 작업물 상세와 미디어 응답을 다시 확인합니다.
+- Git commit `824afe2`를 GitHub `main`에 push하고 Cloudflare Worker version `f6cbf759-b1c5-4e2a-b602-478be24c21a6`을 `dolbakggom.com`에 배포했습니다.
+- 운영 `/api/health`는 HTTP 200과 `database: available`, 홈은 HTTP 200으로 응답했습니다.
+- 공개 상태인 `ptubootcamp`, `rush-hour-app`, `hexalabs`, `a2z-presenter`, `roii-hmi`는 HTTP 200이며 각 상세에 이전·다음 프로젝트 내비게이션이 렌더링됩니다.
+- `roii-tablet`, `autonomous-vehicle-branding`은 로컬과 동일하게 `published = 0`인 초안이므로 공개 URL HTTP 404가 정상입니다.
+- 실제 Rush Hour R2 WebP media route는 HTTP 200, `image/webp`, 118,010 bytes로 응답했습니다.
 
 ## 2026-08-23 Work Navigation Design Study
 
