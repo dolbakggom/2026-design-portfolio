@@ -158,8 +158,12 @@
   }
 
   .timeline-track {
-    gap: clamp(24px, 4svh, 42px);
-    padding: max(32px, 10svh) 0 max(32px, 10svh) 67px;
+    gap: clamp(64px, 10svh, 108px);
+    padding:
+      var(--timeline-start-padding, max(32px, 10svh))
+      0
+      var(--timeline-end-padding, max(32px, 10svh))
+      67px;
   }
 
   .timeline-items::before {

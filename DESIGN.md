@@ -18,6 +18,8 @@
 - The first and last career cards are centered in the visible timeline window. Their top and bottom track padding follows the cards' expanded content height so adjacent items do not displace the endpoints.
 - The extra scroll dwell before leaving the first career card and after reaching the last card is reduced to 50% of the original distance; middle career transitions keep their existing visual pacing.
 - Every career card has a short scroll-progress dwell without locking wheel or touch input. Movement between cards uses `cubic-bezier(.4, 0, .6, 1)` so each item settles before the next transition begins.
+- At `1180px` and below, career cards use a viewport-aware `64px–108px` vertical gap so the tall mobile canvas gives each active history item clearer separation.
+- Mobile Career keeps the computed first/last card padding instead of replacing it with fixed responsive padding, ensuring only one endpoint card can resolve to progress `0` or `1`.
 - The route updates with the active home state: `/`, `/about`, `/career`, or `/work`.
 - Work uses three levels: work intro, full-screen featured project slides, then a filterable gallery.
 - A gallery category with no matching work shows a dedicated empty state in place of the grid and announces the empty result without affecting categories that contain work.

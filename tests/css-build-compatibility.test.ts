@@ -58,6 +58,13 @@ test("profile media caption fades during the career transition", async () => {
   assert.match(script, /\.fromTo\(profileCaption, \{ autoAlpha: 1 \}, \{ autoAlpha: 0, duration: 0\.72 \}, 0\)/);
 });
 
+test("mobile career cards use expanded vertical spacing", async () => {
+  const css = await readFile(new URL("../src/styles/responsive.css", import.meta.url), "utf8");
+
+  assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.timeline-track\s*\{[^}]*gap:\s*clamp\(64px, 10svh, 108px\);/s);
+  assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.timeline-track\s*\{[^}]*padding:\s*var\(--timeline-start-padding,[^}]*var\(--timeline-end-padding,/s);
+});
+
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {
   const publicCss = await readFile("src/styles/work-detail.css", "utf8");
   const previewCss = await readFile("src/styles/admin/preview.css", "utf8");

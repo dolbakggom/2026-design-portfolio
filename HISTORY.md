@@ -69,6 +69,8 @@
 - 중간 항목의 카드 중심 계산과 시각 전환 방식은 유지합니다.
 - 모든 Career 항목에는 카드 간 scroll progress의 앞뒤 12%만큼 짧은 시각적 체류 구간을 추가했습니다. 실제 스크롤 입력은 잠그지 않으며, 카드 사이 전환에 `cubic-bezier(.4, 0, .6, 1)`을 적용합니다.
 - About에서 Career로 전환할 때 프로필 사진 캡션은 사진의 확대·블러 구간 전체에 걸쳐 천천히 사라지고, About으로 되돌아가면 다시 나타납니다.
+- `1180px` 이하 Career 타임라인 카드 gap을 `clamp(24px, 4svh, 42px)`에서 `clamp(64px, 10svh, 108px)`로 확대해 모바일 세로 화면에서 인접 항목이 겹쳐 보이는 현상을 줄였습니다.
+- 모바일 responsive padding이 동적으로 계산된 timeline 시작·끝 padding을 덮어써 첫 두 카드가 progress `0`, 마지막 두 카드가 progress `1`로 합쳐지던 문제를 수정했습니다. 확대된 gap을 fallback으로 유지하면서 `--timeline-start-padding`과 `--timeline-end-padding`을 우선 적용합니다.
 
 ### Gallery 최소 화면 높이 후속 조정
 - Gallery 콘텐츠가 viewport보다 짧으면 문서 끝에서 Gallery 상단까지 스크롤할 공간이 부족해 뒤의 Featured가 노출되는 원인을 수정했습니다.

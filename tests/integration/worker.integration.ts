@@ -290,11 +290,15 @@ test("mobile about and career routes initialize visibly and keep wheel scrolling
     const careerState = await page.evaluate(() => {
       const identity = document.querySelector<HTMLElement>("[data-identity]");
       const careerList = document.querySelector<HTMLElement>("[data-career-list]");
+      const timelineTrack = document.querySelector<HTMLElement>("[data-timeline-track]");
       const rect = careerList?.getBoundingClientRect();
+      const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-timeline-card]"));
       return {
         career: identity?.classList.contains("is-career") ?? false,
         listVisible: Boolean(rect && rect.bottom > 0 && rect.top < window.innerHeight),
-        activeTimelineItems: document.querySelectorAll("[data-timeline-card].is-active").length,
+        activeTimelineItems: cards.filter((card) => card.classList.contains("is-active")).length,
+        fullyFocusedTimelineItems: cards.filter((card) => Number.parseFloat(getComputedStyle(card).opacity) >= 0.99).length,
+        timelineGap: timelineTrack ? Number.parseFloat(getComputedStyle(timelineTrack).rowGap) : 0,
         horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth
       };
     });
@@ -302,7 +306,25 @@ test("mobile about and career routes initialize visibly and keep wheel scrolling
     assert.equal(careerState.career, true);
     assert.equal(careerState.listVisible, true);
     assert.equal(careerState.activeTimelineItems, 1);
+    assert.equal(careerState.fullyFocusedTimelineItems, 1);
+    assert.ok(careerState.timelineGap >= 64, `mobile career gap should stay expanded (${careerState.timelineGap}px)`);
     assert.ok(careerState.horizontalOverflow <= 1);
+
+    await page.evaluate(() => {
+      const cards = document.querySelectorAll<HTMLElement>("[data-timeline-card]");
+      cards.item(cards.length - 1).click();
+    });
+    await page.waitForFunction(() => {
+      const cards = document.querySelectorAll<HTMLElement>("[data-timeline-card]");
+      return cards.length > 0 && cards.item(cards.length - 1).classList.contains("is-active");
+    });
+    await page.waitForTimeout(1300);
+    const fullyFocusedEndItems = await page.evaluate(() => (
+      Array.from(document.querySelectorAll<HTMLElement>("[data-timeline-card]"))
+        .filter((card) => Number.parseFloat(getComputedStyle(card).opacity) >= 0.99)
+        .length
+    ));
+    assert.equal(fullyFocusedEndItems, 1);
     await context.close();
   } finally {
     await browser.close();
