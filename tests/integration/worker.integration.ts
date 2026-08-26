@@ -350,7 +350,10 @@ test("home loading, career endpoints, and gallery height stay visually aligned",
     assert.ok(lastTimelineCenterDelta <= 2, `the last career item should finish centered (delta: ${lastTimelineCenterDelta}px)`);
 
     await page.goto(`${harnessOrigin}/work`, { waitUntil: "networkidle" });
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => {
+      const section = document.querySelector<HTMLElement>(".gallery-section");
+      return Boolean(section && Math.abs(section.getBoundingClientRect().top) <= 1);
+    }, { timeout: 8000 });
     const galleryHeights = await page.evaluate(() => {
       const section = document.querySelector<HTMLElement>(".gallery-section");
       const canvas = document.querySelector<HTMLElement>(".gallery-canvas");

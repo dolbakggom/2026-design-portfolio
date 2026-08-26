@@ -1,7 +1,12 @@
+import { createCubicBezierEasing, remapProgressWithDwell } from "../../lib/scroll-dwell";
+
 type GsapModule = typeof import("gsap").default;
 type ScrollTriggerModule = typeof import("gsap/ScrollTrigger").ScrollTrigger;
 type ScrollTriggerInstance = ReturnType<ScrollTriggerModule["create"]>;
 type GsapTimeline = ReturnType<GsapModule["timeline"]>;
+
+const careerDwellRatio = 0.12;
+const careerTransitionEase = createCubicBezierEasing(0.4, 0, 0.6, 1);
 
 type IdentityControllerOptions = {
   gsap: GsapModule;
@@ -42,6 +47,7 @@ export const initHomeIdentity = ({
   const profileLogo = document.querySelector<HTMLElement>(".profile-logo");
   const profileContact = document.querySelector<HTMLElement>("[data-profile-contact]");
   const profileMedia = document.querySelector<HTMLElement>("[data-profile-media]");
+  const profileCaption = profileMedia?.querySelector<HTMLElement>("figcaption") ?? null;
   const identityStage = document.querySelector<HTMLElement>(".identity-stage");
   const careerList = document.querySelector<HTMLElement>("[data-career-list]");
   const timelineTrack = document.querySelector<HTMLElement>("[data-timeline-track]");
@@ -183,9 +189,17 @@ export const initHomeIdentity = ({
 
   const renderTimelineProgress = (timelineProgress: number) => {
     if (reduceMotion || !timelineCards.length || !timelineTrack || !careerList) return;
-    const progress = gsap.utils.clamp(0, 1, timelineProgress);
     const count = timelineCards.length;
     const progressSlots = Math.max(1, count - 1);
+    const progressAnchors = timelineCards.map((_, index) => (
+      cachedTimelineCardProgresses[index] ?? (count <= 1 ? 0 : index / progressSlots)
+    ));
+    const progress = remapProgressWithDwell(
+      gsap.utils.clamp(0, 1, timelineProgress),
+      progressAnchors,
+      careerDwellRatio,
+      careerTransitionEase
+    );
     const focusRange = 1 / progressSlots * 1.15;
     let bestIndex = 0;
     let bestWeight = -1;
@@ -248,6 +262,7 @@ export const initHomeIdentity = ({
       clipPath: "inset(0% 0% 0% 0%)",
       scale: 1
     });
+    gsap.set(profileCaption, { autoAlpha: 1 });
     gsap.set(aboutCopy, { autoAlpha: 0, y: 18, filter: "blur(8px)" });
     gsap.set(careerCopy, { autoAlpha: 0, y: 24, filter: "blur(8px)" });
     gsap.set(careerList, { autoAlpha: 0, x: 32, yPercent: -50, filter: "blur(10px)" });
@@ -274,6 +289,7 @@ export const initHomeIdentity = ({
         scale: 1.04,
         duration: 0.72
       }, 0)
+      .fromTo(profileCaption, { autoAlpha: 1 }, { autoAlpha: 0, duration: 0.72 }, 0)
       .fromTo(careerCopy, { autoAlpha: 0, y: 24, filter: "blur(8px)" }, { autoAlpha: 1, y: 0, filter: "blur(0px)", duration: 0.58 }, 0.18)
       .fromTo(careerList, { autoAlpha: 0, x: 32, yPercent: -50, filter: "blur(10px)" }, { autoAlpha: 1, x: 0, yPercent: -50, filter: "blur(0px)", duration: 0.46 }, 0.54);
     registerAnimation(transitionTimeline);

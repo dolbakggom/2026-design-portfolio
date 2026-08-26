@@ -49,6 +49,15 @@ test("profile media effects are isolated from the caption", async () => {
   assert.match(css, /\.profile-media figcaption\s*\{[^}]*text-shadow:/s);
 });
 
+test("profile media caption fades during the career transition", async () => {
+  const css = await readFile(new URL("../src/styles/home-identity.css", import.meta.url), "utf8");
+  const script = await readFile(new URL("../src/scripts/home/home-identity.ts", import.meta.url), "utf8");
+
+  assert.match(css, /\.profile-media figcaption\s*\{[^}]*transition:\s*opacity 720ms cubic-bezier\(0\.4, 0, 0\.6, 1\)/s);
+  assert.match(css, /\.identity-section\.is-career \.profile-media figcaption\s*\{[^}]*opacity:\s*0/s);
+  assert.match(script, /\.fromTo\(profileCaption, \{ autoAlpha: 1 \}, \{ autoAlpha: 0, duration: 0\.72 \}, 0\)/);
+});
+
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {
   const publicCss = await readFile("src/styles/work-detail.css", "utf8");
   const previewCss = await readFile("src/styles/admin/preview.css", "utf8");
