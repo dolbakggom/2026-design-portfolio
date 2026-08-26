@@ -45,7 +45,16 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
   structuredData={structuredData}
   skipTarget="#about"
 >
-  <main id="main-content" class="site-shell" data-initial-section={initialSection} tabindex="-1">
+  {initialSection === "intro" ? (
+    <>
+      <script is:inline>document.documentElement.classList.add("home-is-loading");</script>
+      <div class="home-loader" data-home-loader role="status" aria-live="polite">
+        <div class="home-loader-spinner" aria-hidden="true" />
+        <span class="visually-hidden">포트폴리오 불러오는 중</span>
+      </div>
+    </>
+  ) : null}
+  <main id="main-content" class="site-shell" data-initial-section={initialSection} tabindex="-1" aria-busy={initialSection === "intro" ? "true" : undefined}>
     <section class="intro-section" aria-label="Intro" data-route="/">
       <div class="intro-grid">
         <svg class="site-logo intro-logo" viewBox="0 0 50 56" aria-hidden="true" focusable="false">

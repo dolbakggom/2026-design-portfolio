@@ -36,6 +36,44 @@
 
 ---
 
+## 2026-08-26 Home Loading, Career Endpoints, And Gallery Height
+
+### 요구사항
+- 첫 방문에서 초기 로고가 애니메이션 준비 전에 보이는 현상을 로딩 애니메이션으로 가립니다.
+- Career 첫 항목과 마지막 항목이 타임라인 창 중앙에서 시작하고 끝나게 합니다.
+- WORK Gallery 섹션 아래의 과도한 빈 공간을 제거하고 섹션 높이를 실제 gallery canvas와 맞춥니다.
+
+### 구현
+- `HomePage.astro`, `home-identity.css`, `home-page.ts`, `motion-loader.ts`
+  - 루트 인트로에 검은 전체 화면 로더와 흰색 circular sweep을 추가했습니다.
+  - 첫 페인트부터 스크롤을 잠그고 페이지 load·font 준비를 기다린 뒤 로더를 fade-out합니다. 로고는 초기 `autoAlpha: 0` 상태에서 로더 종료 후 blur fade를 시작해 초기 HTML flash를 방지합니다.
+  - 로더가 무한정 남지 않도록 4.5초 fallback과 reduced-motion/모션 모듈 실패 즉시 해제를 추가했습니다.
+  - 로더와 인트로 모션의 자연스러운 handoff를 위해 루트에서도 GSAP runtime을 즉시 초기화합니다.
+- `home-identity.ts`, `home-identity.css`
+  - 첫·마지막 Career 카드의 펼쳐진 실제 높이로 timeline track의 시작·끝 padding을 계산합니다.
+  - 활성 상세 내용에 따라 트랙 높이가 바뀌어도 현재 첫·마지막 카드 중심 좌표를 직접 보간해 양 끝을 정확히 중앙에 맞춥니다.
+- `home-featured.ts`, `home-work.css`
+  - Gallery의 강제 `2 * viewport` 최소 높이를 제거했습니다.
+  - Gallery는 실제 canvas 높이를 따르되 한 panel의 최소 높이를 유지하며, Featured overlap도 한 panel로 맞춰 Gallery가 고정된 Featured 위로 올라오게 합니다.
+
+### 검증
+- `npm test`: 단위 테스트 72개, 통합 테스트 10개 통과.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- Playwright desktop 검증에서 로더 종료 후 로고 opacity가 정상 복구되고, Career 첫·마지막 카드 중심 오차가 2px 이내이며, Gallery 전환 중 Featured가 화면 상단에 고정된 채 Gallery가 그 위로 진입함을 확인했습니다.
+
+### 배포 상태
+- 현재 변경은 로컬에만 있으며 아직 commit/push 또는 운영 배포하지 않았습니다.
+
+### Career 양 끝 대기 구간 후속 조정
+- 첫 Career 항목이 나타난 뒤 두 번째 항목으로 이동하기 전 scroll dwell과 마지막 항목 뒤 WORK 섹션이 시작되기 전 scroll dwell을 기존 거리의 50%로 줄였습니다.
+- 중간 항목의 카드 중심 계산과 시각 전환 방식은 유지합니다.
+
+### Gallery 최소 화면 높이 후속 조정
+- Gallery 콘텐츠가 viewport보다 짧으면 문서 끝에서 Gallery 상단까지 스크롤할 공간이 부족해 뒤의 Featured가 노출되는 원인을 수정했습니다.
+- `gallery-section`은 실제 canvas 높이를 따르되 최소 한 panel 높이를 유지합니다. 콘텐츠가 한 화면보다 길면 별도 하단 여백은 추가되지 않습니다.
+- Gallery와 Featured의 overlap도 canvas 높이와 분리해 정확히 한 panel 높이로 유지합니다. 전환 중에는 Featured가 sticky 상태로 남고 Gallery가 그 위로 올라옵니다.
+- 브라우저 통합 테스트에서 전환 중간의 Featured 고정 상태와 `/work` 진입 시 Gallery의 완전한 덮임을 함께 검증합니다.
+
 ## 2026-08-25 Local Content Production Deployment
 
 ### 요구사항

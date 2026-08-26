@@ -4,15 +4,14 @@ const HOME_ROUTES = new Set(["/", "/about", "/career", "/work"]);
 
 export const shouldLoadMotion = ({
   route,
-  reducedMotion,
-  intent
+  reducedMotion
 }: {
   route: string;
   reducedMotion: boolean;
   intent: MotionIntent;
 }) => {
   if (reducedMotion || !HOME_ROUTES.has(route)) return false;
-  return route !== "/" || intent !== "initial";
+  return true;
 };
 
 export const getReducedMotionTarget = (route: string) => {

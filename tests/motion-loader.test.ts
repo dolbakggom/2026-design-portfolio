@@ -13,8 +13,8 @@ test("direct home aliases initialize immediately", () => {
   assert.equal(shouldLoadMotion({ route: "/work", reducedMotion: false, intent: "initial" }), true);
 });
 
-test("root intro waits for intent but has an idle fallback", () => {
-  assert.equal(shouldLoadMotion({ route: "/", reducedMotion: false, intent: "initial" }), false);
+test("root intro initializes immediately so the loader can hand off to motion", () => {
+  assert.equal(shouldLoadMotion({ route: "/", reducedMotion: false, intent: "initial" }), true);
   assert.equal(shouldLoadMotion({ route: "/", reducedMotion: false, intent: "wheel" }), true);
   assert.equal(shouldLoadMotion({ route: "/", reducedMotion: false, intent: "touch" }), true);
   assert.equal(shouldLoadMotion({ route: "/", reducedMotion: false, intent: "keyboard" }), true);

@@ -11,10 +11,14 @@
 ## Main Page Interaction
 - Home sections use GSAP Observer + ScrollTo controlled navigation so one wheel/touch/key input moves only one target: intro, about, each career item, work intro, each featured work, then gallery.
 - Scroll input is locked for roughly 1 second during section travel, and longer while the first about reveal is playing, so rapid wheel input cannot skip content.
+- A full-screen black loading layer with a white circular sweep appears on the root entry. It waits for the initial page and fonts, fades out, and only then hands off to the logo fade and slogan typing so uninitialized intro content never flashes.
 - Intro starts with a slow blurred logo fade-in, then the slogan `Beyond the Answer` types after a 1 second delay. The green period appears after typing and blinks every 0.5s.
 - About and career share one sticky layout. The about copy types in with the black logo while the profile image reveals, then contact details appear. As the user advances, the copy changes into the career statement and the right-side career rail appears.
+- The first and last career cards are centered in the visible timeline window. Their top and bottom track padding follows the cards' expanded content height so adjacent items do not displace the endpoints.
+- The extra scroll dwell before leaving the first career card and after reaching the last card is reduced to 50% of the original distance; middle career transitions keep their existing visual pacing.
 - The route updates with the active home state: `/`, `/about`, `/career`, or `/work`.
 - Work uses three levels: work intro, full-screen featured project slides, then a filterable gallery.
+- The gallery section height follows its 1920px canvas content instead of reserving two empty viewport heights, while retaining a one-panel minimum so a short gallery can still scroll to the top. The Gallery transition always overlaps one full panel: Featured stays sticky while Gallery rises over and fully covers it.
 - `prefers-reduced-motion` must remove pinning-heavy and typing-heavy behavior.
 
 ## Visual Language

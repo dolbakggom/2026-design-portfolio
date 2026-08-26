@@ -36,6 +36,7 @@ export const initHomeFeatured = ({
   let activeIndex = -1;
   let blurTimeout = 0;
   let cachedTop = Number.POSITIVE_INFINITY;
+  let cachedGalleryOverlap = 0;
 
   const updateGeometry = () => {
     cachedTop = section?.offsetTop ?? Number.POSITIVE_INFINITY;
@@ -69,7 +70,10 @@ export const initHomeFeatured = ({
 
   const syncScrollHeight = () => {
     if (!section) return;
-    section.style.setProperty("--featured-scroll-height", `${(Math.max(1, panels.length) + 2) * getPanelHeight()}px`);
+    const panelHeight = getPanelHeight();
+    cachedGalleryOverlap = panelHeight;
+    section.style.setProperty("--featured-scroll-height", `${Math.max(1, panels.length) * panelHeight + cachedGalleryOverlap}px`);
+    gallerySection?.style.setProperty("--gallery-overlap-height", `${cachedGalleryOverlap}px`);
   };
 
   dots.forEach((dot) => {
@@ -100,7 +104,7 @@ export const initHomeFeatured = ({
     registerTrigger(ScrollTrigger.create({
       trigger: section,
       start: "top top",
-      end: () => `bottom-=${getPanelHeight() * 2}px bottom`,
+      end: () => `bottom-=${cachedGalleryOverlap}px bottom`,
       scrub: true,
       invalidateOnRefresh: true,
       onUpdate: (self) => {

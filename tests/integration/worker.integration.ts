@@ -309,6 +309,102 @@ test("mobile about and career routes initialize visibly and keep wheel scrolling
   }
 });
 
+test("home loading, career endpoints, and gallery height stay visually aligned", async () => {
+  const browser = await chromium.launch({
+    executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    headless: true
+  });
+
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.goto(harnessOrigin, { waitUntil: "domcontentloaded" });
+    assert.equal(await page.locator("[data-home-loader]").count(), 1);
+    await page.waitForFunction(() => {
+      const loader = document.querySelector<HTMLElement>("[data-home-loader]");
+      const logo = document.querySelector<HTMLElement>(".intro-logo");
+      return Boolean(loader?.hidden && logo && Number.parseFloat(getComputedStyle(logo).opacity) > 0.5);
+    }, { timeout: 8000 });
+
+    await page.goto(`${harnessOrigin}/career`, { waitUntil: "networkidle" });
+    await page.waitForFunction(() => document.querySelectorAll("[data-timeline-card].is-active").length === 1);
+    const getTimelineCenterDelta = () => page.evaluate(() => {
+      const list = document.querySelector<HTMLElement>("[data-career-list]");
+      const active = document.querySelector<HTMLElement>("[data-timeline-card].is-active");
+      if (!list || !active) return Number.POSITIVE_INFINITY;
+      const listRect = list.getBoundingClientRect();
+      const cardRect = active.getBoundingClientRect();
+      return Math.abs((listRect.top + listRect.bottom) / 2 - (cardRect.top + cardRect.bottom) / 2);
+    });
+    assert.ok(await getTimelineCenterDelta() <= 2, "the first career item should start centered");
+
+    await page.evaluate(() => {
+      const cards = document.querySelectorAll<HTMLElement>("[data-timeline-card]");
+      cards.item(cards.length - 1).click();
+    });
+    await page.waitForFunction(() => {
+      const cards = document.querySelectorAll<HTMLElement>("[data-timeline-card]");
+      return cards.length > 0 && cards.item(cards.length - 1).classList.contains("is-active");
+    });
+    await page.waitForTimeout(1300);
+    const lastTimelineCenterDelta = await getTimelineCenterDelta();
+    assert.ok(lastTimelineCenterDelta <= 2, `the last career item should finish centered (delta: ${lastTimelineCenterDelta}px)`);
+
+    await page.goto(`${harnessOrigin}/work`, { waitUntil: "networkidle" });
+    await page.waitForTimeout(300);
+    const galleryHeights = await page.evaluate(() => {
+      const section = document.querySelector<HTMLElement>(".gallery-section");
+      const canvas = document.querySelector<HTMLElement>(".gallery-canvas");
+      return {
+        section: section?.offsetHeight ?? 0,
+        canvas: canvas?.offsetHeight ?? 0,
+        panel: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--home-panel-height")) || window.innerHeight,
+        top: section?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY
+      };
+    });
+    assert.ok(galleryHeights.canvas > 0);
+    assert.ok(
+      Math.abs(galleryHeights.section - Math.max(galleryHeights.canvas, galleryHeights.panel)) <= 1,
+      "gallery section should match its content while keeping one full panel of opaque coverage"
+    );
+    assert.ok(
+      Math.abs(galleryHeights.top) <= 1,
+      `the gallery should fully cover the featured stage at its route target (${JSON.stringify(galleryHeights)})`
+    );
+
+    await page.evaluate(() => {
+      const section = document.querySelector<HTMLElement>(".gallery-section");
+      if (!section) return;
+      document.documentElement.style.scrollBehavior = "auto";
+      window.scrollTo({ top: section.offsetTop - window.innerHeight / 2, behavior: "auto" });
+    });
+    await page.waitForFunction(() => {
+      const section = document.querySelector<HTMLElement>(".gallery-section");
+      return Boolean(section && Math.abs(section.getBoundingClientRect().top - window.innerHeight / 2) <= 2);
+    });
+    const galleryEntryState = await page.evaluate(() => {
+      const section = document.querySelector<HTMLElement>(".gallery-section");
+      if (!section) return null;
+      const stage = document.querySelector<HTMLElement>(".featured-stage");
+      return {
+        galleryTop: section.getBoundingClientRect().top,
+        stageTop: stage?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+        viewportHalf: window.innerHeight / 2
+      };
+    });
+    assert.ok(galleryEntryState);
+    assert.ok(
+      Math.abs(galleryEntryState.galleryTop - galleryEntryState.viewportHalf) <= 2,
+      `the gallery should rise over featured through a full-panel transition (${JSON.stringify(galleryEntryState)})`
+    );
+    assert.ok(
+      Math.abs(galleryEntryState.stageTop) <= 2,
+      `the featured stage should remain sticky while the gallery rises over it (${JSON.stringify(galleryEntryState)})`
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
 test("work gallery filters update tiles and support roving keyboard navigation", async () => {
   const browser = await chromium.launch({
     executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",

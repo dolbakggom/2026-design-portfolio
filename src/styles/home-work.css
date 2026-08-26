@@ -360,11 +360,12 @@
 .gallery-section {
   --gallery-width: min(100vw, 1920px);
   --gallery-page-x: clamp(24px, calc(var(--gallery-width) * 0.0515625), 99px);
+  --gallery-overlap-height: var(--home-panel-height);
   position: relative;
   z-index: 4;
   width: 100%;
-  min-height: calc(2 * var(--home-panel-height));
-  margin-top: calc(-2 * var(--home-panel-height));
+  min-height: var(--home-panel-height);
+  margin-top: calc(-1 * var(--gallery-overlap-height));
   margin-inline: 0;
   margin-bottom: 0;
   padding: 0;
@@ -372,7 +373,7 @@
 }
 
 .gallery-section.is-featured-empty {
-  min-height: var(--home-panel-height);
+  --gallery-overlap-height: 0px;
   margin-top: 0;
 }
 

@@ -13,6 +13,21 @@ let homeMotionPromise: Promise<void> | null = null;
 let activeHomeShell: HTMLElement | null = null;
 let cleanupHomePage = () => {};
 
+const completeHomeLoader = (immediate = false) => {
+  const loader = document.querySelector<HTMLElement>("[data-home-loader]");
+  const shell = document.querySelector<HTMLElement>(".site-shell");
+  document.documentElement.classList.remove("home-is-loading");
+  shell?.setAttribute("aria-busy", "false");
+  if (!loader) return;
+
+  if (immediate) loader.style.transition = "none";
+  loader.classList.add("is-complete");
+  loader.setAttribute("aria-hidden", "true");
+  window.setTimeout(() => {
+    loader.hidden = true;
+  }, immediate ? 0 : 440);
+};
+
 const initHomePage = () => {
   const shell = document.querySelector<HTMLElement>(".site-shell");
   if (shell && shell === activeHomeShell) return;
@@ -47,6 +62,7 @@ const initHomePage = () => {
   let cachedWorkTop = Number.POSITIVE_INFINITY;
   let cachedPanelHeight = window.innerHeight;
   let routeDebounceTimeout = 0;
+  let initialReadyTimeout = 0;
   let pendingRoute: string | null = null;
   const portfolioWindow = window as Window & {
     __portfolioLenis?: { resize?: () => void };
@@ -70,6 +86,9 @@ const initHomePage = () => {
     }
     if (routeDebounceTimeout) {
       window.clearTimeout(routeDebounceTimeout);
+    }
+    if (initialReadyTimeout) {
+      window.clearTimeout(initialReadyTimeout);
     }
     cleanupTypewriter();
     identityController.cleanup();
@@ -183,18 +202,40 @@ const clearHomeRoute = () => {
 
 const introLogo = document.querySelector<HTMLElement>(".intro-logo");
 const introTypeTarget = document.querySelector<HTMLElement>("[data-intro-typewriter]");
+const homeLoader = document.querySelector<HTMLElement>("[data-home-loader]");
 
 if (introTypeTarget && !reduceMotion) {
   const phrase = introTypeTarget.dataset.introTypewriter ?? introTypeTarget.textContent ?? "";
   introTypeTarget.textContent = "";
-  gsap.set(introLogo, { filter: "blur(18px)", scale: 0.94 });
-  gsap.to(introLogo, { filter: "blur(0px)", scale: 1, duration: 1.45, ease: "power3.out" });
-  gsap.delayedCall(1, () => {
-    typeText(introTypeTarget, phrase, 64, () => {
-      document.documentElement.classList.add("intro-complete");
-    });
+  gsap.set(introLogo, { autoAlpha: 0, filter: "blur(18px)", scale: 0.94 });
+
+  const loadReady = document.readyState === "complete"
+    ? Promise.resolve()
+    : new Promise<void>((resolve) => window.addEventListener("load", () => resolve(), { once: true, signal: pageSignal }));
+  const fontsReady = document.fonts?.ready?.then(() => undefined).catch(() => undefined) ?? Promise.resolve();
+  const readyTimeout = new Promise<void>((resolve) => {
+    initialReadyTimeout = window.setTimeout(resolve, 4500);
+  });
+
+  void Promise.race([Promise.all([loadReady, fontsReady]), readyTimeout]).then(() => {
+    if (pageSignal.aborted) return;
+    if (initialReadyTimeout) {
+      window.clearTimeout(initialReadyTimeout);
+      initialReadyTimeout = 0;
+    }
+    completeHomeLoader();
+    const introTimeline = gsap.timeline({ defaults: { ease: "power3.out", overwrite: "auto" } });
+    introTimeline
+      .to(introLogo, { autoAlpha: 1, filter: "blur(0px)", scale: 1, duration: 1.45 }, homeLoader ? 0.18 : 0)
+      .add(() => {
+        typeText(introTypeTarget, phrase, 64, () => {
+          document.documentElement.classList.add("intro-complete");
+        });
+      }, homeLoader ? 1.18 : 1);
+    homeScrollAnimations.push(introTimeline);
   });
 } else {
+  completeHomeLoader(true);
   document.documentElement.classList.add("intro-complete");
 }
 
@@ -414,6 +455,7 @@ const loadHomeMotion = (intent: MotionIntent) => {
     })
     .catch(() => {
       document.documentElement.classList.add("motion-load-failed");
+      completeHomeLoader(true);
       homeMotionPromise = null;
     });
 };
@@ -426,6 +468,7 @@ const prepareHomeMotion = () => {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   if (reducedMotion) {
+    completeHomeLoader(true);
     const target = getReducedMotionTarget(route);
     const identity = document.querySelector<HTMLElement>("[data-identity]");
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";

@@ -65,6 +65,17 @@ export const initHomeIdentity = ({
   const updateGeometry = () => {
     cachedIdentityTop = identity?.offsetTop ?? Number.POSITIVE_INFINITY;
     cachedStickyStageHeight = identityStage?.offsetHeight || window.innerHeight;
+    const timelineViewportHeight = careerList?.clientHeight ?? 0;
+    const getExpandedCardHeight = (card: HTMLElement | undefined) => {
+      if (!card) return 0;
+      const titleHeight = card.querySelector<HTMLElement>("p")?.offsetHeight ?? 0;
+      const detailHeight = card.querySelector<HTMLElement>(".timeline-card-details-inner")?.scrollHeight ?? 0;
+      return Math.max(card.offsetHeight, titleHeight + detailHeight);
+    };
+    const firstCardHeight = getExpandedCardHeight(timelineCards[0]);
+    const lastCardHeight = getExpandedCardHeight(timelineCards.at(-1));
+    timelineTrack?.style.setProperty("--timeline-start-padding", `${Math.max(0, timelineViewportHeight / 2 - firstCardHeight / 2).toFixed(2)}px`);
+    timelineTrack?.style.setProperty("--timeline-end-padding", `${Math.max(0, timelineViewportHeight / 2 - lastCardHeight / 2).toFixed(2)}px`);
     cachedTimelineMaxOffset = Math.max(0, (timelineTrack?.scrollHeight ?? 0) - (careerList?.clientHeight ?? 0));
     const cardCount = timelineCards.length;
     const viewportCenter = (careerList?.clientHeight ?? 0) / 2;
@@ -127,6 +138,9 @@ export const initHomeIdentity = ({
 
   const aboutHoldEndProgress = 0.09;
   const careerStartProgress = 0.29;
+  const careerEndpointHoldScale = 0.5;
+  const careerVisibleProgress = aboutHoldEndProgress + (careerStartProgress - aboutHoldEndProgress) * 0.5;
+  const desktopTimelineStartProgress = careerStartProgress - (careerStartProgress - careerVisibleProgress) * careerEndpointHoldScale;
   const mobileCareerListStartProgress = careerStartProgress + aboutHoldEndProgress;
   const getCareerTransitionProgress = (progress: number) => gsap.utils.clamp(
     0,
@@ -146,17 +160,19 @@ export const initHomeIdentity = ({
     const maxTimelineTravel = Math.max(1, totalHeight - getPanelHeight() * 0.3);
     return cachedIdentityTop + maxTimelineTravel * gsap.utils.clamp(0, 1, progress);
   };
-  const getTimelineStartProgress = () => isMobileLayout() ? mobileCareerListStartProgress : careerStartProgress;
+  const getTimelineStartProgress = () => isMobileLayout() ? mobileCareerListStartProgress : desktopTimelineStartProgress;
   const getTimelineStartTop = () => getTimelineScrollForProgress(getTimelineStartProgress());
   const getWorkRevealTop = () => getWorkTop() - getPanelHeight();
   const getTimelineTravel = () => {
     const count = Math.max(1, timelineCards.length);
     const availableBeforeWork = Math.max(1, getWorkRevealTop() - getTimelineStartTop());
     if (count <= 1) return availableBeforeWork;
-    return Math.max(1, availableBeforeWork * ((count - 1) / (count + 1)));
+    const currentTravel = availableBeforeWork * ((count - 1) / (count + 1));
+    const currentEndHold = availableBeforeWork - currentTravel;
+    return Math.max(1, availableBeforeWork - currentEndHold * careerEndpointHoldScale);
   };
   const getTimelineEndTop = () => getTimelineStartTop() + getTimelineTravel();
-  const getCareerEntryTop = () => getTimelineScrollForProgress(isMobileLayout() ? mobileCareerListStartProgress : careerStartProgress);
+  const getCareerEntryTop = () => getTimelineScrollForProgress(getTimelineStartProgress());
   const getPointProgress = (index: number) => {
     const count = Math.max(1, timelineCards.length);
     if (count <= 1) return 0;
@@ -175,7 +191,6 @@ export const initHomeIdentity = ({
     let bestWeight = -1;
     let bestDiff = Number.POSITIVE_INFINITY;
 
-    careerList.style.setProperty("--timeline-focus-offset", `${(cachedTimelineMaxOffset * progress).toFixed(2)}px`);
     timelineCards.forEach((card, index) => {
       const cardProgress = cachedTimelineCardProgresses[index] ?? (count <= 1 ? 0 : index / progressSlots);
       const diff = Math.abs(progress - cardProgress);
@@ -195,6 +210,14 @@ export const initHomeIdentity = ({
       card.style.setProperty("--timeline-dot-scale", (0.6667 + 0.3333 * focusWeight).toFixed(3));
       card.style.setProperty("--timeline-dot-accent-opacity", focusWeight.toFixed(3));
     });
+    const timelineViewportCenter = careerList.clientHeight / 2;
+    const getCardCenterOffset = (card: HTMLElement | undefined) => card
+      ? card.offsetTop + card.offsetHeight / 2 - timelineViewportCenter
+      : 0;
+    const firstCenterOffset = getCardCenterOffset(timelineCards[0]);
+    const lastCenterOffset = getCardCenterOffset(timelineCards.at(-1));
+    const focusOffset = gsap.utils.interpolate(firstCenterOffset, lastCenterOffset, progress);
+    careerList.style.setProperty("--timeline-focus-offset", `${focusOffset.toFixed(2)}px`);
     setActiveTimeline(bestIndex);
   };
 
