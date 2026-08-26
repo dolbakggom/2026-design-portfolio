@@ -20,6 +20,7 @@
 - Every career card has a short scroll-progress dwell without locking wheel or touch input. Movement between cards uses `cubic-bezier(.4, 0, .6, 1)` so each item settles before the next transition begins.
 - The route updates with the active home state: `/`, `/about`, `/career`, or `/work`.
 - Work uses three levels: work intro, full-screen featured project slides, then a filterable gallery.
+- A gallery category with no matching work shows a dedicated empty state in place of the grid and announces the empty result without affecting categories that contain work.
 - The gallery section height follows its 1920px canvas content instead of reserving two empty viewport heights, while retaining a one-panel minimum so a short gallery can still scroll to the top. The Gallery transition always overlaps one full panel: Featured stays sticky while Gallery rises over and fully covers it.
 - `prefers-reduced-motion` must remove pinning-heavy and typing-heavy behavior.
 
@@ -42,12 +43,13 @@
 - The WORK editor and live preview are separated by a draggable split handle so the editor/preview ratio can be adjusted during content work.
 - Work detail blocks support editor controls for line height, paragraph spacing, block width, and alignment.
 - Text blocks default to `100%` content width, and newly added Heading, Paragraph, or Quote blocks inherit the editor's current Content width selection.
-- Every work detail Heading, including the first one, adds 24px above the shared 34px block gap; the scaled admin live preview uses 12px additional top spacing.
+- Every work detail Heading, including the first one, adds 48px above the shared 34px block gap; the scaled admin live preview uses 24px additional top spacing.
 - The body block toolbar remains sticky within the work editor while long content scrolls, then releases at the end of the body editor. On mobile it follows the page scroll with a small top inset.
 - Work metadata presents the existing `role` value as `Tools` in the public detail and admin UI because the field contains software names; the internal key remains unchanged for data compatibility.
 - Website blocks render as a full-background CTA: the linked site's representative image fills the block beneath a strong blur and black overlay, while custom title/description and an enlarged Korean link action remain high-contrast in the foreground. The admin fetches Open Graph metadata, imports the representative image into R2, and lets the editor override title and description afterward.
 - Divider blocks render as a full-width 1px neutral line with consistent spacing in the public detail page and its scaled admin live preview.
 - Work detail pages end with a full-viewport, two-panel previous/next project navigation ordered by the admin WORK sequence. Each panel is 320px tall on desktop; pointer hover expands an opaque acid-green circle from the cursor position until it fully covers the project image. Typography follows title, direction, then category/year in descending size, and the direction arrows use the same sweep language as the detail topbar.
+- Previous copy uses 200% of the base left inset and Next copy uses 200% of the base right inset, while the opposite edges and full-width media remain unchanged.
 - The work detail top cover keeps its paper-colored lower fade. The bottom previous/next navigation uses a uniform dark image overlay with no directional gradient, and its opaque acid-green reveal sits above that overlay so the hover state remains a true flat color.
 - The navigation's foreground contrast follows the same circular reveal: white text remains over the image, while a synchronized clipped duplicate switches only the green-covered portion to black. This applies to titles, direction labels, metadata, and arrows without an abrupt whole-label color change.
 - Make save states explicit and keep forms dense enough for repeated editing.

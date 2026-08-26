@@ -60,6 +60,7 @@ export const initHomeWorkSection = ({ gsap, signal }: WorkSectionOptions) => {
   const filterButtons = document.querySelectorAll<HTMLButtonElement>("[data-filter]");
   const galleryPanel = document.querySelector<HTMLElement>("#work-gallery-grid");
   const galleryStatus = document.querySelector<HTMLElement>("[data-gallery-status]");
+  const galleryFilterEmpty = document.querySelector<HTMLElement>("[data-gallery-filter-empty]");
   const tiles = Array.from(galleryPanel?.querySelectorAll<HTMLElement>("[data-category]") ?? []);
 
   const animateGalleryFilter = (filter: string) => {
@@ -130,6 +131,24 @@ export const initHomeWorkSection = ({ gsap, signal }: WorkSectionOptions) => {
         gsap.to(tile, { autoAlpha: 1, scale: 1, y: 0, duration: 0.42, ease: "power3.out", overwrite: true });
       }
     });
+
+    const visibleCount = tiles.filter((tile) => !tile.hidden).length;
+    const showFilterEmpty = filter !== "ALL" && visibleCount === 0;
+    if (galleryFilterEmpty) {
+      gsap.killTweensOf(galleryFilterEmpty);
+      galleryFilterEmpty.hidden = !showFilterEmpty;
+      if (showFilterEmpty) {
+        gsap.fromTo(galleryFilterEmpty, { autoAlpha: 0, y: 12 }, {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.42,
+          ease: "power3.out",
+          overwrite: true
+        });
+      }
+    }
+
+    return visibleCount;
   };
 
   filterButtons.forEach((button) => {
@@ -144,10 +163,11 @@ export const initHomeWorkSection = ({ gsap, signal }: WorkSectionOptions) => {
         item.tabIndex = isSelected ? 0 : -1;
       });
       if (button.id) galleryPanel?.setAttribute("aria-labelledby", button.id);
-      animateGalleryFilter(filter);
-      const visibleCount = tiles.filter((tile) => !tile.hidden).length;
+      const visibleCount = animateGalleryFilter(filter);
       if (galleryStatus) {
-        galleryStatus.textContent = `${filter === "ALL" ? "전체" : filter} 작업물 ${visibleCount}개`;
+        galleryStatus.textContent = visibleCount === 0 && filter !== "ALL"
+          ? `${filter} 작업물 0개. 아직 등록된 작업물이 없습니다.`
+          : `${filter === "ALL" ? "전체" : filter} 작업물 ${visibleCount}개`;
       }
     }, { signal });
 

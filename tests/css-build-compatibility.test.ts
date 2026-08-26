@@ -62,8 +62,8 @@ test("every work heading receives additional top spacing in public and live prev
   const publicCss = await readFile("src/styles/work-detail.css", "utf8");
   const previewCss = await readFile("src/styles/admin/preview.css", "utf8");
 
-  assert.match(publicCss, /\.work-block-heading\s*\{[^}]*margin:\s*24px 0 0;/s);
-  assert.match(previewCss, /\.preview-block-heading\s*\{[^}]*margin:\s*12px 0 0;/s);
+  assert.match(publicCss, /\.work-block-heading\s*\{[^}]*margin:\s*48px 0 0;/s);
+  assert.match(previewCss, /\.preview-block-heading\s*\{[^}]*margin:\s*24px 0 0;/s);
   assert.doesNotMatch(publicCss, /\.work-block-heading:(?:first-child|first-of-type)/);
 });
 
@@ -77,5 +77,7 @@ test("work project navigation keeps its full-width circular acid reveal", async 
   assert.match(css, /\.work-project-navigation-copy\.is-reveal-copy\s*\{[^}]*color:\s*var\(--color-ink\);[^}]*clip-path:\s*circle\(0 at var\(--project-reveal-x\) var\(--project-reveal-y\)\);/s);
   assert.match(component, /class="work-project-navigation-copy is-reveal-copy" aria-hidden="true"/);
   assert.match(css, /\.work-project-navigation-link:hover \.work-project-navigation-tint[^}]*clip-path:\s*circle\(150% at var\(--project-reveal-x\) var\(--project-reveal-y\)\);/s);
+  assert.match(css, /\.work-project-navigation-link:first-child \.work-project-navigation-copy\s*\{[^}]*left:\s*calc\(var\(--project-navigation-inline\) \* 2\);/s);
+  assert.match(css, /\.work-project-navigation-link:last-child \.work-project-navigation-copy\s*\{[^}]*right:\s*calc\(var\(--project-navigation-inline\) \* 2\);/s);
   assert.match(component, /addEventListener\("pointermove"[\s\S]*--project-reveal-x[\s\S]*--project-reveal-y/);
 });

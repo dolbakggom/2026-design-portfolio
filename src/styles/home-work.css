@@ -420,7 +420,8 @@
   gap: 57px 38px;
 }
 
-.gallery-empty {
+.gallery-empty,
+.gallery-filter-empty {
   min-height: min(50svh, 520px);
   display: grid;
   align-content: center;
@@ -428,14 +429,20 @@
   padding: 64px 0;
 }
 
-.gallery-empty p {
+.gallery-filter-empty[hidden] {
+  display: none;
+}
+
+.gallery-empty p,
+.gallery-filter-empty p {
   margin: 0 0 10px;
   font-size: clamp(28px, 2.4vw, 46px);
   font-weight: 700;
   line-height: 1.2;
 }
 
-.gallery-empty span {
+.gallery-empty span,
+.gallery-filter-empty span {
   color: var(--color-muted);
   font-size: 16px;
   line-height: 1.5;

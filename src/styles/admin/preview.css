@@ -184,7 +184,7 @@
 }
 
 .preview-block-heading {
-  margin: 12px 0 0;
+  margin: 24px 0 0;
   font-size: 1.8rem;
   font-weight: 700;
   line-height: var(--preview-line-height, 1.3);

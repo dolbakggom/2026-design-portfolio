@@ -309,6 +309,7 @@
   }
 
   .work-project-navigation {
+    --project-navigation-inline: 20px;
     grid-template-columns: 1fr;
     height: auto;
     margin-top: 112px;
@@ -324,7 +325,7 @@
   }
 
   .work-project-navigation-copy {
-    inset: 26px 20px 28px;
+    inset: 26px var(--project-navigation-inline) 28px;
   }
 
   .work-project-navigation-copy strong {

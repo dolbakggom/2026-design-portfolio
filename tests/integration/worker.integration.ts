@@ -439,10 +439,26 @@ test("work gallery filters update tiles and support roving keyboard navigation",
     assert.ok(uiUxState.visibleCount > 0);
     assert.ok(uiUxState.categories.every((category) => category.split(",").map((value) => value.trim()).includes("UI/UX")));
 
+    await page.evaluate(() => {
+      document.querySelectorAll<HTMLElement>("#work-gallery-grid [data-category]").forEach((tile) => {
+        tile.dataset.category = "UI/UX";
+      });
+    });
     await uiUxTab.focus();
     await uiUxTab.press("ArrowRight");
     await page.waitForFunction(() => document.querySelector('[data-filter="BI/BX"]')?.getAttribute("aria-selected") === "true");
     assert.equal(await page.locator('[data-filter="BI/BX"]').getAttribute("tabindex"), "0");
+    await page.waitForFunction(() => document.querySelector<HTMLElement>("[data-gallery-filter-empty]")?.hidden === false);
+    assert.equal(await page.locator("[data-gallery-filter-empty] p").textContent(), "이런... 아직 작업물이 없네요.");
+    assert.equal(await page.locator("#work-gallery-grid [data-category]:visible").count(), 0);
+    assert.equal(
+      await page.locator("[data-gallery-status]").textContent(),
+      "BI/BX 작업물 0개. 아직 등록된 작업물이 없습니다."
+    );
+
+    await page.locator('[data-filter="ALL"]').click();
+    await page.waitForFunction(() => document.querySelector<HTMLElement>("[data-gallery-filter-empty]")?.hidden === true);
+    assert.ok(await page.locator("#work-gallery-grid [data-category]:visible").count() > 0);
   } finally {
     await browser.close();
   }

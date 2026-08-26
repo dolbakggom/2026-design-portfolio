@@ -266,7 +266,7 @@
 
 .work-block-heading {
   width: min(var(--block-max-width, 880px), 100%);
-  margin: 24px 0 0;
+  margin: 48px 0 0;
   font-size: 42px;
   font-weight: 700;
   line-height: var(--block-line-height, 1.3);
@@ -517,6 +517,7 @@
 }
 
 .work-project-navigation {
+  --project-navigation-inline: 40px;
   position: relative;
   z-index: 2;
   display: grid;
@@ -580,11 +581,15 @@
 
 .work-project-navigation-copy {
   position: absolute;
-  inset: 32px 40px 36px;
+  inset: 32px var(--project-navigation-inline) 36px;
   z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+}
+
+.work-project-navigation-link:first-child .work-project-navigation-copy {
+  left: calc(var(--project-navigation-inline) * 2);
 }
 
 .work-project-navigation-copy.is-reveal-copy {
@@ -596,6 +601,7 @@
 }
 
 .work-project-navigation-link:last-child .work-project-navigation-copy {
+  right: calc(var(--project-navigation-inline) * 2);
   align-items: flex-end;
   text-align: right;
 }

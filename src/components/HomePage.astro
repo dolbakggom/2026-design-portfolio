@@ -305,6 +305,12 @@ const safeProfileIntro = sanitizeProfileIntro(profile.intro);
             })
           }
         </div>
+        {works.length > 0 ? (
+          <div class="gallery-filter-empty" data-gallery-filter-empty hidden>
+            <p>이런... 아직 작업물이 없네요.</p>
+            <span>새로운 프로젝트를 준비하고 있습니다.</span>
+          </div>
+        ) : null}
         {works.length === 0 ? (
           <div class="gallery-empty" role="status">
             <p>공개된 작업물이 없습니다.</p>

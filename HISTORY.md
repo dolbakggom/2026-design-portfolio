@@ -75,6 +75,7 @@
 - `gallery-section`은 실제 canvas 높이를 따르되 최소 한 panel 높이를 유지합니다. 콘텐츠가 한 화면보다 길면 별도 하단 여백은 추가되지 않습니다.
 - Gallery와 Featured의 overlap도 canvas 높이와 분리해 정확히 한 panel 높이로 유지합니다. 전환 중에는 Featured가 sticky 상태로 남고 Gallery가 그 위로 올라옵니다.
 - 브라우저 통합 테스트에서 전환 중간의 Featured 고정 상태와 `/work` 진입 시 Gallery의 완전한 덮임을 함께 검증합니다.
+- 선택한 Gallery 카테고리에 공개 작업물이 없으면 `이런... 아직 작업물이 없네요.` 빈 상태를 표시하고, 접근성 상태 문구에도 해당 카테고리의 0개 결과를 안내합니다.
 
 ## 2026-08-25 Local Content Production Deployment
 
@@ -132,6 +133,7 @@
 - 사용자 정정에 따라 Work Detail 최상단 커버의 paper 색상 하단 그라데이션은 원래대로 복구했습니다.
 - 제거 대상은 하단 이전·다음 프로젝트 패널의 검정 세로 그라데이션이었습니다. 이를 균일한 검정 오버레이로 교체하고, 단색 녹색 reveal을 그 위 레이어로 올려 hover 전체가 정확한 `#08c840`으로 보이게 수정했습니다.
 - 녹색 원과 동일한 `clip-path`를 쓰는 검정 텍스트 복제 레이어를 추가했습니다. 원이 지나간 부분의 제목, Previous/Next, 카테고리·연도, 화살표만 검정으로 바뀌고 나머지는 흰색으로 남아 배경과 전경 대비가 공간적으로 함께 전환됩니다.
+- 하단 Previous의 왼쪽 여백과 Next의 오른쪽 여백을 기존 가로 여백의 200%로 확대했습니다. 데스크톱은 `40px → 80px`, 모바일은 `20px → 40px`이며 원본·검정 reveal copy에 동일하게 적용됩니다.
 - 쿼리스트링이 있는 로컬 URL에서만 최신 내비게이션이 보이고 일반 Work URL에는 이전 HTML이 남던 원인을 확인했습니다. 미들웨어의 10분 Cloudflare Cache API가 Astro 개발 서버에서도 동작해 기존 HTML을 반환하고 있었습니다.
 - 공개 HTML Cache API는 이제 `import.meta.env.PROD`에서만 사용합니다. 운영의 10분 TTL/purge 정책은 유지하고, `npm run dev`에서는 모든 Work Detail이 쿼리스트링 없이 즉시 최신 렌더를 반환합니다.
 - 검증: `npm run test:unit` 72개 통과, `npm run build` 0 errors/warnings/hints. 쿼리스트링 없는 Rush Hour, HEXA LABS, 평택대학교 Work Detail에서 내비게이션과 동기화된 텍스트 reveal 레이어가 모두 렌더링되는 것을 확인했습니다.
@@ -258,6 +260,10 @@
 
 ### 검증
 - 공개 및 관리자 미리보기의 Heading top margin과 첫 번째 Heading 예외 selector 부재를 확인하는 회귀 테스트를 추가했습니다.
+
+### 2026-08-26 Heading 여백 확대
+- 공개 작업물 상세의 모든 Heading 추가 상단 여백을 `24px`에서 `48px`로, 관리자 실시간 미리보기는 `12px`에서 `24px`로 두 배 확대했습니다.
+- 저장 데이터가 아닌 공통 렌더링 CSS를 변경해 첫 Heading과 기존 작업물을 포함한 모든 Heading에 일괄 적용됩니다.
 - `npm run test:unit`: 69 tests passed.
 - `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
 
