@@ -266,6 +266,7 @@
 ### 2026-08-26 Heading 여백 확대
 - 공개 작업물 상세의 모든 Heading 추가 상단 여백을 `24px`에서 `48px`로, 관리자 실시간 미리보기는 `12px`에서 `24px`로 두 배 확대했습니다.
 - 저장 데이터가 아닌 공통 렌더링 CSS를 변경해 첫 Heading과 기존 작업물을 포함한 모든 Heading에 일괄 적용됩니다.
+- `1180px` 이하 작업물 상세 텍스트 크기를 Heading `42px → 36px`, 본문 `20px → 18px`, 인용 `28px → 24px`로 낮췄습니다. 공통 responsive CSS 변경이라 기존 작업물 전체에 적용됩니다.
 - `npm run test:unit`: 69 tests passed.
 - `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
 

@@ -45,6 +45,7 @@
 - The WORK editor and live preview are separated by a draggable split handle so the editor/preview ratio can be adjusted during content work.
 - Work detail blocks support editor controls for line height, paragraph spacing, block width, and alignment.
 - Text blocks default to `100%` content width, and newly added Heading, Paragraph, or Quote blocks inherit the editor's current Content width selection.
+- At `1180px` and below, work content uses `36px` Heading, `18px` body, and `24px` quote text while desktop typography remains unchanged.
 - Every work detail Heading, including the first one, adds 48px above the shared 34px block gap; the scaled admin live preview uses 24px additional top spacing.
 - The body block toolbar remains sticky within the work editor while long content scrolls, then releases at the end of the body editor. On mobile it follows the page scroll with a small top inset.
 - Work metadata presents the existing `role` value as `Tools` in the public detail and admin UI because the field contains software names; the internal key remains unchanged for data compatibility.

@@ -65,6 +65,14 @@ test("mobile career cards use expanded vertical spacing", async () => {
   assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.timeline-track\s*\{[^}]*padding:\s*var\(--timeline-start-padding,[^}]*var\(--timeline-end-padding,/s);
 });
 
+test("mobile work content uses a quieter text scale", async () => {
+  const css = await readFile(new URL("../src/styles/responsive.css", import.meta.url), "utf8");
+
+  assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.work-block-heading\s*\{[^}]*font-size:\s*36px;/s);
+  assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.work-block-copy\s*\{[^}]*font-size:\s*18px;/s);
+  assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.work-block-quote\s*\{[^}]*font-size:\s*24px;/s);
+});
+
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {
   const publicCss = await readFile("src/styles/work-detail.css", "utf8");
   const previewCss = await readFile("src/styles/admin/preview.css", "utf8");

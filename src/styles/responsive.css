@@ -200,6 +200,18 @@
     line-height: 1.4;
   }
 
+  .work-block-heading {
+    font-size: 36px;
+  }
+
+  .work-block-copy {
+    font-size: 18px;
+  }
+
+  .work-block-quote {
+    font-size: 24px;
+  }
+
   .work-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
