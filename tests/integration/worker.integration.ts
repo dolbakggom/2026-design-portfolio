@@ -181,7 +181,12 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
       {
         id: "integration-code",
         type: "code",
-        content: { code: "const portfolio = 'Beyond the Answer.';", language: "typescript", blockWidth: "100%", caption: "Scroll dwell implementation" },
+        content: {
+          code: "import { createCubicBezierEasing, remapProgressWithDwell } from '../src/lib/scroll-dwell';",
+          language: "typescript",
+          blockWidth: "100%",
+          caption: "Scroll dwell implementation"
+        },
         sortOrder: 3
       },
       { id: "integration-divider", type: "divider", content: {}, sortOrder: 4 }
@@ -203,13 +208,62 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
   assert.match(html, /Saved D1 block is publicly rendered with/);
   assert.match(html, /<code>--tile-image<\/code>/);
   assert.match(html, /class="work-block-code"/);
-  assert.match(html, /const portfolio = &#39;Beyond the Answer\.&#39;;/);
+  assert.match(html, /createCubicBezierEasing/);
   assert.match(html, /class="work-code-caption">Scroll dwell implementation/);
   assert.match(html, /data-code-copy/);
   assert.match(html, /class="work-block-divider"/);
   assert.match(html, /<dt>Tools<\/dt>/);
   assert.match(html, /Figma, Illustrator/);
   assert.doesNotMatch(html, /Draft block content/);
+});
+
+test("mobile public code blocks contain long lines without widening the document", async () => {
+  const browser = await chromium.launch({
+    executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    headless: true
+  });
+
+  try {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 1,
+      isMobile: true,
+      hasTouch: true
+    });
+    const page = await context.newPage();
+    await page.goto(`${harnessOrigin}/work/integration-work`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".work-block-code code");
+
+    const state = await page.evaluate(() => {
+      const figure = document.querySelector<HTMLElement>(".work-block-code");
+      const shell = document.querySelector<HTMLElement>(".work-code-shell");
+      const pre = document.querySelector<HTMLElement>(".work-block-code pre");
+      const code = document.querySelector<HTMLElement>(".work-block-code code");
+      return {
+        documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        documentWidth: document.documentElement.clientWidth,
+        figureWidth: figure?.getBoundingClientRect().width ?? 0,
+        shellWidth: shell?.getBoundingClientRect().width ?? 0,
+        preWidth: pre?.getBoundingClientRect().width ?? 0,
+        preScrollWidth: pre?.scrollWidth ?? 0,
+        fontSize: code ? getComputedStyle(code).fontSize : "",
+        textSizeAdjust: code ? getComputedStyle(code).webkitTextSizeAdjust : ""
+      };
+    });
+
+    assert.ok(state.documentOverflow <= 1, `document overflow: ${state.documentOverflow}`);
+    assert.ok(state.figureWidth <= state.documentWidth, `figure width: ${state.figureWidth}, document width: ${state.documentWidth}`);
+    assert.ok(Math.abs(state.shellWidth - state.figureWidth) <= 1);
+    assert.ok(
+      Math.abs(state.preWidth - state.shellWidth) <= 2.1,
+      `public pre width: ${state.preWidth}, shell width: ${state.shellWidth}`
+    );
+    assert.ok(state.preScrollWidth > state.preWidth, "long code should scroll inside the code block");
+    assert.equal(state.fontSize, "13px");
+    assert.equal(state.textSizeAdjust, "100%");
+  } finally {
+    await browser.close();
+  }
 });
 
 test("image upload stores bytes in R2, metadata in D1, and serves immutable media", async () => {
@@ -652,10 +706,37 @@ test("admin CSS imports render the shell and work editor layout", async () => {
       (previousCount) => document.querySelectorAll(".preview-block-code").length > previousCount,
       previewCodeCount
     );
-    await page.getByLabel("Code").last().fill("const screenshot = true;");
+    await page.getByLabel("Code").last().fill("const screenshot = createCubicBezierEasing(0.4, 0, 0.6, 1); // intentionally long preview line");
     await page.getByLabel("Caption").last().fill("Screenshot-ready code");
-    assert.match(await page.locator(".preview-block-code code").last().textContent() ?? "", /const screenshot = true;/);
+    assert.match(await page.locator(".preview-block-code code").last().textContent() ?? "", /createCubicBezierEasing/);
     assert.equal(await page.locator(".preview-block-code > figcaption").last().textContent(), "Screenshot-ready code");
+
+    const previewWidthState = await page.locator(".work-preview-panel").evaluate((preview) => {
+      const scroll = preview.querySelector<HTMLElement>(".work-preview-scroll");
+      const codeBlocks = Array.from(preview.querySelectorAll<HTMLElement>(".preview-block-code"));
+      const codeBlock = codeBlocks.at(-1);
+      const shell = codeBlock?.querySelector<HTMLElement>(".preview-code-shell");
+      const pre = codeBlock?.querySelector<HTMLElement>("pre");
+      const copyBlocks = Array.from(preview.querySelectorAll<HTMLElement>(".preview-block-copy"));
+      const scrollRight = scroll?.getBoundingClientRect().right ?? 0;
+      return {
+        panelOverflow: preview.scrollWidth - preview.clientWidth,
+        scrollOverflow: (scroll?.scrollWidth ?? 0) - (scroll?.clientWidth ?? 0),
+        shellWidth: shell?.getBoundingClientRect().width ?? 0,
+        preWidth: pre?.getBoundingClientRect().width ?? 0,
+        preScrollWidth: pre?.scrollWidth ?? 0,
+        copyEscapesPanel: copyBlocks.some((copy) => copy.getBoundingClientRect().right > scrollRight + 1)
+      };
+    });
+
+    assert.ok(previewWidthState.panelOverflow <= 1, `preview panel overflow: ${previewWidthState.panelOverflow}`);
+    assert.ok(previewWidthState.scrollOverflow <= 1, `preview scroller overflow: ${previewWidthState.scrollOverflow}`);
+    assert.ok(
+      Math.abs(previewWidthState.preWidth - previewWidthState.shellWidth) <= 2.1,
+      `preview pre width: ${previewWidthState.preWidth}, shell width: ${previewWidthState.shellWidth}`
+    );
+    assert.ok(previewWidthState.preScrollWidth > previewWidthState.preWidth, "long preview code should scroll inside its pre element");
+    assert.equal(previewWidthState.copyEscapesPanel, false);
 
     const previewDividerCount = await page.locator(".preview-block-divider").count();
     await page.getByRole("button", { name: "Divider", exact: true }).click();

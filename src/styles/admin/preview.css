@@ -1,7 +1,10 @@
 .work-preview-panel {
   min-height: 0;
+  min-width: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  container-name: work-preview;
+  container-type: inline-size;
   border: 1px solid var(--admin-border);
   border-radius: 12px;
   background: var(--admin-surface);
@@ -100,7 +103,9 @@
 
 .work-preview-scroll {
   min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   overflow-anchor: none;
   background: #f4f4f4;
 }
@@ -172,8 +177,14 @@
 
 .preview-block-list {
   display: grid;
+  min-width: 0;
   gap: 18px;
   padding: 10px 16px 24px;
+}
+
+.preview-block-list > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .preview-block-heading,
@@ -201,6 +212,7 @@
 .preview-block-copy {
   color: rgba(0, 0, 0, 0.72);
   line-height: var(--preview-line-height, 1.7);
+  overflow-wrap: break-word;
 }
 
 .preview-block-copy p,
@@ -272,10 +284,16 @@
 
 .preview-block-code {
   width: min(var(--preview-block-width, 100%), 100%);
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
+  contain: inline-size;
 }
 
 .preview-code-shell {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
@@ -350,18 +368,53 @@
 }
 
 .preview-block-code pre {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
   margin: 0;
   padding: 4px 14px 16px;
   tab-size: 2;
 }
 
 .preview-block-code code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
   font-weight: 400;
   line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   white-space: pre;
+}
+
+@container work-preview (max-width: 420px) {
+  .preview-hero,
+  .preview-block-list {
+    padding-inline: 12px;
+  }
+
+  .preview-block-heading {
+    font-size: 1.5rem;
+  }
+
+  .preview-block-copy {
+    font-size: 0.92rem;
+  }
+
+  .preview-code-toolbar {
+    padding-inline: 10px;
+  }
+
+  .preview-block-code pre {
+    padding-inline: 12px;
+  }
 }
 
 .preview-block-code .hljs-keyword,

@@ -41,6 +41,8 @@ html {
   font-family: var(--font-sans);
   font-weight: 400;
   letter-spacing: 0;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   overflow-x: hidden;
   overflow-x: clip;
   scroll-behavior: smooth;

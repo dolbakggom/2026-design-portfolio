@@ -1857,3 +1857,27 @@
 - `AdminApp.tsx`는 크게 줄었지만 상태와 저장 orchestration이 1,111줄에 남아 있습니다. 다음 관리자 기능 추가 전에 Profile/Timeline/Works 화면 컴포넌트와 controller hook을 추가 분리하는 것이 좋습니다.
 - `.git`에는 과거 commit의 압축된 백업 object가 남아 있습니다. 이번 변경을 commit한 뒤 일반 `git gc`로 일부 회수할 수 있지만, 과거 history에서 완전히 제거하려면 파괴적인 history rewrite가 필요하므로 수행하지 않았습니다.
 - 통합 테스트는 macOS의 `/Applications/Google Chrome.app`을 사용합니다. Chrome이 없는 CI에서는 실행 경로를 환경변수로 바꾸거나 Playwright browser provisioning이 필요합니다.
+
+## 2026-08-30 Mobile Code Block And Admin Preview Width Containment
+
+### 요구사항
+- iOS 실기기에서 코드 글자가 과도하게 커지고 긴 줄이 화면 밖으로 잘리는 현상을 수정합니다.
+- 관리자 WORK 라이브 프리뷰에서 긴 코드가 프리뷰 전체 폭을 밀어 본문까지 잘리게 만드는 현상을 수정합니다.
+
+### 구현
+- `src/styles/global.css`, `src/styles/work-detail.css`
+  - iOS Safari text autosizing을 100%로 고정했습니다.
+  - 공개 코드 블록의 모든 폭 경계에 `min-width: 0`, `max-width: 100%`, inline-size containment를 적용했습니다.
+  - 긴 코드는 페이지 폭을 늘리지 않고 `pre` 내부에서만 관성 가로 스크롤되도록 구성했습니다.
+- `src/styles/admin/preview.css`
+  - 프리뷰 패널, 스크롤 영역, 블록 목록과 코드 셸의 최소 폭을 0으로 제한하고 바깥 가로 overflow를 차단했습니다.
+  - 긴 코드만 내부 `pre`에서 가로 스크롤되며, 420px 이하 프리뷰 패널은 container query로 여백과 글자 크기를 조정합니다.
+- `tests/css-build-compatibility.test.ts`, `tests/integration/worker.integration.ts`
+  - iOS text-size 조정과 폭 containment 규칙을 회귀 테스트에 추가했습니다.
+  - 390x844 공개 상세와 좁은 관리자 프리뷰에 긴 코드 한 줄을 넣어 문서/패널 폭과 내부 스크롤을 실제 Chromium 치수로 검증합니다.
+
+### 검증
+- `npm run test:unit`: 83 tests passed.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- 관련 통합 테스트 6개 통과: D1 저장·공개 렌더링, 390px 모바일 코드 containment, R2 업로드, 관리자 라이브 프리뷰 containment.
+- 전체 통합 테스트 중 기존 WORK 갤러리 필터 테스트 1개는 BI/BX 카테고리가 비어 있는 현재 fixture 상태 때문에 별도로 실패했으며 이번 변경과 무관합니다.

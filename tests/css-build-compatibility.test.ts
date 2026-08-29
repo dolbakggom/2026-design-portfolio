@@ -101,11 +101,15 @@ test("code blocks share editor, preview, and public rendering styles", async () 
   assert.match(publicCss, /\.work-block-code\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s);
   assert.match(publicCss, /\.work-block-code pre\s*\{[^}]*max-width:\s*100%;[^}]*overflow:\s*auto;/s);
   assert.match(publicCss, /\.work-block-code code\s*\{[^}]*width:\s*max-content;[^}]*min-width:\s*100%;/s);
+  assert.match(publicCss, /\.work-block-code code\s*\{[^}]*-webkit-text-size-adjust:\s*100%;/s);
   assert.match(publicCss, /\.work-block-code \.token\.keyword[\s\S]*?color:\s*#f28dad;/s);
   assert.match(publicBlocks, /class="work-code-caption"/);
   const previewCss = await readFile(new URL("../src/styles/admin/preview.css", import.meta.url), "utf8");
   assert.match(publicCss, /\.work-code-caption,\s*\.work-block-image figcaption\s*\{[^}]*font-size:\s*14px;/s);
   assert.match(previewCss, /\.preview-block-code > figcaption,\s*\.preview-block-image figcaption\s*\{[^}]*font-size:\s*0\.82rem;/s);
+  assert.match(previewCss, /\.work-preview-scroll\s*\{[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s);
+  assert.match(previewCss, /\.preview-block-code\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s);
+  assert.match(previewCss, /\.preview-block-code code\s*\{[^}]*width:\s*max-content;[^}]*min-width:\s*100%;/s);
 });
 
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {
