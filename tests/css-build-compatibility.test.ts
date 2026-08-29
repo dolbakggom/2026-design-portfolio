@@ -82,6 +82,22 @@ test("admin work cards render thumbnail URLs as image elements", async () => {
   assert.match(adminCss, /\.admin-work-card \.work-tile-media\.is-image-unavailable img\s*\{[^}]*display:\s*none;/s);
 });
 
+test("code blocks share editor, preview, and public rendering styles", async () => {
+  const editor = await readFile(new URL("../src/components/admin/BlockEditor.tsx", import.meta.url), "utf8");
+  const preview = await readFile(new URL("../src/components/admin/AdminSupport.tsx", import.meta.url), "utf8");
+  const publicBlocks = await readFile(new URL("../src/components/WorkBlocks.astro", import.meta.url), "utf8");
+  const publicCss = await readFile(new URL("../src/styles/work-detail.css", import.meta.url), "utf8");
+
+  assert.match(editor, /toggleCode\(\)/);
+  assert.match(editor, /addBlock\("code"\)/);
+  assert.match(editor, /enableTabIndentation:\s*true/);
+  assert.match(preview, /className="preview-block-code"/);
+  assert.match(publicBlocks, /class="work-block-code"/);
+  assert.match(publicBlocks, /data-code-copy/);
+  assert.match(publicCss, /\.work-block-copy :not\(pre\) > code/);
+  assert.match(publicCss, /\.work-block-code\s*\{[^}]*background:\s*#0d1117;/s);
+});
+
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {
   const publicCss = await readFile("src/styles/work-detail.css", "utf8");
   const previewCss = await readFile("src/styles/admin/preview.css", "utf8");

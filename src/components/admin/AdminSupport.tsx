@@ -348,6 +348,16 @@ export const contentOption = (block: WorkBlock, key: string, options: string[], 
   return typeof value === "string" && options.includes(value) ? value : fallback;
 };
 
+const codeLanguageLabels: Record<string, string> = {
+  plaintext: "Plain text",
+  html: "HTML",
+  css: "CSS",
+  javascript: "JavaScript",
+  typescript: "TypeScript",
+  json: "JSON",
+  bash: "Shell"
+};
+
 export const previewBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", paragraphGap: "18px" }) =>
   ({
     "--preview-line-height": contentOption(block, "lineHeight", ["1.3", "1.5", "1.7", "1.9"], defaults.lineHeight),
@@ -426,6 +436,40 @@ export function WorkLivePreview({ work }: { work: WorkItem }) {
                     style={previewBlockStyle(block, { lineHeight: "1.5", paragraphGap: "10px" })}
                     dangerouslySetInnerHTML={{ __html: contentText(block, "html", "<blockquote></blockquote>") }}
                   />
+                );
+              }
+
+              if (block.type === "code") {
+                const code = contentText(block, "code");
+                const language = contentOption(block, "language", ["plaintext", "html", "css", "javascript", "typescript", "json", "bash"], "plaintext");
+                return (
+                  <figure
+                    className="preview-block-code"
+                    key={block.id}
+                    style={{ "--preview-block-width": contentOption(block, "blockWidth", ["680px", "880px", "1080px", "100%"], "100%") } as CSSProperties}
+                  >
+                    <figcaption>
+                      <span className="preview-code-window-dots" aria-hidden="true"><i /><i /><i /></span>
+                      <span>{codeLanguageLabels[language]}</span>
+                      <button
+                        type="button"
+                        onClick={async (event) => {
+                          const button = event.currentTarget;
+                          try {
+                            await navigator.clipboard.writeText(code);
+                            button.textContent = "Copied";
+                            window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
+                          } catch {
+                            button.textContent = "Failed";
+                            window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
+                          }
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </figcaption>
+                    <pre><code>{code}</code></pre>
+                  </figure>
                 );
               }
 

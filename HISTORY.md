@@ -36,6 +36,41 @@
 
 ---
 
+## 2026-08-30 Work Code Blocks And Markdown Code
+
+### 요구사항
+- WORK 본문 에디터에 VS Code/Codex와 유사한 독립 Code 블록을 추가합니다.
+- Paragraph/Quote 본문에서 Markdown 백틱 문법을 입력하면 자동으로 코드 표현으로 전환되게 합니다.
+
+### 구현
+- `code`를 정식 `WorkBlockType`으로 추가하고 `code`, `language`, `blockWidth` 콘텐츠를 Zod로 검증·정규화합니다. 지원 언어 표시는 Plain text, HTML, CSS, JavaScript, TypeScript, JSON, Shell입니다.
+- 관리자 블록 툴바에 Code를 추가하고, 언어 선택과 여러 줄 입력이 가능한 어두운 코드 편집 패널을 구현했습니다. Code 블록은 현재 Content width를 상속하며 실시간 미리보기에도 즉시 반영됩니다.
+- Tiptap StarterKit의 inline code와 fenced code input rule을 유지하고 toolbar에 Inline code 버튼을 추가했습니다. `` `code` `` 입력은 인라인 코드 칩으로, triple backtick 뒤 공백/줄바꿈은 본문 내 multiline code로 변환됩니다.
+- 공개 상세 Code 블록은 편집기 스타일의 header, language label, 가로 스크롤 영역과 Copy/Copied 상태를 제공합니다. 코드 문자열은 HTML로 실행하지 않고 escaped text로 렌더링합니다.
+- `0008_code_work_block.sql`에서 D1 `work_blocks.type` CHECK 제약에 `code`를 추가했습니다. 현재 로컬 D1에는 migration을 적용했습니다.
+
+### 중요 파일
+- `migrations/0008_code_work_block.sql`
+- `src/lib/work-block-content.ts`
+- `src/components/admin/BlockEditor.tsx`
+- `src/components/admin/AdminSupport.tsx`
+- `src/components/WorkBlocks.astro`
+- `src/styles/work-detail.css`
+- `src/styles/admin/works-editor.css`
+- `src/styles/admin/preview.css`
+
+### 검증
+- `npm run test:unit`: 81개 통과.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- `npm run test:integration`: 10개 통과. 관리자 백틱 입력의 `<code>` 전환, Code 블록 추가·실시간 미리보기, D1 저장 후 공개 렌더링을 포함합니다.
+- `npm run db:migrate:local`: `0008_code_work_block.sql` 적용 성공.
+
+### 배포 주의
+- 현재 변경은 로컬에만 있으며 아직 commit/push 또는 운영 배포하지 않았습니다.
+- 원격 D1 전체를 `../backups/d1/remote-before-code-block-2026-08-30.sql`로 백업한 뒤 `npm run db:migrate:remote`로 `0008_code_work_block.sql`을 적용했습니다.
+- 적용 후 `work_blocks.type` CHECK 제약에 `code`가 포함된 것을 확인했고 기존 work block 197개가 유지됐습니다. `wrangler d1 migrations list portfolio-db --remote` 결과도 `No migrations to apply`입니다.
+- 애플리케이션 코드는 아직 commit/push 또는 운영 배포하지 않았으므로, Code 블록 UI와 공개 렌더링은 이후 코드 배포가 완료되어야 사용할 수 있습니다.
+
 ## 2026-08-30 Admin WORK Thumbnail Rendering
 
 ### 요구사항

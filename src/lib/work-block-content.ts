@@ -6,6 +6,7 @@ const lineHeightSchema = z.enum(["1.3", "1.5", "1.7", "1.9"]);
 const paragraphGapSchema = z.enum(["0px", "10px", "18px", "28px"]);
 const blockWidthSchema = z.enum(["680px", "880px", "1080px", "100%"]);
 const alignSchema = z.enum(["left", "center"]);
+const codeLanguageSchema = z.enum(["plaintext", "html", "css", "javascript", "typescript", "json", "bash"]);
 
 const isSafeMediaUrl = (value: string) => {
   if (value === "") return true;
@@ -71,6 +72,12 @@ const quoteContentSchema = z.object({
   align: textStyleShape.align.default("left")
 });
 
+const codeContentSchema = z.object({
+  code: z.string().max(100_000).default(""),
+  language: codeLanguageSchema.default("plaintext"),
+  blockWidth: blockWidthSchema.default("100%")
+});
+
 const imageContentSchema = mediaItemSchema.extend({
   caption: z.string().max(1200).default("")
 });
@@ -111,6 +118,7 @@ const blockBaseShape = {
 const fallbackContent = {
   heading: { text: "", lineHeight: "1.3", blockWidth: "100%", align: "left" },
   paragraph: { html: "<p></p>", lineHeight: "1.7", paragraphGap: "18px", blockWidth: "100%", align: "left" },
+  code: { code: "", language: "plaintext", blockWidth: "100%" },
   image: { url: "", alt: "", caption: "" },
   gallery: { images: [] },
   quote: { html: "<blockquote></blockquote>", lineHeight: "1.5", paragraphGap: "18px", blockWidth: "100%", align: "left" },
@@ -121,6 +129,7 @@ const fallbackContent = {
 export const workBlockSchema = z.discriminatedUnion("type", [
   z.object({ ...blockBaseShape, type: z.literal("heading"), content: headingContentSchema.default(fallbackContent.heading) }),
   z.object({ ...blockBaseShape, type: z.literal("paragraph"), content: paragraphContentSchema.default(fallbackContent.paragraph) }),
+  z.object({ ...blockBaseShape, type: z.literal("code"), content: codeContentSchema.default(fallbackContent.code) }),
   z.object({ ...blockBaseShape, type: z.literal("image"), content: imageContentSchema.default(fallbackContent.image) }),
   z.object({ ...blockBaseShape, type: z.literal("gallery"), content: galleryContentSchema.default(() => ({ images: [] })) }),
   z.object({ ...blockBaseShape, type: z.literal("quote"), content: quoteContentSchema.default(fallbackContent.quote) }),
@@ -131,6 +140,7 @@ export const workBlockSchema = z.discriminatedUnion("type", [
 const contentSchemas = {
   heading: headingContentSchema,
   paragraph: paragraphContentSchema,
+  code: codeContentSchema,
   image: imageContentSchema,
   gallery: galleryContentSchema,
   quote: quoteContentSchema,
@@ -192,6 +202,14 @@ export const normalizeStoredWorkBlockContent = (type: WorkBlockType, content: un
       paragraphGap: safeOption(paragraphGapSchema, value.paragraphGap, "18px"),
       blockWidth: safeOption(blockWidthSchema, value.blockWidth, "100%"),
       align: safeOption(alignSchema, value.align, "left")
+    };
+  }
+
+  if (type === "code") {
+    return {
+      code: safeString(value.code, 100_000),
+      language: safeOption(codeLanguageSchema, value.language, "plaintext"),
+      blockWidth: safeOption(blockWidthSchema, value.blockWidth, "100%")
     };
   }
 

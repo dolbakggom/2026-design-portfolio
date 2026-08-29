@@ -57,7 +57,7 @@ export const works = sqliteTable("works", {
 export const workBlocks = sqliteTable("work_blocks", {
   id: text("id").primaryKey(),
   workId: text("work_id").notNull(),
-  type: text("type", { enum: ["heading", "paragraph", "image", "gallery", "quote", "website", "divider"] }).notNull(),
+  type: text("type", { enum: ["heading", "paragraph", "code", "image", "gallery", "quote", "website", "divider"] }).notNull(),
   content: text("content").notNull().default("{}"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),

@@ -29,7 +29,7 @@
 ## Visual Language
 - Tone: minimal, direct, Figma-led, portfolio-first.
 - Base palette: black, white, #f4f4f4 paper, muted black, and #08c840 green accent.
-- Typography: Pretendard across the full site and admin.
+- Typography: Pretendard across the full site and admin. Code content is the deliberate exception and uses the platform monospace stack so punctuation, indentation, and alignment remain legible.
 - Font weights are limited to 400 for body text, 500 for `em`/subtle emphasis, and 700 for `strong`, headings, buttons, labels, and active states.
 - Keep the main public accent `#08c840` for scroll markers and site identity. Admin button hover/active highlights use a softer pastel green instead of the main accent.
 - Only the WORK gallery section uses a centered 1920px maximum design canvas. Other public sections may use the full viewport width.
@@ -52,6 +52,8 @@
 - Work metadata presents the existing `role` value as `Tools` in the public detail and admin UI because the field contains software names; the internal key remains unchanged for data compatibility.
 - Website blocks render as a full-background CTA: the linked site's representative image fills the block beneath a strong blur and black overlay, while custom title/description and an enlarged Korean link action remain high-contrast in the foreground. The admin fetches Open Graph metadata, imports the representative image into R2, and lets the editor override title and description afterward.
 - Divider blocks render as a full-width 1px neutral line with consistent spacing in the public detail page and its scaled admin live preview.
+- Code blocks use a restrained VS Code/Codex-inspired dark surface with a language header, editor dots, horizontally scrollable monospace content, and a Copy action. They inherit the current Content width setting and remain responsive on mobile.
+- Paragraph and Quote editors keep Tiptap's Markdown input rules enabled: wrapping text in single backticks creates inline code, while a triple-backtick fence followed by a space or line break creates an embedded multiline code block. Inline code renders as a compact neutral chip in the editor, live preview, and public article.
 - Work detail pages end with a full-viewport, two-panel previous/next project navigation ordered by the admin WORK sequence. Each panel is 320px tall on desktop; pointer hover expands an opaque acid-green circle from the cursor position until it fully covers the project image. Typography follows title, direction, then category/year in descending size, and the direction arrows use the same sweep language as the detail topbar.
 - Previous copy uses 200% of the base left inset and Next copy uses 200% of the base right inset, while the opposite edges and full-width media remain unchanged.
 - The work detail top cover keeps its paper-colored lower fade. The bottom previous/next navigation uses a uniform dark image overlay with no directional gradient, and its opaque acid-green reveal sits above that overlay so the hover state remains a true flat color.

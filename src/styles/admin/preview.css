@@ -231,12 +231,114 @@
   font-weight: 500;
 }
 
+.preview-block-copy :not(pre) > code,
+.preview-block-quote :not(pre) > code {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 0.1em 0.32em;
+  background: rgba(0, 0, 0, 0.07);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.86em;
+  font-weight: 500;
+}
+
+.preview-block-copy pre,
+.preview-block-quote pre {
+  overflow: auto;
+  margin: var(--preview-paragraph-gap, 18px) 0 0;
+  border: 1px solid #2a3038;
+  border-radius: 6px;
+  padding: 14px;
+  background: #0d1117;
+  color: #e6edf3;
+  text-align: left;
+}
+
+.preview-block-copy pre code,
+.preview-block-quote pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
 .preview-block-quote {
   border-left: 4px solid var(--admin-accent-border);
   padding-left: 14px;
   font-size: 1.25rem;
   font-weight: 700;
   line-height: var(--preview-line-height, 1.5);
+}
+
+.preview-block-code {
+  width: min(var(--preview-block-width, 100%), 100%);
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid #2a3038;
+  border-radius: 6px;
+  background: #0d1117;
+  color: #e6edf3;
+}
+
+.preview-block-code figcaption {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  border-bottom: 1px solid #2a3038;
+  padding: 0 10px;
+  background: #161b22;
+  color: #9da7b3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.preview-code-window-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.preview-code-window-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #69717d;
+}
+
+.preview-code-window-dots i:nth-child(2) {
+  opacity: 0.72;
+}
+
+.preview-code-window-dots i:nth-child(3) {
+  opacity: 0.44;
+}
+
+.preview-block-code button {
+  min-height: 24px;
+  border: 1px solid #39414c;
+  border-radius: 4px;
+  padding: 0 7px;
+  background: #21262d;
+  color: #c9d1d9;
+  font-family: inherit;
+  font-size: 9px;
+}
+
+.preview-block-code pre {
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  tab-size: 2;
+}
+
+.preview-block-code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.6;
+  white-space: pre;
 }
 
 .preview-block-image {

@@ -1,5 +1,5 @@
 export type WorkCategory = "UI/UX" | "BI/BX" | "UI/UX, BI/BX";
-export type WorkBlockType = "heading" | "paragraph" | "image" | "gallery" | "quote" | "website" | "divider";
+export type WorkBlockType = "heading" | "paragraph" | "code" | "image" | "gallery" | "quote" | "website" | "divider";
 
 export interface LinkItem {
   label: string;

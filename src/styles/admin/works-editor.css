@@ -518,6 +518,110 @@ button.block-drag-handle svg {
   font-weight: 500;
 }
 
+.rich-editor .ProseMirror :not(pre) > code {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+  padding: 0.1em 0.34em;
+  background: rgba(0, 0, 0, 0.07);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+  font-weight: 500;
+}
+
+.rich-editor .ProseMirror pre {
+  overflow: auto;
+  margin: 12px 0;
+  border: 1px solid #2a3038;
+  border-radius: 7px;
+  padding: 16px;
+  background: #0d1117;
+  color: #e6edf3;
+  text-align: left;
+}
+
+.rich-editor .ProseMirror pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.code-block-editor {
+  overflow: hidden;
+  border: 1px solid #2a3038;
+  border-radius: 8px;
+  background: #0d1117;
+}
+
+.code-block-editor-bar {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid #2a3038;
+  padding: 0 14px;
+  background: #161b22;
+}
+
+.code-window-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.code-window-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #69717d;
+}
+
+.code-window-dots i:nth-child(2) {
+  opacity: 0.72;
+}
+
+.code-window-dots i:nth-child(3) {
+  opacity: 0.44;
+}
+
+.code-block-editor-bar label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-self: end;
+  color: #9da7b3;
+  font-size: 0.68rem;
+}
+
+.code-block-editor-bar select {
+  min-width: 132px;
+  min-height: 30px;
+  border-color: #39414c;
+  padding: 0 30px 0 10px;
+  background-color: #21262d;
+  color: #e6edf3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.code-block-editor textarea {
+  display: block;
+  width: 100%;
+  min-height: 260px;
+  resize: vertical;
+  border: 0;
+  border-radius: 0;
+  padding: 18px;
+  background: #0d1117;
+  color: #e6edf3;
+  caret-color: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.65;
+  tab-size: 2;
+  outline: none;
+}
+
 .media-edit-row {
   display: grid;
   gap: 10px;

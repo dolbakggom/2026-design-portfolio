@@ -212,12 +212,33 @@
     font-size: 24px;
   }
 
+  .work-block-code code,
+  .work-block-copy pre code,
+  .work-block-quote pre code {
+    font-size: 14px;
+  }
+
   .work-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
+  .work-block-code figcaption {
+    min-height: 40px;
+    padding-inline: 12px;
+  }
+
+  .work-block-code pre {
+    padding: 18px 16px;
+  }
+
+  .work-block-code code,
+  .work-block-copy pre code,
+  .work-block-quote pre code {
+    font-size: 13px;
+  }
+
   .profile-media figcaption {
     right: 16px;
     bottom: 16px;

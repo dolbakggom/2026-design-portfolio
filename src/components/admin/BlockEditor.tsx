@@ -35,7 +35,16 @@ const lineHeightOptions = ["1.3", "1.5", "1.7", "1.9"];
 const paragraphGapOptions = ["0px", "10px", "18px", "28px"];
 const blockWidthOptions = ["680px", "880px", "1080px", "100%"];
 const alignOptions = ["left", "center"];
-const textBlockTypes = new Set<WorkBlockType>(["heading", "paragraph", "quote"]);
+const codeLanguageOptions = [
+  ["plaintext", "Plain text"],
+  ["html", "HTML"],
+  ["css", "CSS"],
+  ["javascript", "JavaScript"],
+  ["typescript", "TypeScript"],
+  ["json", "JSON"],
+  ["bash", "Shell"]
+] as const;
+const textBlockTypes = new Set<WorkBlockType>(["heading", "paragraph", "quote", "code"]);
 
 const newBlock = (type: WorkBlockType, blockWidth = "100%"): WorkBlock => ({
   id: crypto.randomUUID(),
@@ -43,21 +52,23 @@ const newBlock = (type: WorkBlockType, blockWidth = "100%"): WorkBlock => ({
   content:
     type === "heading"
       ? { text: "New heading", lineHeight: "1.3", blockWidth, align: "left" }
-      : type === "image"
-        ? { url: "", alt: "", caption: "" }
-        : type === "gallery"
-          ? { images: [] }
-          : type === "divider"
-            ? {}
-          : type === "website"
-            ? { url: "", title: "", description: "", domain: "", imageUrl: "", imageAlt: "" }
-          : {
-              html: type === "quote" ? "<blockquote>New quote</blockquote>" : "<p>New paragraph</p>",
-              lineHeight: type === "quote" ? "1.5" : "1.7",
-              paragraphGap: "18px",
-              blockWidth,
-              align: "left"
-            },
+      : type === "code"
+        ? { code: "", language: "plaintext", blockWidth }
+        : type === "image"
+          ? { url: "", alt: "", caption: "" }
+          : type === "gallery"
+            ? { images: [] }
+            : type === "divider"
+              ? {}
+              : type === "website"
+                ? { url: "", title: "", description: "", domain: "", imageUrl: "", imageAlt: "" }
+                : {
+                    html: type === "quote" ? "<blockquote>New quote</blockquote>" : "<p>New paragraph</p>",
+                    lineHeight: type === "quote" ? "1.5" : "1.7",
+                    paragraphGap: "18px",
+                    blockWidth,
+                    align: "left"
+                  },
   sortOrder: 0
 });
 
@@ -97,7 +108,11 @@ function RichTextBlock({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: false
+        heading: false,
+        codeBlock: {
+          enableTabIndentation: true,
+          tabSize: 2
+        }
       }),
       Image,
       Placeholder.configure({
@@ -125,6 +140,15 @@ function RichTextBlock({
         </button>
         <button type="button" className={editor?.isActive("italic") ? "is-active" : ""} onClick={() => editor?.chain().focus().toggleItalic().run()}>
           I
+        </button>
+        <button
+          type="button"
+          className={editor?.isActive("code") ? "is-active" : ""}
+          aria-label="Inline code"
+          title="Inline code (`code`)"
+          onClick={() => editor?.chain().focus().toggleCode().run()}
+        >
+          &lt;/&gt;
         </button>
         <button type="button" className={editor?.isActive("paragraph") ? "is-active" : ""} onClick={() => editor?.chain().focus().setParagraph().run()}>
           P
@@ -315,6 +339,9 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
           <button type="button" onClick={() => addBlock("paragraph")}>
             Paragraph
           </button>
+          <button type="button" onClick={() => addBlock("code")}>
+            Code
+          </button>
           <button type="button" onClick={() => addBlock("image")}>
             Image
           </button>
@@ -429,6 +456,31 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
             ) : null}
 
             {block.type === "paragraph" || block.type === "quote" ? <RichTextBlock block={block} onChange={updateBlock} /> : null}
+
+            {block.type === "code" ? (
+              <div className="code-block-editor">
+                <div className="code-block-editor-bar">
+                  <span className="code-window-dots" aria-hidden="true"><i /><i /><i /></span>
+                  <label>
+                    Language
+                    <select
+                      value={optionFromBlock(block, "language", codeLanguageOptions.map(([value]) => value), "plaintext")}
+                      onChange={(event) => updateContent(block, "language", event.target.value)}
+                    >
+                      {codeLanguageOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <textarea
+                  aria-label="Code"
+                  value={textFromBlock(block, "code")}
+                  rows={12}
+                  spellCheck={false}
+                  placeholder="Paste or write code here"
+                  onChange={(event) => updateContent(block, "code", event.target.value)}
+                />
+              </div>
+            ) : null}
 
             {block.type === "divider" ? (
               <div className="divider-edit-preview" aria-label="구분선 미리보기">

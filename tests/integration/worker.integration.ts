@@ -175,10 +175,16 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
       {
         id: "integration-paragraph",
         type: "paragraph",
-        content: { html: "<p>Saved D1 block is publicly rendered.</p>", textAlign: "left", lineHeight: "1.7" },
+        content: { html: "<p>Saved D1 block is publicly rendered with <code>--tile-image</code>.</p>", textAlign: "left", lineHeight: "1.7" },
         sortOrder: 2
       },
-      { id: "integration-divider", type: "divider", content: {}, sortOrder: 3 }
+      {
+        id: "integration-code",
+        type: "code",
+        content: { code: "const portfolio = 'Beyond the Answer.';", language: "typescript", blockWidth: "100%" },
+        sortOrder: 3
+      },
+      { id: "integration-divider", type: "divider", content: {}, sortOrder: 4 }
     ]
   };
 
@@ -194,7 +200,11 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
   assert.equal(publicResponse.status, 200);
   assert.match(html, /Integration Work Published/);
   assert.match(html, /Published Heading/);
-  assert.match(html, /Saved D1 block is publicly rendered\./);
+  assert.match(html, /Saved D1 block is publicly rendered with/);
+  assert.match(html, /<code>--tile-image<\/code>/);
+  assert.match(html, /class="work-block-code"/);
+  assert.match(html, /const portfolio = &#39;Beyond the Answer\.&#39;;/);
+  assert.match(html, /data-code-copy/);
   assert.match(html, /class="work-block-divider"/);
   assert.match(html, /<dt>Tools<\/dt>/);
   assert.match(html, /Figma, Illustrator/);
@@ -628,6 +638,21 @@ test("admin CSS imports render the shell and work editor layout", async () => {
       await page.locator(".preview-block-copy").last().evaluate((node) => node.style.getPropertyValue("--preview-block-width")),
       "100%"
     );
+
+    const inlineCodeEditor = page.locator(".rich-editor .ProseMirror").last();
+    await inlineCodeEditor.fill("");
+    await inlineCodeEditor.pressSequentially("Use `--tile-image`");
+    await page.waitForFunction(() => Boolean(document.querySelector(".rich-editor .ProseMirror code")));
+    assert.equal(await page.locator(".rich-editor .ProseMirror code").last().textContent(), "--tile-image");
+
+    const previewCodeCount = await page.locator(".preview-block-code").count();
+    await page.getByRole("button", { name: "Code", exact: true }).click();
+    await page.waitForFunction(
+      (previousCount) => document.querySelectorAll(".preview-block-code").length > previousCount,
+      previewCodeCount
+    );
+    await page.getByLabel("Code").last().fill("const screenshot = true;");
+    assert.match(await page.locator(".preview-block-code code").last().textContent() ?? "", /const screenshot = true;/);
 
     const previewDividerCount = await page.locator(".preview-block-divider").count();
     await page.getByRole("button", { name: "Divider", exact: true }).click();

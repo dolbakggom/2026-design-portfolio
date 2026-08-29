@@ -123,6 +123,24 @@ test("divider blocks normalize to empty content", () => {
   assert.deepEqual(normalizeStoredWorkBlockContent("divider", { legacy: true }), {});
 });
 
+test("code blocks preserve code safely and normalize display options", () => {
+  const parsed = workSchema.parse({
+    ...validWork,
+    blocks: [{ type: "code", content: { code: "const answer = '<script>';", language: "typescript", blockWidth: "1080px", unexpected: true } }]
+  });
+
+  assert.deepEqual(parsed.blocks[0]?.content, {
+    code: "const answer = '<script>';",
+    language: "typescript",
+    blockWidth: "1080px"
+  });
+  assert.deepEqual(normalizeStoredWorkBlockContent("code", { code: "legacy()", language: "unknown", blockWidth: "999px" }), {
+    code: "legacy()",
+    language: "plaintext",
+    blockWidth: "100%"
+  });
+});
+
 test("stored block normalization preserves safe legacy copy while repairing malformed options", () => {
   assert.deepEqual(
     normalizeStoredWorkBlockContent("paragraph", {
@@ -146,11 +164,12 @@ test("new text block payloads default to full content width", () => {
     blocks: [
       { type: "heading", content: { text: "Full heading" } },
       { type: "paragraph", content: { html: "<p>Full paragraph</p>" } },
-      { type: "quote", content: { html: "<blockquote>Full quote</blockquote>" } }
+      { type: "quote", content: { html: "<blockquote>Full quote</blockquote>" } },
+      { type: "code", content: { code: "fullWidth()" } }
     ]
   });
 
-  assert.deepEqual(parsed.blocks.map((block) => block.content.blockWidth), ["100%", "100%", "100%"]);
+  assert.deepEqual(parsed.blocks.map((block) => block.content.blockWidth), ["100%", "100%", "100%", "100%"]);
 });
 
 test("work payloads cap block and gallery collection sizes", () => {
