@@ -50,6 +50,8 @@
 - Code 블록에 선택형 caption 필드를 추가했습니다. 관리자 입력과 실시간 미리보기에 즉시 반영되며 공개 상세에서는 어두운 코드 패널 아래의 muted `figcaption`으로 표시됩니다. 기존 Code 블록은 빈 caption으로 호환되고 콘텐츠 JSON만 확장하므로 추가 D1 migration은 필요하지 않습니다.
 - 공개 상세는 Cloudflare Worker 호환성이 보장된 Astro Prism, 관리자 실시간 미리보기는 선택 언어만 등록한 `highlight.js`로 코드를 토큰화합니다. 키워드, 내장 객체/타입, 함수, 숫자, 문자열, 주석에 같은 Codex 계열 색상을 적용하며, 입력 코드는 실행 가능한 HTML이 되지 않도록 각 highlighter가 escape합니다.
 - 코드 패널을 Codex에 가까운 `#242424` 단일 표면, 20px public radius, `</>` 언어 표시, 아이콘형 복사 버튼으로 재구성했습니다. 관리자 입력 패널과 축소 미리보기도 같은 시각 언어를 사용합니다.
+- 모바일에서 긴 코드 줄의 min-content 너비가 CSS Grid 열을 약 762px까지 확장해 패널 전체가 잘리던 문제를 수정했습니다. Code block과 shell은 `min-width: 0`으로 본문 폭까지 수축하고, `<pre>`는 패널 폭을 유지하며 실제 긴 코드 줄만 내부 가로 스크롤하도록 분리했습니다.
+- Code caption과 Image caption이 공개 상세 및 관리자 실시간 미리보기에서 각각 같은 CSS 규칙을 공유하도록 통합했습니다. 특히 관리자 preview에서 Code caption만 `9px`로 축소되던 값을 Image caption과 같은 `0.82rem`으로 맞췄습니다.
 - `0008_code_work_block.sql`에서 D1 `work_blocks.type` CHECK 제약에 `code`를 추가했습니다. 현재 로컬 D1에는 migration을 적용했습니다.
 
 ### 중요 파일

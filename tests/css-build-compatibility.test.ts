@@ -98,8 +98,14 @@ test("code blocks share editor, preview, and public rendering styles", async () 
   assert.match(preview, /highlightCode\(code, language\)/);
   assert.match(publicCss, /\.work-block-copy :not\(pre\) > code/);
   assert.match(publicCss, /\.work-code-shell\s*\{[^}]*border-radius:\s*20px;[^}]*background:\s*#242424;/s);
+  assert.match(publicCss, /\.work-block-code\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s);
+  assert.match(publicCss, /\.work-block-code pre\s*\{[^}]*max-width:\s*100%;[^}]*overflow:\s*auto;/s);
+  assert.match(publicCss, /\.work-block-code code\s*\{[^}]*width:\s*max-content;[^}]*min-width:\s*100%;/s);
   assert.match(publicCss, /\.work-block-code \.token\.keyword[\s\S]*?color:\s*#f28dad;/s);
   assert.match(publicBlocks, /class="work-code-caption"/);
+  const previewCss = await readFile(new URL("../src/styles/admin/preview.css", import.meta.url), "utf8");
+  assert.match(publicCss, /\.work-code-caption,\s*\.work-block-image figcaption\s*\{[^}]*font-size:\s*14px;/s);
+  assert.match(previewCss, /\.preview-block-code > figcaption,\s*\.preview-block-image figcaption\s*\{[^}]*font-size:\s*0\.82rem;/s);
 });
 
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {

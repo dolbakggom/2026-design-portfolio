@@ -295,10 +295,11 @@
   font-weight: 500;
 }
 
-.preview-block-code > figcaption {
-  margin-top: 6px;
+.preview-block-code > figcaption,
+.preview-block-image figcaption {
+  margin-top: 8px;
   color: var(--color-muted);
-  font-size: 9px;
+  font-size: 0.82rem;
   font-weight: 400;
   line-height: 1.45;
 }
@@ -408,12 +409,6 @@
   width: 100%;
   min-height: 220px;
   background: var(--color-ink);
-}
-
-.preview-block-image figcaption {
-  margin-top: 8px;
-  color: var(--color-muted);
-  font-size: 0.82rem;
 }
 
 .preview-block-gallery {
