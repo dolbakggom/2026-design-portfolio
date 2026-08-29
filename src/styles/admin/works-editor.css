@@ -40,6 +40,10 @@
     0 16px 42px rgba(8, 200, 64, 0.16);
 }
 
+.admin-work-card .work-tile-media.is-image-unavailable img {
+  display: none;
+}
+
 .admin-work-card-copy {
   display: grid;
   gap: 4px;

@@ -1,4 +1,4 @@
-import type { CSSProperties, DragEvent } from "react";
+import type { DragEvent } from "react";
 import type { Profile, TimelineItem, WorkItem } from "../../types";
 import { ProfileLinkIcon } from "./AdminSupport";
 
@@ -154,9 +154,6 @@ export function WorksListPanel({
       {works.length ? (
         <div className="work-grid admin-work-grid">
           {works.map((work) => {
-            const tileStyle = work.thumbnail?.url
-              ? ({ "--tile-image": `url("${work.thumbnail.url}")` } as CSSProperties)
-              : undefined;
             const isDragging = draggedWorkId === work.id;
             const isDragOver = dragOverWorkId === work.id && draggedWorkId !== work.id;
 
@@ -181,10 +178,22 @@ export function WorksListPanel({
               >
                 <div
                   className={`work-tile-media ${work.thumbnail?.url ? "has-image" : ""}`}
-                  style={tileStyle}
                   aria-label={work.thumbnail?.alt ?? work.title}
                   role="img"
-                />
+                >
+                  {work.thumbnail?.url ? (
+                    <img
+                      src={work.thumbnail.url}
+                      alt=""
+                      width={work.thumbnail.width ?? undefined}
+                      height={work.thumbnail.height ?? undefined}
+                      loading="lazy"
+                      decoding="async"
+                      onLoad={(event) => event.currentTarget.parentElement?.classList.remove("is-image-unavailable")}
+                      onError={(event) => event.currentTarget.parentElement?.classList.add("is-image-unavailable")}
+                    />
+                  ) : null}
+                </div>
                 <div className="admin-work-card-copy">
                   <h3>{work.title}</h3>
                   <span>{work.category}</span>

@@ -11,6 +11,7 @@ const ADMIN_PASSWORD = "integration-pass";
 const SESSION_SECRET = "integration-session-secret-with-at-least-32-bytes";
 const APP_WORKER = "2026-design-portfolio";
 const SETUP_WORKER = "portfolio-test-d1-setup";
+const THUMBNAIL_TEST_WORK_TITLE = "Admin Thumbnail Integration";
 
 let server: TestHarness;
 let app: WorkerHandle;
@@ -201,12 +202,12 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
 });
 
 test("image upload stores bytes in R2, metadata in D1, and serves immutable media", async () => {
-  const pngSignature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const pngBytes = new Uint8Array(await readFile("public/og-image.png"));
   const form = new FormData();
-  form.append("file", new Blob([pngSignature], { type: "image/png" }), "integration.png");
+  form.append("file", new Blob([pngBytes], { type: "image/png" }), "integration.png");
   form.append("alt", "Integration upload");
-  form.append("width", "1");
-  form.append("height", "1");
+  form.append("width", "1200");
+  form.append("height", "630");
 
   const serializedRequest = new Request(`${APP_ORIGIN}/api/admin/assets`, {
     method: "POST",
@@ -224,17 +225,36 @@ test("image upload stores bytes in R2, metadata in D1, and serves immutable medi
   assert.equal(uploadResponse.status, 201, await uploadResponse.clone().text());
 
   const body = (await uploadResponse.json()) as {
-    asset: { url: string; alt: string; mime: string; width: number; height: number; size: number };
+    asset: { id: string; url: string; alt: string; mime: string; width: number; height: number; size: number };
   };
   assert.equal(body.asset.alt, "Integration upload");
   assert.equal(body.asset.mime, "image/png");
-  assert.equal(body.asset.size, pngSignature.byteLength);
+  assert.equal(body.asset.size, pngBytes.byteLength);
 
   const mediaResponse = await app.fetch(`${APP_ORIGIN}${body.asset.url}`);
   assert.equal(mediaResponse.status, 200);
   assert.equal(mediaResponse.headers.get("content-type"), "image/png");
   assert.equal(mediaResponse.headers.get("cache-control"), "public, max-age=31536000, immutable");
-  assert.deepEqual(new Uint8Array(await mediaResponse.arrayBuffer()), pngSignature);
+  assert.deepEqual(new Uint8Array(await mediaResponse.arrayBuffer()), pngBytes);
+
+  const workResponse = await app.fetch(`${APP_ORIGIN}/api/admin/works`, {
+    method: "POST",
+    headers: adminHeaders("application/json"),
+    body: JSON.stringify({
+      slug: "admin-thumbnail-integration",
+      title: THUMBNAIL_TEST_WORK_TITLE,
+      category: "UI/UX",
+      summary: "Admin thumbnail rendering test",
+      client: "Integration",
+      year: "2026",
+      role: "Figma",
+      thumbnailAssetId: body.asset.id,
+      featured: false,
+      published: true,
+      blocks: []
+    })
+  });
+  assert.equal(workResponse.status, 201, await workResponse.clone().text());
 });
 
 test("mobile about and career routes initialize visibly and keep wheel scrolling usable", async () => {
@@ -574,6 +594,21 @@ test("admin CSS imports render the shell and work editor layout", async () => {
 
     await page.getByRole("button", { name: "Works" }).click();
     await page.waitForSelector(".admin-work-card");
+
+    const thumbnailCard = page.locator(".admin-work-card", { hasText: THUMBNAIL_TEST_WORK_TITLE });
+    const thumbnailImage = thumbnailCard.locator(".work-tile-media img");
+    await thumbnailImage.waitFor({ state: "visible" });
+    await page.waitForFunction(
+      (title) => {
+        const cards = Array.from(document.querySelectorAll<HTMLElement>(".admin-work-card"));
+        const card = cards.find((candidate) => candidate.textContent?.includes(title));
+        const image = card?.querySelector<HTMLImageElement>(".work-tile-media img");
+        return Boolean(image?.complete && image.naturalWidth > 0);
+      },
+      THUMBNAIL_TEST_WORK_TITLE
+    );
+    assert.ok((await thumbnailImage.evaluate((image) => image.naturalWidth)) > 0);
+
     await page.locator(".admin-work-card").first().click();
     await page.waitForSelector(".work-preview-panel");
     await page.waitForSelector(".block-toolbar");

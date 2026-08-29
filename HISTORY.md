@@ -36,6 +36,32 @@
 
 ---
 
+## 2026-08-30 Admin WORK Thumbnail Rendering
+
+### 요구사항
+- 로컬과 운영 `/admin`의 WORK 목록에서 썸네일 영역이 비어 보이는 문제를 원인 분석하고 수정합니다.
+
+### 원인 및 구현
+- `AdminPanels.tsx`의 관리자 카드만 과거 `--tile-image` CSS 배경 변수 방식을 유지하고 있었습니다. 현재 공통 `.work-tile-media`는 실제 `<img>`를 렌더링하고 `has-image` 상태에서는 placeholder를 숨기므로, URL이 정상이어도 관리자 카드에는 그릴 이미지 요소가 없어 빈 영역이 노출됐습니다.
+- 관리자 WORK 카드도 공개 갤러리와 동일하게 실제 `<img>`를 렌더링하도록 변경했습니다. 원본 크기, lazy loading, async decoding을 유지하고 이미지 요청 실패 시 placeholder가 복구되도록 `is-image-unavailable` 상태를 연결했습니다.
+- `css-build-compatibility.test.ts`에 관리자 썸네일이 실제 이미지 요소를 사용하며 폐기한 `--tile-image` 방식으로 돌아가지 않는지 확인하는 회귀 테스트를 추가했습니다.
+- 통합 테스트는 실제 PNG를 R2에 업로드하고 해당 asset을 D1 WORK 썸네일로 저장한 뒤, 관리자 브라우저 카드에서 이미지가 정상 디코딩되는지 확인하도록 확장했습니다.
+
+### 중요 파일
+- `src/components/admin/AdminPanels.tsx`
+- `src/styles/admin/works-editor.css`
+- `tests/css-build-compatibility.test.ts`
+- `tests/integration/worker.integration.ts`
+- `DESIGN.md`
+
+### 검증
+- `npm run test:unit`: 79개 통과.
+- `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
+- `npm run test:integration`: 실제 R2 upload → D1 WORK 연결 → `/admin` 이미지 디코딩 검증을 포함한 10개 통과.
+
+### 배포 상태
+- 현재 변경은 로컬에만 있으며 아직 commit/push 또는 운영 배포하지 않았습니다. 운영 반영에는 이후 commit/push가 필요합니다.
+
 ## 2026-08-26 Home Loading, Career Endpoints, And Gallery Height
 
 ### 요구사항

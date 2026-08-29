@@ -43,6 +43,7 @@
 - Use direct controls for status, category, order, featured state, and media upload.
 - WORK editing must show a live right-side preview of the selected project using the unsaved local form state.
 - The WORK editor and live preview are separated by a draggable split handle so the editor/preview ratio can be adjusted during content work.
+- WORK list thumbnails render as real image elements using the same media frame rules as the public gallery. Do not restore the obsolete `--tile-image` background custom property; failed image requests must fall back to the gallery placeholder instead of leaving a blank card.
 - Work detail blocks support editor controls for line height, paragraph spacing, block width, and alignment.
 - Text blocks default to `100%` content width, and newly added Heading, Paragraph, or Quote blocks inherit the editor's current Content width selection.
 - At `1180px` and below, work content uses `36px` Heading, `18px` body, and `24px` quote text while desktop typography remains unchanged.

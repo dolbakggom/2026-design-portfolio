@@ -73,6 +73,15 @@ test("mobile work content uses a quieter text scale", async () => {
   assert.match(css, /@media \(max-width: 1180px\)[\s\S]*?\.work-block-quote\s*\{[^}]*font-size:\s*24px;/s);
 });
 
+test("admin work cards render thumbnail URLs as image elements", async () => {
+  const component = await readFile(new URL("../src/components/admin/AdminPanels.tsx", import.meta.url), "utf8");
+  const adminCss = await readFile(new URL("../src/styles/admin/works-editor.css", import.meta.url), "utf8");
+
+  assert.match(component, /className={`work-tile-media[\s\S]*?<img[\s\S]*?src={work\.thumbnail\.url}/);
+  assert.doesNotMatch(component, /--tile-image/);
+  assert.match(adminCss, /\.admin-work-card \.work-tile-media\.is-image-unavailable img\s*\{[^}]*display:\s*none;/s);
+});
+
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {
   const publicCss = await readFile("src/styles/work-detail.css", "utf8");
   const previewCss = await readFile("src/styles/admin/preview.css", "utf8");
