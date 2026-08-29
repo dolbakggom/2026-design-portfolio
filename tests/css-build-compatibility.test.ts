@@ -94,8 +94,12 @@ test("code blocks share editor, preview, and public rendering styles", async () 
   assert.match(preview, /className="preview-block-code"/);
   assert.match(publicBlocks, /class="work-block-code"/);
   assert.match(publicBlocks, /data-code-copy/);
+  assert.match(publicBlocks, /<Prism class="work-code-source"/);
+  assert.match(preview, /highlightCode\(code, language\)/);
   assert.match(publicCss, /\.work-block-copy :not\(pre\) > code/);
-  assert.match(publicCss, /\.work-block-code\s*\{[^}]*background:\s*#0d1117;/s);
+  assert.match(publicCss, /\.work-code-shell\s*\{[^}]*border-radius:\s*20px;[^}]*background:\s*#242424;/s);
+  assert.match(publicCss, /\.work-block-code \.token\.keyword[\s\S]*?color:\s*#f28dad;/s);
+  assert.match(publicBlocks, /class="work-code-caption"/);
 });
 
 test("every work heading receives additional top spacing in public and live preview layouts", async () => {

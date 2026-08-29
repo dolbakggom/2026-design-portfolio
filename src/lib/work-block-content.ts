@@ -75,7 +75,8 @@ const quoteContentSchema = z.object({
 const codeContentSchema = z.object({
   code: z.string().max(100_000).default(""),
   language: codeLanguageSchema.default("plaintext"),
-  blockWidth: blockWidthSchema.default("100%")
+  blockWidth: blockWidthSchema.default("100%"),
+  caption: z.string().max(1200).default("")
 });
 
 const imageContentSchema = mediaItemSchema.extend({
@@ -118,7 +119,7 @@ const blockBaseShape = {
 const fallbackContent = {
   heading: { text: "", lineHeight: "1.3", blockWidth: "100%", align: "left" },
   paragraph: { html: "<p></p>", lineHeight: "1.7", paragraphGap: "18px", blockWidth: "100%", align: "left" },
-  code: { code: "", language: "plaintext", blockWidth: "100%" },
+  code: { code: "", language: "plaintext", blockWidth: "100%", caption: "" },
   image: { url: "", alt: "", caption: "" },
   gallery: { images: [] },
   quote: { html: "<blockquote></blockquote>", lineHeight: "1.5", paragraphGap: "18px", blockWidth: "100%", align: "left" },
@@ -209,7 +210,8 @@ export const normalizeStoredWorkBlockContent = (type: WorkBlockType, content: un
     return {
       code: safeString(value.code, 100_000),
       language: safeOption(codeLanguageSchema, value.language, "plaintext"),
-      blockWidth: safeOption(blockWidthSchema, value.blockWidth, "100%")
+      blockWidth: safeOption(blockWidthSchema, value.blockWidth, "100%"),
+      caption: safeString(value.caption, 1200)
     };
   }
 

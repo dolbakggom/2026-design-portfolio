@@ -126,18 +126,20 @@ test("divider blocks normalize to empty content", () => {
 test("code blocks preserve code safely and normalize display options", () => {
   const parsed = workSchema.parse({
     ...validWork,
-    blocks: [{ type: "code", content: { code: "const answer = '<script>';", language: "typescript", blockWidth: "1080px", unexpected: true } }]
+    blocks: [{ type: "code", content: { code: "const answer = '<script>';", language: "typescript", blockWidth: "1080px", caption: "Implementation detail", unexpected: true } }]
   });
 
   assert.deepEqual(parsed.blocks[0]?.content, {
     code: "const answer = '<script>';",
     language: "typescript",
-    blockWidth: "1080px"
+    blockWidth: "1080px",
+    caption: "Implementation detail"
   });
   assert.deepEqual(normalizeStoredWorkBlockContent("code", { code: "legacy()", language: "unknown", blockWidth: "999px" }), {
     code: "legacy()",
     language: "plaintext",
-    blockWidth: "100%"
+    blockWidth: "100%",
+    caption: ""
   });
 });
 

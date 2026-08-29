@@ -53,7 +53,7 @@ const newBlock = (type: WorkBlockType, blockWidth = "100%"): WorkBlock => ({
     type === "heading"
       ? { text: "New heading", lineHeight: "1.3", blockWidth, align: "left" }
       : type === "code"
-        ? { code: "", language: "plaintext", blockWidth }
+        ? { code: "", language: "plaintext", blockWidth, caption: "" }
         : type === "image"
           ? { url: "", alt: "", caption: "" }
           : type === "gallery"
@@ -458,27 +458,41 @@ export default function BlockEditor({ blocks, onChange, onUpload }: Props) {
             {block.type === "paragraph" || block.type === "quote" ? <RichTextBlock block={block} onChange={updateBlock} /> : null}
 
             {block.type === "code" ? (
-              <div className="code-block-editor">
-                <div className="code-block-editor-bar">
-                  <span className="code-window-dots" aria-hidden="true"><i /><i /><i /></span>
-                  <label>
-                    Language
-                    <select
-                      value={optionFromBlock(block, "language", codeLanguageOptions.map(([value]) => value), "plaintext")}
-                      onChange={(event) => updateContent(block, "language", event.target.value)}
-                    >
-                      {codeLanguageOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </label>
+              <div className="code-block-fields">
+                <div className="code-block-editor">
+                  <div className="code-block-editor-bar">
+                    <span className="code-editor-identity">
+                      <span className="code-editor-mark" aria-hidden="true">&lt;/&gt;</span>
+                      <span>Code</span>
+                    </span>
+                    <label>
+                      Language
+                      <select
+                        value={optionFromBlock(block, "language", codeLanguageOptions.map(([value]) => value), "plaintext")}
+                        onChange={(event) => updateContent(block, "language", event.target.value)}
+                      >
+                        {codeLanguageOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <textarea
+                    aria-label="Code"
+                    value={textFromBlock(block, "code")}
+                    rows={12}
+                    spellCheck={false}
+                    placeholder="Paste or write code here"
+                    onChange={(event) => updateContent(block, "code", event.target.value)}
+                  />
                 </div>
-                <textarea
-                  aria-label="Code"
-                  value={textFromBlock(block, "code")}
-                  rows={12}
-                  spellCheck={false}
-                  placeholder="Paste or write code here"
-                  onChange={(event) => updateContent(block, "code", event.target.value)}
-                />
+                <label className="code-caption-field">
+                  Caption
+                  <input
+                    value={textFromBlock(block, "caption")}
+                    maxLength={1200}
+                    placeholder="코드에 대한 설명"
+                    onChange={(event) => updateContent(block, "caption", event.target.value)}
+                  />
+                </label>
               </div>
             ) : null}
 

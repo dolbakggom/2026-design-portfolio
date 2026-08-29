@@ -224,9 +224,9 @@
 }
 
 @media (max-width: 760px) {
-  .work-block-code figcaption {
-    min-height: 40px;
-    padding-inline: 12px;
+  .work-code-toolbar {
+    min-height: 52px;
+    padding-inline: 14px;
   }
 
   .work-block-code pre {

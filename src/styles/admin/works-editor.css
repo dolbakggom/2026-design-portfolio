@@ -546,11 +546,21 @@ button.block-drag-handle svg {
   line-height: 1.6;
 }
 
+.code-block-fields {
+  display: grid;
+  gap: 12px;
+}
+
 .code-block-editor {
   overflow: hidden;
-  border: 1px solid #2a3038;
-  border-radius: 8px;
-  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: #242424;
+}
+
+.code-caption-field {
+  display: grid;
+  gap: 7px;
 }
 
 .code-block-editor-bar {
@@ -558,30 +568,23 @@ button.block-drag-handle svg {
   grid-template-columns: auto 1fr;
   gap: 12px;
   align-items: center;
-  min-height: 48px;
-  border-bottom: 1px solid #2a3038;
-  padding: 0 14px;
-  background: #161b22;
+  min-height: 54px;
+  padding: 0 18px;
 }
 
-.code-window-dots {
+.code-editor-identity {
   display: inline-flex;
-  gap: 6px;
+  gap: 9px;
+  align-items: center;
+  color: #f2f2f2;
+  font-size: 0.78rem;
+  font-weight: 500;
 }
 
-.code-window-dots i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #69717d;
-}
-
-.code-window-dots i:nth-child(2) {
-  opacity: 0.72;
-}
-
-.code-window-dots i:nth-child(3) {
-  opacity: 0.44;
+.code-editor-mark {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .code-block-editor-bar label {
@@ -589,17 +592,17 @@ button.block-drag-handle svg {
   gap: 8px;
   align-items: center;
   justify-self: end;
-  color: #9da7b3;
+  color: #b9b9b9;
   font-size: 0.68rem;
 }
 
 .code-block-editor-bar select {
   min-width: 132px;
   min-height: 30px;
-  border-color: #39414c;
+  border-color: rgba(255, 255, 255, 0.12);
   padding: 0 30px 0 10px;
-  background-color: #21262d;
-  color: #e6edf3;
+  background-color: #303030;
+  color: #f2f2f2;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -610,9 +613,9 @@ button.block-drag-handle svg {
   resize: vertical;
   border: 0;
   border-radius: 0;
-  padding: 18px;
-  background: #0d1117;
-  color: #e6edf3;
+  padding: 10px 20px 22px;
+  background: #242424;
+  color: #f2f2f2;
   caret-color: #ffffff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 13px;

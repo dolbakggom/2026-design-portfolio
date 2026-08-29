@@ -181,7 +181,7 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
       {
         id: "integration-code",
         type: "code",
-        content: { code: "const portfolio = 'Beyond the Answer.';", language: "typescript", blockWidth: "100%" },
+        content: { code: "const portfolio = 'Beyond the Answer.';", language: "typescript", blockWidth: "100%", caption: "Scroll dwell implementation" },
         sortOrder: 3
       },
       { id: "integration-divider", type: "divider", content: {}, sortOrder: 4 }
@@ -204,6 +204,7 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
   assert.match(html, /<code>--tile-image<\/code>/);
   assert.match(html, /class="work-block-code"/);
   assert.match(html, /const portfolio = &#39;Beyond the Answer\.&#39;;/);
+  assert.match(html, /class="work-code-caption">Scroll dwell implementation/);
   assert.match(html, /data-code-copy/);
   assert.match(html, /class="work-block-divider"/);
   assert.match(html, /<dt>Tools<\/dt>/);
@@ -652,7 +653,9 @@ test("admin CSS imports render the shell and work editor layout", async () => {
       previewCodeCount
     );
     await page.getByLabel("Code").last().fill("const screenshot = true;");
+    await page.getByLabel("Caption").last().fill("Screenshot-ready code");
     assert.match(await page.locator(".preview-block-code code").last().textContent() ?? "", /const screenshot = true;/);
+    assert.equal(await page.locator(".preview-block-code > figcaption").last().textContent(), "Screenshot-ready code");
 
     const previewDividerCount = await page.locator(".preview-block-divider").count();
     await page.getByRole("button", { name: "Divider", exact: true }).click();

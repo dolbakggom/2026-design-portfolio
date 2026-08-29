@@ -1,5 +1,6 @@
 ---
 import type { AssetRef, AssetVariant, WorkBlock } from "../types";
+import Prism from "@astrojs/prism/Prism.astro";
 import { sanitizeRichTextHtml } from "../lib/content-sanitizer";
 import { buildResponsiveImageSource } from "../lib/responsive-images";
 
@@ -52,6 +53,16 @@ const codeLanguages: Record<string, string> = {
   bash: "Shell"
 };
 
+const prismLanguages: Record<string, string> = {
+  plaintext: "plaintext",
+  html: "markup",
+  css: "css",
+  javascript: "javascript",
+  typescript: "typescript",
+  json: "json",
+  bash: "bash"
+};
+
 const textBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", paragraphGap: "18px" }) => {
   const lineHeight = optionOf(block, "lineHeight", ["1.3", "1.5", "1.7", "1.9"], defaults.lineHeight);
   const paragraphGap = optionOf(block, "paragraphGap", ["0px", "10px", "18px", "28px"], defaults.paragraphGap);
@@ -78,16 +89,26 @@ const textBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", paragr
 
       if (block.type === "code") {
         const code = textOf(block, "code");
+        const caption = textOf(block, "caption");
         const language = optionOf(block, "language", Object.keys(codeLanguages), "plaintext");
         const blockWidth = optionOf(block, "blockWidth", ["680px", "880px", "1080px", "100%"], "100%");
         return (
           <figure class="work-block-code" style={`--block-max-width:${blockWidth};`} data-code-block>
-            <figcaption>
-              <span class="work-code-window-dots" aria-hidden="true"><i /><i /><i /></span>
-              <span class="work-code-language">{codeLanguages[language]}</span>
-              <button type="button" data-code-copy aria-label="코드 복사"><span data-code-copy-label>Copy</span></button>
-            </figcaption>
-            <pre><code>{code}</code></pre>
+            <div class="work-code-shell">
+              <div class="work-code-toolbar">
+                <span class="work-code-mark" aria-hidden="true">&lt;/&gt;</span>
+                <span class="work-code-language">{codeLanguages[language]}</span>
+                <button type="button" data-code-copy aria-label="코드 복사" title="코드 복사">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="8" y="8" width="11" height="11" rx="2" />
+                    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+                  </svg>
+                  <span class="work-code-copy-label" data-code-copy-label>Copy</span>
+                </button>
+              </div>
+              <Prism class="work-code-source" code={code} lang={prismLanguages[language]} />
+            </div>
+            {caption ? <figcaption class="work-code-caption">{caption}</figcaption> : null}
           </figure>
         );
       }
@@ -198,9 +219,13 @@ const textBlockStyle = (block: WorkBlock, defaults = { lineHeight: "1.7", paragr
       await navigator.clipboard.writeText(code);
       const label = button.querySelector<HTMLElement>("[data-code-copy-label]");
       if (label) label.textContent = "Copied";
+      button.setAttribute("aria-label", "복사됨");
+      button.setAttribute("title", "복사됨");
       button.classList.add("is-copied");
       window.setTimeout(() => {
         if (label) label.textContent = "Copy";
+        button.setAttribute("aria-label", "코드 복사");
+        button.setAttribute("title", "코드 복사");
         button.classList.remove("is-copied");
       }, 1600);
     } catch {

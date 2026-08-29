@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { AssetVariant, Profile, WorkBlock, WorkCategory, WorkItem } from "../../types";
+import { highlightCode } from "../../lib/code-highlighter";
 import { fitImageDimensions, MAX_IMAGE_UPLOAD_BYTES } from "../../lib/image-upload";
 import { selectVariantWidths, variantDimensions } from "../../lib/responsive-images";
 
@@ -442,33 +443,48 @@ export function WorkLivePreview({ work }: { work: WorkItem }) {
               if (block.type === "code") {
                 const code = contentText(block, "code");
                 const language = contentOption(block, "language", ["plaintext", "html", "css", "javascript", "typescript", "json", "bash"], "plaintext");
+                const highlightedCode = highlightCode(code, language);
                 return (
                   <figure
                     className="preview-block-code"
                     key={block.id}
                     style={{ "--preview-block-width": contentOption(block, "blockWidth", ["680px", "880px", "1080px", "100%"], "100%") } as CSSProperties}
                   >
-                    <figcaption>
-                      <span className="preview-code-window-dots" aria-hidden="true"><i /><i /><i /></span>
-                      <span>{codeLanguageLabels[language]}</span>
-                      <button
-                        type="button"
-                        onClick={async (event) => {
-                          const button = event.currentTarget;
-                          try {
-                            await navigator.clipboard.writeText(code);
-                            button.textContent = "Copied";
-                            window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
-                          } catch {
-                            button.textContent = "Failed";
-                            window.setTimeout(() => { button.textContent = "Copy"; }, 1600);
-                          }
-                        }}
-                      >
-                        Copy
-                      </button>
-                    </figcaption>
-                    <pre><code>{code}</code></pre>
+                    <div className="preview-code-shell">
+                      <div className="preview-code-toolbar">
+                        <span className="preview-code-mark" aria-hidden="true">&lt;/&gt;</span>
+                        <span>{codeLanguageLabels[language]}</span>
+                        <button
+                          type="button"
+                          aria-label="코드 복사"
+                          title="코드 복사"
+                          onClick={async (event) => {
+                            const button = event.currentTarget;
+                            try {
+                              await navigator.clipboard.writeText(code);
+                              button.classList.add("is-copied");
+                              button.setAttribute("aria-label", "복사됨");
+                              button.setAttribute("title", "복사됨");
+                              window.setTimeout(() => {
+                                button.classList.remove("is-copied");
+                                button.setAttribute("aria-label", "코드 복사");
+                                button.setAttribute("title", "코드 복사");
+                              }, 1600);
+                            } catch {
+                              button.classList.add("is-copy-error");
+                              window.setTimeout(() => { button.classList.remove("is-copy-error"); }, 1600);
+                            }
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="8" y="8" width="11" height="11" rx="2" />
+                            <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+                          </svg>
+                        </button>
+                      </div>
+                      <pre><code className={`hljs language-${language}`} dangerouslySetInnerHTML={{ __html: highlightedCode }} /></pre>
+                    </div>
+                    {contentText(block, "caption") ? <figcaption>{contentText(block, "caption")}</figcaption> : null}
                   </figure>
                 );
               }

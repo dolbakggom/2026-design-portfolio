@@ -47,22 +47,28 @@
 - 관리자 블록 툴바에 Code를 추가하고, 언어 선택과 여러 줄 입력이 가능한 어두운 코드 편집 패널을 구현했습니다. Code 블록은 현재 Content width를 상속하며 실시간 미리보기에도 즉시 반영됩니다.
 - Tiptap StarterKit의 inline code와 fenced code input rule을 유지하고 toolbar에 Inline code 버튼을 추가했습니다. `` `code` `` 입력은 인라인 코드 칩으로, triple backtick 뒤 공백/줄바꿈은 본문 내 multiline code로 변환됩니다.
 - 공개 상세 Code 블록은 편집기 스타일의 header, language label, 가로 스크롤 영역과 Copy/Copied 상태를 제공합니다. 코드 문자열은 HTML로 실행하지 않고 escaped text로 렌더링합니다.
+- Code 블록에 선택형 caption 필드를 추가했습니다. 관리자 입력과 실시간 미리보기에 즉시 반영되며 공개 상세에서는 어두운 코드 패널 아래의 muted `figcaption`으로 표시됩니다. 기존 Code 블록은 빈 caption으로 호환되고 콘텐츠 JSON만 확장하므로 추가 D1 migration은 필요하지 않습니다.
+- 공개 상세는 Cloudflare Worker 호환성이 보장된 Astro Prism, 관리자 실시간 미리보기는 선택 언어만 등록한 `highlight.js`로 코드를 토큰화합니다. 키워드, 내장 객체/타입, 함수, 숫자, 문자열, 주석에 같은 Codex 계열 색상을 적용하며, 입력 코드는 실행 가능한 HTML이 되지 않도록 각 highlighter가 escape합니다.
+- 코드 패널을 Codex에 가까운 `#242424` 단일 표면, 20px public radius, `</>` 언어 표시, 아이콘형 복사 버튼으로 재구성했습니다. 관리자 입력 패널과 축소 미리보기도 같은 시각 언어를 사용합니다.
 - `0008_code_work_block.sql`에서 D1 `work_blocks.type` CHECK 제약에 `code`를 추가했습니다. 현재 로컬 D1에는 migration을 적용했습니다.
 
 ### 중요 파일
 - `migrations/0008_code_work_block.sql`
 - `src/lib/work-block-content.ts`
+- `src/lib/code-highlighter.ts`
 - `src/components/admin/BlockEditor.tsx`
 - `src/components/admin/AdminSupport.tsx`
 - `src/components/WorkBlocks.astro`
 - `src/styles/work-detail.css`
 - `src/styles/admin/works-editor.css`
 - `src/styles/admin/preview.css`
+- `tests/code-highlighter.test.ts`
 
 ### 검증
 - `npm run test:unit`: 81개 통과.
 - `npm run build`: Astro check 0 errors / 0 warnings / 0 hints, Cloudflare server build complete.
 - `npm run test:integration`: 10개 통과. 관리자 백틱 입력의 `<code>` 전환, Code 블록 추가·실시간 미리보기, D1 저장 후 공개 렌더링을 포함합니다.
+- Caption 후속 변경에서도 관리자 Caption 입력, 실시간 preview `figcaption`, D1 저장 후 공개 `work-code-caption` 렌더링이 통과했습니다. 전체 재실행은 기존 Home Gallery 위치 테스트의 간헐적 loader timing으로 9/10이었고, 실패한 Home 테스트를 독립 재실행해 정상 통과를 확인했습니다.
 - `npm run db:migrate:local`: `0008_code_work_block.sql` 적용 성공.
 
 ### 배포 주의
