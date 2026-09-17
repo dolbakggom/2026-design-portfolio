@@ -121,7 +121,6 @@ The integration suite uses Wrangler's isolated Worker runtime with temporary D1,
 - `/` public one-page portfolio
 - `/work/[slug]` project detail
 - `/admin` built-in CMS
-- `/privacy` visitor analytics notice and browser opt-out
 
 ## Visitor Analytics
 
@@ -129,7 +128,7 @@ The admin Dashboard shows sessions, engaged page views, approximate active readi
 
 - Collection starts after 5 seconds of foreground reading; subsequent updates are batched at 15-second intervals and on leaving the page. Time stops after 60 seconds without interaction. Very short visits are not counted.
 - Random browser session IDs rotate after 30 minutes of inactivity. No IP, raw user agent, full referrer URL, query string, or search keyword is stored in the analytics table. IP is used transiently by Cloudflare's rate limiter, separate from stored analytics.
-- Local development, authenticated admins, known bots, DNT/GPC, and browser opt-out are excluded. Collection is enabled only on `dolbakggom.com` and `www.dolbakggom.com`.
+- Local development, authenticated admins, known bots, DNT/GPC, and previously stored browser opt-out preferences are excluded. Collection is enabled only on `dolbakggom.com` and `www.dolbakggom.com`. There is no public analytics notice page or opt-out UI.
 - Records older than 30 days since last activity are deleted on the next ingestion or admin report request. This is lazy cleanup, not a scheduled deletion job.
 - Statistics are best-effort and may miss blocked requests. They are neither an identity system nor an audit log. Previous visits cannot be reconstructed.
 

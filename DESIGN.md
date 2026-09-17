@@ -69,4 +69,4 @@
 - Dashboard is the first admin tab, using the existing native CSS admin visual language; this utility view has no corresponding Figma frame.
 - Keep period controls, three summary metrics, recent-first daily counts, popular projects, and recent sessions unframed and compact. Tables scroll horizontally inside their own container on narrow screens.
 - Clearly distinguish sessions from people and active reading estimates from exact dwell time. Include loading, empty, error, and manual refresh states.
-- Link to the visitor analytics notice from the public gallery and project detail. Preserve browser opt-out and avoid identifying individual visitors or collecting search terms.
+- Do not render public visitor analytics notice links or an analytics notice page. Retain DNT/GPC handling and previously stored opt-out preferences; avoid identifying individual visitors or collecting search terms.

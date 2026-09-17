@@ -36,7 +36,23 @@
 
 ---
 
+## 2026-09-17 Cloudflare Scanner Protection And Unused Pages Removal
+
+- 요청: Cloudflare의 해외 트래픽을 점검하고 안전한 보안 설정 적용. 사용하지 않는 기타 타브 서비스의 DNS, 자동 배포 및 공개 접속 중지는 사용자에게 범위를 확인한 후 진행했습니다.
+- 화면 기준 최근 24시간 902요청 중 `tab.dolbakggom.com` 705건, 포트폴리오 본체 197건이었으며 `.env`/PHP 탐색 요청이 관찰되었습니다. 국가별 전체 차단은 적용하지 않았습니다.
+- WAF 규칙 `Portfolio - block unused scanner paths` (ID `c3ddab4dfe46471287a8a1ca4219c6b6`)을 활성화했습니다. 대상 호스트는 `dolbakggom.com`, `www.dolbakggom.com`뿐이며 경로를 소문자로 비교해 `/.env`, `/.git/`, 끝이 `/.git` 또는 `.php`, `.php/`, `/wp-admin`, `/wp-content/`, `/wp-includes/`, 시작이 `/_profiler/`인 요청을 Block 처리합니다. 쿼리나 POST 본문은 비교하지 않습니다. 이는 일부 스캐너 탐색 차단이며 모든 공격을 차단한다는 의미는 아닙니다.
+- UI 활성 상태와 실제 홈/`/work/rush-hour-app` 열람, `/robots.php`의 Cloudflare 차단 화면을 확인했습니다. 롤백은 보안 규칙에서 해당 규칙을 비활성화하면 됩니다.
+- 사용자 확인 후 `tab` CNAME(`guitar-tab-viewer.pages.dev`, 프록싱, TTL 자동)을 삭제했습니다. 기타 타브 Pages 프로젝트의 프로덕션/미리보기 자동 배포를 해제한 뒤, Pages 측 사용자 도메인 연결도 제거하고 `guitar-tab-viewer` 프로젝트와 기존 배포 2개를 영구 삭제했습니다. GitHub `dolbakggom/guitar-tab-viewer` 저장소는 변경하지 않았습니다.
+- 삭제 완료 후 Workers 및 Pages 목록에 `2026-design-portfolio` 1개만 남은 것을 확인했습니다. 삭제된 pages.dev 직접 접속 검증은 브라우저 도구 navigation 시간 초과로 완료하지 못했으며, 서비스 제거는 Cloudflare 관리 화면에서 확인했습니다. pages.dev 이름은 재사용될 수 있으므로 오래된 공유 링크는 정리해야 합니다.
+- 포트폴리오 Worker/D1/R2/자동 배포는 변경하지 않았습니다. `www` DNS는 원래 없으며 이번에 추가하지 않았습니다. 보안/DNS 변경은 운영에 직접 적용된 것이므로 Git push와 무관합니다. 로컬 안내 페이지 제거 변경은 여전히 별도 커밋/배포 대상입니다.
+
 ## 2026-09-17 Anonymous Visitor Analytics
+
+### 후속 수정: 공개 방문 통계 안내 제거
+- 사용자 요청으로 홈 갤러리와 작업물 상세의 안내 링크, `/privacy` 페이지(수집 제외 UI 포함), 관련 CSS를 제거했습니다.
+- 통계 수집/API/관리자 Dashboard는 유지하며 DNT/GPC 및 이미 저장된 수집 제외 설정도 계속 존중합니다.
+- 중요 파일: `HomePage.astro`, `src/pages/work/[slug].astro`, `src/pages/privacy.astro` 삭제, `global.css`, `README.md`, `DESIGN.md`.
+- 검증: `npm run build` 통과(Astro check 74 files, 오류/경고 0), `git diff --check` 통과, `src` 내 안내 문구/링크 참조 없음 확인. 커밋/푸시/배포는 하지 않았습니다.
 
 ### 요구사항
 - 회사별 링크나 검색어 수집은 보류하고, 무작위 세션 ID 기반 방문 통계를 admin Dashboard에서 확인합니다. 컴퓨터 종료 후 저장된 작업을 이어서 마무리합니다.
