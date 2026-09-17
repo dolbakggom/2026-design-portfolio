@@ -217,6 +217,88 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
   assert.doesNotMatch(html, /Draft block content/);
 });
 
+test("analytics excludes admins and private data, deduplicates visits, and restricts reports", async () => {
+  const payload = { id: crypto.randomUUID(), sessionId: crypto.randomUUID(), path: '/work/integration-work', referrer: 'google.com', device: 'desktop', activeSeconds: 5 };
+  const send = (body: object, headers: Record<string, string> = {}) => app.fetch(`${APP_ORIGIN}/api/analytics`, {
+    method: 'POST', headers: { origin: APP_ORIGIN, 'content-type': 'application/json', ...headers }, body: JSON.stringify(body)
+  });
+  assert.equal((await app.fetch(`${APP_ORIGIN}/api/admin/analytics`)).status, 401);
+  assert.equal((await send(payload, { origin: 'https://other.test' })).status, 403);
+  assert.equal((await send({ ...payload, referrer: 'google.com/?q=secret' })).status, 400);
+  assert.equal((await send({ ...payload, path: '/work/not-a-public-project' })).status, 400);
+  assert.equal((await send(payload, { cookie: adminCookie })).status, 204);
+  assert.equal((await send(payload, { dnt: '1' })).status, 204);
+  assert.equal((await send(payload, { 'user-agent': 'PreviewBot' })).status, 204);
+  const report = async () => {
+    const response = await app.fetch(`${APP_ORIGIN}/api/admin/analytics?days=7`, { headers: adminHeaders() });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    return await response.json() as { summary: { sessions: number; views: number; seconds: number }; daily: unknown[]; recent: { paths: string }[] };
+  };
+  assert.equal((await report()).summary.views, 0);
+  assert.equal((await send(payload)).status, 204);
+  assert.equal((await send(payload)).status, 204);
+  assert.deepEqual((await report()).summary, { sessions: 1, views: 1, seconds: 5 });
+  await send({ ...payload, activeSeconds: 6 });
+  await send({ ...payload, activeSeconds: 5 });
+  assert.equal((await report()).summary.seconds, 6);
+  await send({ ...payload, id: crypto.randomUUID(), path: '/about' });
+  const twoPages = await report();
+  assert.equal(twoPages.summary.sessions, 1);
+  assert.equal(twoPages.summary.views, 2);
+  assert.equal(twoPages.daily.length, 7);
+  assert.match(twoPages.recent[0].paths, /\/about/);
+  await setup.fetch('http://setup.test/', { method: 'POST', body: `UPDATE analytics_views SET last_seen = 0` });
+  assert.equal((await report()).summary.views, 0);
+});
+
+test('browser analytics waits for engagement, keeps a session across pages, and honors opt-out', async () => {
+  const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+  try {
+    const page = await browser.newPage();
+    const events: Array<{ sessionId: string; id: string; path: string; activeSeconds: number; referrer: string }> = [];
+    // Route the production hostname entirely to the isolated local test worker.
+    await page.route('https://dolbakggom.com/**', async route => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/analytics') {
+        events.push(route.request().postDataJSON());
+        await route.fulfill({ status: 204 });
+      } else {
+        const response = await route.fetch({ url: `${harnessOrigin}${url.pathname}${url.search}` });
+        await route.fulfill({ response });
+      }
+    });
+    const firstRequest = page.waitForResponse(response => response.url().endsWith('/api/analytics'));
+    await page.goto('https://dolbakggom.com/work/integration-work', { waitUntil: 'domcontentloaded' });
+    await firstRequest;
+    assert.ok(events[0].activeSeconds >= 5);
+    assert.equal(events[0].path, '/work/integration-work');
+    // The existing home controller canonicalizes the about stage to `/`.
+    const nextRequest = page.waitForResponse(response => response.url().endsWith('/api/analytics') && response.request().postDataJSON().path === '/');
+    await page.goto('https://dolbakggom.com/about', { waitUntil: 'domcontentloaded' });
+    await nextRequest;
+    const home = events.find(event => event.path === '/');
+    assert.ok(home);
+    assert.equal(home.path, new URL(page.url()).pathname);
+    assert.equal(home.sessionId, events[0].sessionId);
+    assert.notEqual(home.id, events[0].id);
+    await page.evaluate(() => {
+      const session = JSON.parse(localStorage.getItem('portfolio-visit-session')!);
+      session.last = Date.now() - 31 * 60 * 1000;
+      localStorage.setItem('portfolio-visit-session', JSON.stringify(session));
+    });
+    const renewed = page.waitForResponse(response => response.url().endsWith('/api/analytics') && response.request().postDataJSON().sessionId !== home.sessionId);
+    await page.goto('https://dolbakggom.com/work/integration-work', { waitUntil: 'domcontentloaded' });
+    await renewed;
+    assert.notEqual(events.at(-1)?.sessionId, home.sessionId);
+    await page.evaluate(() => localStorage.setItem('portfolio-analytics-off', '1'));
+    const count = events.length;
+    await page.goto('https://dolbakggom.com/work/integration-work', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(6500);
+    assert.equal(events.length, count);
+  } finally { await browser.close(); }
+});
+
 test("mobile public code blocks contain long lines without widening the document", async () => {
   const browser = await chromium.launch({
     executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -565,6 +647,7 @@ test("work gallery filters update tiles and support roving keyboard navigation",
 
     await page.locator('[data-filter="ALL"]').click();
     await page.waitForFunction(() => document.querySelector<HTMLElement>("[data-gallery-filter-empty]")?.hidden === true);
+    await page.locator('#work-gallery-grid [data-category]').first().waitFor({ state: 'visible' });
     assert.ok(await page.locator("#work-gallery-grid [data-category]:visible").count() > 0);
   } finally {
     await browser.close();
@@ -656,6 +739,24 @@ test("admin CSS imports render the shell and work editor layout", async () => {
     assert.notEqual(shellState.shellColumns, "none");
     assert.equal(shellState.sidebarPosition, "sticky");
     assert.ok(shellState.horizontalOverflow <= 1);
+
+    await page.getByRole('heading', { name: '방문 통계', exact: true }).waitFor();
+    await page.getByText('아직 기록된 방문이 없습니다.', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '최근 30일', exact: true }).click();
+    await page.getByText('아직 기록된 방문이 없습니다.', { exact: true }).waitFor();
+
+    await app.fetch(`${APP_ORIGIN}/api/analytics`, {
+      method: 'POST', headers: { origin: APP_ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ id: crypto.randomUUID(), sessionId: crypto.randomUUID(), path: '/work/integration-work', referrer: 'google.com', device: 'mobile', activeSeconds: 10 })
+    });
+    await page.getByRole('button', { name: '새로고침', exact: true }).click();
+    await page.getByRole('heading', { name: '많이 본 프로젝트', exact: true }).waitFor();
+    await page.screenshot({ path: '/tmp/portfolio-analytics-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() => (document.querySelector('.admin-sidebar')?.getBoundingClientRect().right ?? Infinity) <= 1);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+    await page.screenshot({ path: '/tmp/portfolio-analytics-mobile.png', fullPage: true });
+    await page.setViewportSize({ width: 1440, height: 1000 });
 
     await page.getByRole("button", { name: "Works" }).click();
     await page.waitForSelector(".admin-work-card");

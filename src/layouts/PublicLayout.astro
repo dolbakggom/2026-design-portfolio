@@ -23,6 +23,11 @@ const { skipTarget = "#main-content" } = props;
 ---
 
 <BaseLayout {...props}>
+  <script>
+    import { initVisitAnalytics } from '../scripts/visit-analytics';
+    initVisitAnalytics();
+    document.addEventListener('astro:after-swap', initVisitAnalytics);
+  </script>
   <script is:inline slot="head">
     document.documentElement.classList.add("portfolio-fade-ready");
   </script>

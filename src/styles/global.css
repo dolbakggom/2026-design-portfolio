@@ -2,6 +2,16 @@
 
 @import "./pretendard-dynamic-subset.css";
 
+.analytics-privacy-link {
+  position: relative;
+  display: inline-block;
+  margin-top: 32px;
+  padding-block: 12px;
+  color: var(--color-muted);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
 :root {
   color-scheme: light;
   --color-paper: #f4f4f4;

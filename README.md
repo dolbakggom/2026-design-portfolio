@@ -121,3 +121,18 @@ The integration suite uses Wrangler's isolated Worker runtime with temporary D1,
 - `/` public one-page portfolio
 - `/work/[slug]` project detail
 - `/admin` built-in CMS
+- `/privacy` visitor analytics notice and browser opt-out
+
+## Visitor Analytics
+
+The admin Dashboard shows sessions, engaged page views, approximate active reading time, popular projects, and recent sessions for today, 7 days, or 30 days (Asia/Seoul). A session is not a unique person and cannot identify a recruiter or company.
+
+- Collection starts after 5 seconds of foreground reading; subsequent updates are batched at 15-second intervals and on leaving the page. Time stops after 60 seconds without interaction. Very short visits are not counted.
+- Random browser session IDs rotate after 30 minutes of inactivity. No IP, raw user agent, full referrer URL, query string, or search keyword is stored in the analytics table. IP is used transiently by Cloudflare's rate limiter, separate from stored analytics.
+- Local development, authenticated admins, known bots, DNT/GPC, and browser opt-out are excluded. Collection is enabled only on `dolbakggom.com` and `www.dolbakggom.com`.
+- Records older than 30 days since last activity are deleted on the next ingestion or admin report request. This is lazy cleanup, not a scheduled deletion job.
+- Statistics are best-effort and may miss blocked requests. They are neither an identity system nor an audit log. Previous visits cannot be reconstructed.
+
+Before deploying this feature, run `npm run db:migrate:remote` to apply `0009_visit_analytics.sql`, then deploy the Worker with the `ANALYTICS_RATE_LIMITER` binding from `wrangler.toml`. No new secret is required. Do not copy local analytics into production when promoting portfolio content.
+
+After deployment, use a signed-out browser without DNT/GPC to open a project for at least 5 seconds, then refresh Dashboard in an authenticated browser. Confirm that the session appears and that administrator browsing does not add visits. Local `/admin` can display the dashboard, but local public browsing intentionally produces no data.

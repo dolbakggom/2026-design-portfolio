@@ -38,3 +38,11 @@ namespace_id = "71014"
 
 [vars]
 ADMIN_USERNAME = "dolbakggom"
+
+[[ratelimits]]
+name = "ANALYTICS_RATE_LIMITER"
+namespace_id = "71015"
+
+  [ratelimits.simple]
+  limit = 120
+  period = 60

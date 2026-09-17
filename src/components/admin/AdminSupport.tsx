@@ -34,12 +34,13 @@ export const publicationPriority: Record<PublicationResult["status"], number> = 
 export const lessSuccessfulPublication = (current: PublicationResult | null, next: PublicationResult) =>
   !current || publicationPriority[next.status] > publicationPriority[current.status] ? next : current;
 
-export type Tab = "profile" | "timeline" | "works";
+export type Tab = "analytics" | "profile" | "timeline" | "works";
 export type WorkScreen = "list" | "editor";
 export type WorkAssetKind = "thumbnail" | "featuredThumbnail";
 export type AdminIconName = Tab | "logout";
 
 export const navItems: Array<{ tab: Tab; label: string; icon: AdminIconName }> = [
+  { tab: "analytics", label: "Dashboard", icon: "analytics" },
   { tab: "profile", label: "Profile", icon: "profile" },
   { tab: "timeline", label: "Timeline", icon: "timeline" },
   { tab: "works", label: "Works", icon: "works" }
@@ -47,6 +48,7 @@ export const navItems: Array<{ tab: Tab; label: string; icon: AdminIconName }> =
 
 export function AdminIcon({ name }: { name: AdminIconName }) {
   const paths: Record<AdminIconName, ReactNode> = {
+    analytics: <><path d="M4 4v16h16" /><path d="M8 16v-5M13 16V7M18 16V4" /></>,
     profile: (
       <>
         <path d="M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />

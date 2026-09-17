@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+export const prerender = false;
+---
+<BaseLayout title="방문 통계 안내 | Beyond the Answer.">
+  <main class="privacy-content">
+    <a href="/">홈으로</a>
+    <h1>방문 통계 안내</h1>
+    <p>포트폴리오가 어떻게 열람되는지 확인하기 위해 무작위 세션 ID, 방문 시각, 열어본 페이지, 대략적인 활성 열람 시간, 모바일·데스크톱 구분, 유입 사이트 도메인을 기록합니다.</p>
+    <p>통계 데이터베이스에는 IP 주소, 검색어, 유입 URL 전체, 브라우저 지문을 저장하지 않습니다. 세션 ID는 이 브라우저에 저장되며 30분 동안 활동이 없으면 새로 생성됩니다. 통계는 사이트 관리자만 열람할 수 있습니다.</p>
+    <p>최근 30일 기록을 조회하며, 30일이 지난 기록은 다음 통계 수집 또는 관리자 조회 시 삭제합니다. 인프라 제공자의 보안·접속 로그는 이 방문 통계와 별개입니다.</p>
+    <p>브라우저의 추적 거부(DNT)와 Global Privacy Control 신호가 있으면 수집하지 않습니다. 아래 설정으로 이 브라우저의 향후 수집을 중지할 수도 있습니다.</p>
+    <label><input type="checkbox" id="analytics-opt-out" /> 이 브라우저에서 방문 통계 수집 제외</label>
+    <p id="privacy-status" role="status"></p>
+  </main>
+  <script>
+    const toggle = document.querySelector<HTMLInputElement>('#analytics-opt-out');
+    const status = document.querySelector<HTMLElement>('#privacy-status');
+    if (toggle && status) {
+      try {
+        toggle.checked = localStorage.getItem('portfolio-analytics-off') === '1';
+        toggle.addEventListener('change', () => {
+          try {
+            localStorage.setItem('portfolio-analytics-off', toggle.checked ? '1' : '0');
+            if (toggle.checked) localStorage.removeItem('portfolio-visit-session');
+            status.textContent = toggle.checked ? '이 브라우저의 향후 방문은 수집하지 않습니다.' : '방문 통계 수집을 허용했습니다.';
+          } catch { status.textContent = '브라우저 저장소에 접근할 수 없습니다. DNT 또는 GPC 설정을 이용해주세요.'; }
+        });
+      } catch { status.textContent = '브라우저 저장소에 접근할 수 없습니다. DNT 또는 GPC 설정을 이용해주세요.'; }
+    }
+  </script>
+</BaseLayout>
+<style>
+  .privacy-content { width: min(720px, calc(100% - 40px)); margin: 64px auto; line-height: 1.8; }
+  h1 { font-size: 28px; }
+  label { display: flex; gap: 10px; align-items: center; margin-top: 32px; }
+</style>

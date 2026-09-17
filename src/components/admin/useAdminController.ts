@@ -22,7 +22,7 @@ export function useAdminController() {
   const [authenticated, setAuthenticated] = useState(false);
   const [loginPending, setLoginPending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>("profile");
+  const [activeTab, setActiveTab] = useState<Tab>("analytics");
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [works, setWorks] = useState<WorkItem[]>([]);
@@ -641,4 +641,3 @@ export function useAdminController() {
     workScreen
   };
 }
-

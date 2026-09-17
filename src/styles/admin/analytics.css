@@ -1,0 +1,27 @@
+.analytics-dashboard { min-width: 0; }
+.analytics-controls, .analytics-controls > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.analytics-controls { justify-content: space-between; }
+.analytics-controls [aria-pressed="true"] { background: var(--color-ink); color: white; }
+.analytics-note { color: var(--color-muted); font-size: 14px; line-height: 1.6; }
+.analytics-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 28px 0; border-block: 1px solid var(--admin-border); }
+.analytics-metrics > div { padding: 24px 12px; }
+.analytics-metrics dt { font-size: 14px; }
+.analytics-metrics dd { font-size: 28px; font-weight: 700; margin: 12px 0 0; }
+.analytics-dashboard section { margin-top: 36px; }
+.analytics-dashboard h3 { font-size: 20px; }
+.analytics-dashboard small { font-size: 13px; color: var(--color-muted); font-weight: 400; }
+.analytics-days { display: grid; gap: 10px; max-height: 300px; overflow: auto; }
+.analytics-days > div { display: grid; grid-template-columns: 100px minmax(0, 1fr) 40px; gap: 12px; align-items: center; font-size: 14px; }
+.analytics-days meter { width: 100%; height: 16px; accent-color: var(--admin-accent-border); }
+.analytics-table { overflow-x: auto; }
+.analytics-table table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 14px; }
+.analytics-table th, .analytics-table td { border-bottom: 1px solid var(--admin-border); text-align: left; padding: 14px 12px; vertical-align: top; line-height: 1.6; min-width: 90px; }
+.analytics-table th { font-weight: 500; }
+.analytics-table a { overflow-wrap: anywhere; }
+.analytics-path { display: block; }
+.analytics-empty { padding-block: 60px; text-align: center; }
+@media (max-width: 660px) {
+  .analytics-metrics { grid-template-columns: 1fr; }
+  .analytics-metrics > div { display: flex; align-items: center; justify-content: space-between; }
+  .analytics-metrics dd { margin: 0; font-size: 24px; }
+}

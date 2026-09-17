@@ -3,6 +3,8 @@ import { ProfilePanel, TimelinePanel, WorksListPanel } from "./AdminPanels";
 import WorkEditorPanel from "./WorkEditorPanel";
 import { useAdminController } from "./useAdminController";
 import "../../styles/admin.css";
+import AnalyticsPanel from "./AnalyticsPanel";
+import "../../styles/admin/analytics.css";
 
 export default function AdminApp() {
   const {
@@ -154,7 +156,7 @@ export default function AdminApp() {
                   ←
                 </button>
               ) : null}
-              <h2>{activeTab === "profile" ? "자기소개 관리" : activeTab === "timeline" ? "이력 관리" : activeTab === "works" && workScreen === "editor" ? selectedWork?.title || "작업물 편집" : "작업물 관리"}</h2>
+              <h2>{activeTab === "analytics" ? "방문 통계" : activeTab === "profile" ? "자기소개 관리" : activeTab === "timeline" ? "이력 관리" : activeTab === "works" && workScreen === "editor" ? selectedWork?.title || "작업물 편집" : "작업물 관리"}</h2>
             </div>
           </div>
           <div className="admin-topbar-actions">
@@ -174,6 +176,7 @@ export default function AdminApp() {
           </div>
         </header>
 
+        {activeTab === "analytics" ? <AnalyticsPanel /> : null}
         {activeTab === "profile" ? (
           <ProfilePanel
             profile={profile}

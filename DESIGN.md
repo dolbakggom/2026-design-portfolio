@@ -64,3 +64,9 @@
 - Featured work thumbnails are full-bleed background images with text overlaid on top.
 - Featured titles render at 100% fill. Category and metadata render at 50% fill using the active black/white text tone.
 - Featured cards sample image brightness on the client and switch text between black and white for contrast.
+
+## Visitor Analytics Dashboard
+- Dashboard is the first admin tab, using the existing native CSS admin visual language; this utility view has no corresponding Figma frame.
+- Keep period controls, three summary metrics, recent-first daily counts, popular projects, and recent sessions unframed and compact. Tables scroll horizontally inside their own container on narrow screens.
+- Clearly distinguish sessions from people and active reading estimates from exact dwell time. Include loading, empty, error, and manual refresh states.
+- Link to the visitor analytics notice from the public gallery and project detail. Preserve browser opt-out and avoid identifying individual visitors or collecting search terms.

@@ -36,6 +36,32 @@
 
 ---
 
+## 2026-09-17 Anonymous Visitor Analytics
+
+### 요구사항
+- 회사별 링크나 검색어 수집은 보류하고, 무작위 세션 ID 기반 방문 통계를 admin Dashboard에서 확인합니다. 컴퓨터 종료 후 저장된 작업을 이어서 마무리합니다.
+
+### 구현
+- D1 `analytics_views`와 공개 수집 API, 인증된 관리자 통계 API를 추가했습니다. 오늘/7일/30일(KST), 방문 세션, 페이지 조회, 추정 활성 열람 시간, 프로젝트 순위, 최근 100개 세션을 제공합니다.
+- 5초 이상 활성 열람부터 기록하고 15초 간격/페이지 이탈 시 전송합니다. 60초 무입력 또는 비활성 탭은 시간 집계를 멈추며 세션은 30분 무활동 후 교체합니다. 로컬, 관리자 로그인, 알려진 봇, DNT/GPC, 수집 제외 설정을 반영합니다.
+- IP/원본 UA/유입 URL 전체/검색어는 D1에 저장하지 않습니다. IP는 수집 API rate limiter에서 일시적으로만 사용합니다. 과거 30일 기록은 다음 수집/관리자 조회 시 정리합니다.
+- `/privacy` 안내와 브라우저별 수집 제외 기능, 공개 페이지 안내 링크를 추가했습니다. 세션은 실제 사람 수나 채용담당자 신원을 의미하지 않습니다.
+
+### 중요 파일
+- `migrations/0009_visit_analytics.sql`, `src/lib/analytics.ts`
+- `src/scripts/visit-analytics.ts`, `src/pages/api/analytics.ts`, `src/pages/api/admin/analytics.ts`
+- `src/components/admin/AnalyticsPanel.tsx`, `src/styles/admin/analytics.css`, `src/pages/privacy.astro`
+- `tests/analytics.test.ts`, `tests/integration/worker.integration.ts`, `wrangler.toml`
+
+### 검증 / 배포 주의
+- 로컬 D1 migration 적용 완료. 운영 D1 적용, 배포, 커밋/푸시는 아직 하지 않았습니다.
+- `npm run test:unit`: 85개 통과. 최종 `npm run test:integration`: Astro check 75 files / 0 errors / 0 warnings, production build 및 통합 13개 모두 통과했습니다.
+- 브라우저에서 페이지 이동 시 세션 유지, 30분 만료 후 ID 교체, 수집 제외, 관리자 통계 화면 및 390px 모바일 가로 넘침을 검증했습니다. 테스트 수집 요청은 운영 호스트 이름을 로컬 fixture로 완전히 가로채므로 실제 운영 통계를 만들지 않습니다.
+- 중간 실행에서 기존 gallery 초기 정렬 테스트가 1회 시간 초과했으나 최종 재실행은 통과했습니다. 홈 about stage는 기존 controller가 `/`로 정리하므로 통계 테스트도 실제 주소를 검증합니다. 직접 node 실행에서는 harness 초기화 지연이 있어 표준 `npm run test:integration`으로 확인했습니다.
+- 로컬 서버 `http://127.0.0.1:4321` 재시작 및 `/admin` HTTP 200 확인. 데스크톱/모바일 Dashboard 스크린샷도 확인했습니다.
+- 배포 전 `npm run db:migrate:remote`로 0009를 적용한 후 새 rate-limit binding을 포함해 Worker를 배포해야 합니다. 새 secret은 필요하지 않습니다.
+- 통계는 배포 이후 수집분부터 표시되며, 운영 데이터 승격 시 로컬 통계 테이블을 덮어쓰지 않습니다.
+
 ## 2026-08-30 Work Code Blocks And Markdown Code
 
 ### 요구사항
