@@ -1,11 +1,12 @@
 import type { APIRoute } from "astro";
-import { createExpiredSessionCookie } from "../../../lib/auth";
-import { json } from "../../../lib/http";
+import { createExpiredSessionCookie, isAdminRequest } from "../../../lib/auth";
+import { json, unauthorized } from "../../../lib/http";
 
 export const prerender = false;
 
-export const POST: APIRoute = async () =>
-  json(
+export const POST: APIRoute = async ({ request }) => {
+  if (!(await isAdminRequest(request))) return unauthorized();
+  return json(
     { ok: true },
     {
       headers: {
@@ -13,3 +14,4 @@ export const POST: APIRoute = async () =>
       }
     }
   );
+};

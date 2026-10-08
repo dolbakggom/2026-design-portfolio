@@ -2,7 +2,7 @@ import { defineMiddleware } from "astro:middleware";
 import { env } from "cloudflare:workers";
 import { isAdminPath, verifyCloudflareAccess } from "./lib/cloudflare-access";
 import { isFallbackContentResponse } from "./lib/content-response";
-import { forbidden } from "./lib/http";
+import { forbidden, notFound } from "./lib/http";
 import { isAllowedAdminMutation } from "./lib/request-security";
 
 const EDGE_TTL_SECONDS = 600;
@@ -52,6 +52,10 @@ const withPublicCacheHeaders = (response: Response, cacheState: "MISS" | "BYPASS
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const requestUrl = new URL(context.request.url);
+  // R2 variants serve portfolio images; the unused Astro optimizer must not probe assets.
+  let imagePath = requestUrl.pathname;
+  try { imagePath = decodeURIComponent(imagePath); } catch { /* Invalid paths are left to the router. */ }
+  if (imagePath === "/_image" || imagePath.startsWith("/_image/")) return notFound();
   if (import.meta.env.PROD && isAdminPath(requestUrl.pathname) && env.CLOUDFLARE_ACCESS_ENABLED === "true") {
     if (!(await verifyCloudflareAccess(context.request, {
       teamDomain: env.CLOUDFLARE_ACCESS_TEAM_DOMAIN,

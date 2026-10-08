@@ -49,7 +49,7 @@ Run production releases in this order so code, D1 block types, and public render
 2. Run `npm test` and confirm the build and integration suite pass.
 3. Run `npm run db:migrate:remote` and confirm every pending migration succeeds. This currently includes the Website and Divider block migrations (`0006`, `0007`) on environments where they have not yet been applied.
 4. Run `npx wrangler deploy`.
-5. Confirm `https://dolbakggom.com/api/health` returns HTTP 200 with the database content source.
+5. Confirm `https://dolbakggom.com/api/health` returns HTTP 200 with `{"status":"ok"}`. Failed required-schema checks return HTTP 503 with only `{"status":"degraded"}`; database details stay in sanitized server logs.
 6. In production `/admin`, open an existing work and verify Website/Divider blocks can be added and saved, then confirm the corresponding public `/work/[slug]` page.
 
 Do not deploy the editor code before its pending D1 migrations. Git deployment updates application code only; local D1/R2 content is promoted separately as described below.
@@ -59,6 +59,13 @@ Regenerate Cloudflare binding/runtime types after changing `wrangler.toml`:
 ```bash
 npm run cf:types
 ```
+
+### Endpoint Security
+
+- Every administrator data operation, including logout, requires the existing signed CMS session in addition to the production Access perimeter. Mutations require a matching Origin. Missing, oversized, malformed or altered session cookies are treated as unauthenticated, not server errors.
+- Logout clears the current browser's CMS cookie. It does not revoke previously copied stateless cookies or sign out the separate Cloudflare Access session.
+- Public health reports only the overall status and never caches it; the real D1 schema probe and sanitized failure logs remain active. HTTP 200/503 intentionally remains observable by uptime monitors.
+- The unused Astro `/_image` endpoint always returns the same non-cacheable 404, including encoded/trailing-slash variants, without inspecting the supplied image path. The site uses R2 media and stored responsive variants, not this optimizer. Review this guard before introducing `astro:assets` runtime image transformations.
 
 Public routes keep rendering starter content when D1 is unavailable. These fallback events are recorded as `portfolio.content.read_failed` with `home` or `work` scope. Inspect production failures in Workers Logs or stream only matching entries:
 

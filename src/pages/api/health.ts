@@ -22,9 +22,9 @@ export const GET: APIRoute = async () => {
       throw new Error("Required D1 content tables are unavailable.");
     }
 
-    return json({ status: "ok", database: "available" });
+    return json({ status: "ok" });
   } catch (error) {
     reportDatabaseHealthFailure(error);
-    return json({ status: "degraded", database: "unavailable" }, { status: 503 });
+    return json({ status: "degraded" }, { status: 503 });
   }
 };

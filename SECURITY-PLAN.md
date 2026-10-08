@@ -29,11 +29,15 @@ not successful administrator access or private file contents being read.
    - Use server-issued expiring anonymous identifiers/tokens with replay controls.
    - Retain request limits and privacy exclusions; do not persist visitor IPs.
    - Anonymous tokens reduce forgery but do not prove a visitor is human.
-4. Endpoint hardening and regression verification: pending.
+4. Endpoint hardening and regression verification: implemented locally; verification recorded in HISTORY.md, deployment pending.
    - Minimize public health details while preserving operational probes.
    - Review logout policy, malformed authentication cookies, and image endpoint exposure.
    - Verify every administrator data route rejects unauthenticated callers.
    - Test public viewing, authorized editing/uploads, and ordinary analytics together.
+   - Public health retains only overall status and HTTP 200/503; database failure details remain in server logs.
+   - Logout now requires a valid CMS session and matching mutation Origin; it clears only the browser cookie, not copied stateless sessions or Access.
+   - Reject malformed/oversized/extra-segment CMS tokens without throwing or issuing cookies.
+   - Disable the unused /_image optimizer with identical 404 responses; R2 media/static assets remain available.
 5. Dependency advisories: newly identified, assessment pending.
    - npm audit --omit=dev reported 46 affected package entries (30 moderate, 15 high, 1 critical).
    - Astro and Tiptap are among the flagged dependencies; assess affected versions/features before updating.

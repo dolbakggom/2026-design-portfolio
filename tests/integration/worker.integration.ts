@@ -104,7 +104,7 @@ test("health endpoint verifies the required D1 content schema without caching", 
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await response.json(), { status: "ok", database: "available" });
+  assert.deepEqual(await response.json(), { status: "ok" });
 });
 
 test("admin login rejects invalid credentials and issues a signed session cookie for valid credentials", async () => {
@@ -128,6 +128,66 @@ test("admin login rejects invalid credentials and issues a signed session cookie
   assert.match(setCookie ?? "", /HttpOnly/);
   assert.match(setCookie ?? "", /SameSite=Strict/);
   adminCookie = setCookie?.split(";", 1)[0] ?? "";
+});
+
+test('all administrator data operations reject anonymous and malformed sessions before side effects', async () => {
+  const operations = [
+    ['GET', '/api/admin/profile'], ['PUT', '/api/admin/profile'],
+    ['GET', '/api/admin/timeline'], ['POST', '/api/admin/timeline'],
+    ['PUT', '/api/admin/timeline/test-id'], ['DELETE', '/api/admin/timeline/test-id'],
+    ['GET', '/api/admin/works'], ['POST', '/api/admin/works'],
+    ['PUT', '/api/admin/works/test-id'], ['DELETE', '/api/admin/works/test-id'],
+    ['POST', '/api/admin/assets'], ['PATCH', '/api/admin/reorder'],
+    ['POST', '/api/admin/website-metadata'], ['GET', '/api/admin/analytics'],
+    ['POST', '/api/admin/logout']
+  ];
+  for (const [method, path] of operations) {
+    for (const cookie of ['', 'portfolio_admin=%E0%A4%A', 'portfolio_admin=forged', `${adminCookie}.extra`, `portfolio_admin=${'a'.repeat(2200)}`]) {
+      const response = await app.fetch(`${APP_ORIGIN}${path}`, {
+        method, headers: { origin: APP_ORIGIN, cookie, 'content-type': 'application/json' },
+        ...(method === 'GET' ? {} : { body: '{}' })
+      });
+      assert.equal(response.status, 401, `${method} ${path}`);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('set-cookie'), null);
+    }
+  }
+  for (const origin of ['', 'https://other.test']) {
+    const response = await app.fetch(`${APP_ORIGIN}/api/admin/logout`, {
+      method: 'POST', headers: { cookie: adminCookie, ...(origin ? { origin } : {}) }
+    });
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get('set-cookie'), null);
+  }
+  const logout = await app.fetch(`${APP_ORIGIN}/api/admin/logout`, { method: 'POST', headers: adminHeaders() });
+  assert.equal(logout.status, 200);
+  assert.match(logout.headers.get('set-cookie')!, /portfolio_admin=;/);
+  assert.match(logout.headers.get('set-cookie')!, /Max-Age=0/);
+  const afterLogout = await app.fetch(`${APP_ORIGIN}/api/admin/profile`, { headers: { cookie: logout.headers.get('set-cookie')!.split(';')[0] } });
+  assert.equal(afterLogout.status, 401);
+  const ignoredAnalytics = await app.fetch(`${APP_ORIGIN}/api/analytics`, {
+    method: 'POST', headers: { origin: APP_ORIGIN, cookie: 'portfolio_admin=%E0%A4%A', dnt: '1' }, body: '{}'
+  });
+  assert.equal(ignoredAnalytics.status, 204);
+  const invalidAnalytics = await app.fetch(`${APP_ORIGIN}/api/analytics`, {
+    method: 'POST', headers: { origin: APP_ORIGIN, cookie: 'portfolio_admin=%E0%A4%A', 'content-type': 'application/json' }, body: '{}'
+  });
+  assert.equal(invalidAnalytics.status, 400, 'malformed admin cookie must not crash public telemetry');
+});
+
+test('unused image optimizer returns identical not-found responses without file-existence hints', async () => {
+  let baseline = '';
+  for (const path of ['/_image', '/_image/', '/%5fimage']) {
+    for (const href of ['/favicon.svg', '/not-a-real-file.svg', '/.env', 'https://external.test/image.png']) {
+      const response = await app.fetch(`${APP_ORIGIN}${path}?href=${encodeURIComponent(href)}&w=100`);
+      assert.equal(response.status, 404, `${path}: ${href}`);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      const body = await response.text();
+      if (!baseline) baseline = body;
+      assert.equal(body, baseline);
+    }
+  }
+  assert.equal((await app.fetch(`${APP_ORIGIN}/favicon.svg`)).status, 200);
 });
 
 test("saved work blocks are read from D1 and rendered on the public detail page", async () => {
@@ -972,7 +1032,7 @@ test("D1 read failures expose degraded content without caching the fallback resp
   const healthResponse = await app.fetch(`${APP_ORIGIN}/api/health`);
   assert.equal(healthResponse.status, 503);
   assert.equal(healthResponse.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await healthResponse.json(), { status: "degraded", database: "unavailable" });
+  assert.deepEqual(await healthResponse.json(), { status: "degraded" });
 
   for (let requestIndex = 0; requestIndex < 2; requestIndex += 1) {
     const response = await app.fetch(`${APP_ORIGIN}/work/rush-hour-app`);

@@ -82,7 +82,12 @@ const getCookie = (request: Request, name: string) => {
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${name}=`));
 
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+  if (!match || match.length > 2048) return null;
+  try {
+    return decodeURIComponent(match.slice(name.length + 1));
+  } catch {
+    return null;
+  }
 };
 
 export const verifyPassword = async (password: string, storedHash = env.ADMIN_PASSWORD_HASH) => {
@@ -126,7 +131,7 @@ export const createExpiredSessionCookie = () =>
 
 export const isAdminRequest = async (request: Request) => {
   const token = getCookie(request, COOKIE_NAME);
-  if (!token) return false;
+  if (!token || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(token)) return false;
 
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return false;
@@ -136,7 +141,7 @@ export const isAdminRequest = async (request: Request) => {
 
   try {
     const parsed = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload))) as { sub?: string; exp?: number };
-    return parsed.sub === "admin" && typeof parsed.exp === "number" && parsed.exp > Date.now();
+    return parsed.sub === "admin" && typeof parsed.exp === "number" && Number.isFinite(parsed.exp) && parsed.exp > Date.now();
   } catch {
     return false;
   }

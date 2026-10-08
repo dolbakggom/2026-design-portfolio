@@ -36,6 +36,19 @@
 
 ---
 
+## 2026-10-08 Endpoint Hardening
+
+- 요청: 다음 보안 개선 단계 진행 및 작업 요약.
+- 공개 `/api/health`는 기존 D1 필수 테이블 검증과 서버 장애 로그를 유지하되 응답에서 database 항목을 제거했습니다. 정상은 status: ok / 200, 장애는 status: degraded / 503이며 no-store를 유지합니다. 상태 자체는 uptime 모니터를 위해 공개합니다.
+- `/api/admin/logout`도 CMS 세션을 검증하도록 수정했습니다. 익명/변조 쿠키는 401이고 mutation Origin 가드는 기존 middleware에서 유지합니다. 정상 로그아웃은 현재 브라우저 쿠키만 지웁니다. 복제된 stateless 세션의 서버 측 폐기 및 Access 로그아웃 기능을 추가한 것은 아닙니다.
+- 쿠키 URI 디코딩 오류, 2048자를 넘는 쿠키, 잘못된 토큰 구조/서명 길이, 추가 token segment를 미인증으로 처리합니다. 악성 쿠키가 공개 통계 API나 관리자 API를 500으로 만드는 문제를 방지합니다.
+- 현재 이미지는 R2 미디어 및 저장된 반응형 variants를 사용하고 astro:assets를 쓰지 않는 것을 소스에서 확인했습니다. 사용하지 않는 `/_image`는 기존파일/없는파일/외부URL/encoded 및 trailing-slash 경로에 모두 동일한 no-store 404를 반환하도록 차단했습니다. 일반 static/R2 이미지 경로는 유지하며 향후 Astro 이미지 변환 사용 시 guard 검토가 필요합니다.
+- Worker 통합 테스트에 관리자 데이터 작업 15개 × 쿠키 5종 인증 거부, 로그아웃 Origin/정상 쿠키 만료, 공개 통계 malformed cookie, 이미지 경로 존재 여부 구분 제거 검증을 추가했습니다. 기존 작업물 저장→D1→공개 렌더링, R2 업로드, 방문 통계, 모바일 및 관리자 UI 테스트도 유지합니다.
+- 중요 파일: `src/lib/auth.ts`, `src/pages/api/admin/logout.ts`, `src/pages/api/health.ts`, `src/middleware.ts`, `tests/integration/worker.integration.ts`, `README.md`, `SECURITY-PLAN.md`.
+- 단위 테스트 95개 통과, build/check 0 errors/0 warnings. 전체 통합 최종 결과는 아래 후속 기록에 남깁니다. D1 migration/새 secret은 없으며 커밋·푸시·운영 배포는 이번 요청에서 수행하지 않았습니다.
+- 다음 단계: dependency advisory의 실제 사용 기능/영향 버전 확인 후 필요한 최소 업데이트 및 회귀 검증. Access 실제 관리자 인증은 사용자 확인이 남아 있습니다.
+- 최종 검증: 단위 95/95, `npm run test:integration` 재실행 build/check 0 errors/0 warnings 및 17/17 통과, `git diff --check` 통과. 최초 통합 실행은 16/17 통과하고 기존 갤러리 `/work` 위치 대기(line 632)만 30초 timeout이 발생했습니다. 홈 스크롤 코드는 수정하지 않았고 동일 명령 재실행에서는 해당 테스트가 약 4.3초에 통과했습니다. 스크롤 타이밍 테스트의 간헐적 불안정은 별도 주의사항으로 남깁니다.
+
 ## 2026-10-08 Analytics Integrity
 
 - 요청: 기존 관리자 보안 변경을 커밋/푸시하고 다음 개선 단계 진행. `c7d1edc`를 main에 푸시했습니다.
