@@ -36,6 +36,32 @@
 
 ---
 
+## 2026-10-08 Security Remediation: Login And Access
+
+- 요청: 외부 취약점 보고서 개선 계획을 순서대로 실행하고 설치한 Cloudflare 플러그인으로 운영 설정 적용.
+- 플러그인 조회로 운영 로그인 rate-limit binding(10회/60초)이 존재함을 확인했습니다. 존재하지 않는 테스트 계정으로 최대 15회만 시도하는 운영 검증은 12번째 요청에서 429와 Retry-After: 60을 받아 즉시 중단했습니다. 보고서의 "제한 없음"과 달리 현재 운영에서는 제한이 동작하며, Cloudflare location별 eventual consistency라는 한계가 있습니다.
+- 로그인 제한 키를 전체 공유에서 Cloudflare client IP별로 분리했습니다. 로그인 JSON은 4 KiB로 제한하고 실패/차단/검증 장애 구조화 로그를 추가했습니다. 비밀번호, 쿠키, 입력 아이디, 원본 IP, 요청 본문은 로그에 남기지 않습니다. 자동 경보 메일이나 전역 계정 잠금은 추가하지 않았습니다.
+- 사용자에게 허용 이메일을 확인한 후 Cloudflare One organization(`dolbakggom.cloudflareaccess.com`), email PIN IdP, `Portfolio administrator` Access application을 플러그인으로 생성했습니다. 앱 ID: `05847c87-ee59-4a3f-a56a-5cc3f06b8c9f`, 정책 ID: `c79cf542-682a-4b6b-80f4-ae506b1b02a2`. 허용된 이메일 1개만 포함하고 세션은 8시간입니다. `/admin`, `/admin/*`, `/api/admin`, `/api/admin/*`만 보호하며 공개 사이트 전체 차단은 적용하지 않았습니다.
+- `jose`로 Access JWT 서명, RS256, issuer, audience, exp/iat/sub를 검증하는 production middleware를 추가했습니다. 기존 CMS 세션 인증은 유지합니다. 로컬 dev와 명시적으로 분리된 통합 fixture만 Access를 우회합니다.
+- 운영 workers.dev와 preview URL이 이미 꺼져 있음을 API로 확인하고, 재배포 시 유지되도록 Wrangler에 false를 명시했습니다. Access 설정은 비밀값이 아닌 vars로 관리하고 binding types를 재생성했습니다.
+- 운영 확인: 공개 `/`, `/work/rush-hour-app` 200, 익명 `/admin`, `/api/admin/profile`, `/api/admin/login`은 Access 인증 도메인으로 302. 사용자가 이메일 PIN 인증 후 실제 CMS 로그인까지 확인하는 검증은 아직 필요합니다. 인증 코드는 채팅에 수집하지 않습니다.
+- 첫 Worker 배포 성공: version `6de098d1-9d1f-4b94-968c-0f0cfc3c32e3`. D1/R2 콘텐츠와 migration은 변경하지 않았으며 커밋/푸시는 수행하지 않았습니다.
+- 배포 로그에서 macOS `.DS_Store` asset 포함을 발견해 `public/.assetsignore`로 메타데이터 배포를 제외했습니다. 최종 재배포/검증 결과는 아래 후속 기록에 남깁니다.
+- 검증: 단위 92개 통과, Astro check 76 files / 0 errors / 0 warnings 및 build 성공. 첫 전체 통합 실행 14개 통과. 추가 Access 테스트 포함 재실행은 기존 홈 스크롤 테스트에서 대기가 끝나지 않아 중단(8개 통과, 파일 실행 취소)했지만, 관리자 로그인/IP 분리/Access middleware 3개 독립 실행은 모두 통과했습니다. 최종 `npm run test:integration` 표준 명령 재실행은 15개 모두 통과했습니다.
+- npm 설치가 node_modules symlink를 디렉터리로 교체해 `node_modules -> node_modules.nosync`를 복구했습니다. 기존 dependency 디렉터리는 `/tmp/portfolio-node-modules-before-security-20261008`에 보존했습니다. 중간 테스트 실행의 astro 명령 누락은 설치 중 경로 교체 때문이며 복구 후 빌드 성공했습니다.
+- 추가로 `npm audit --omit=dev`에서 46 package entries(30 moderate/15 high/1 critical)가 보고되었습니다. Astro/Tiptap 등 실제 영향 기능을 확인하고 업데이트해야 합니다. 이 숫자는 빌드 도구/전이 의존성도 포함하며 실제 악용 가능성이 확인된 취약점 수는 아닙니다. 무검토 audit fix는 실행하지 않았습니다.
+- 중요 파일: `src/lib/admin-login-security.ts`, `src/lib/cloudflare-access.ts`, `src/pages/api/admin/login.ts`, `src/middleware.ts`, `wrangler.toml`, `tests/admin-login-security.test.ts`, `tests/cloudflare-access.test.ts`, `tests/integration/worker.integration.ts`, `README.md`, `AGENTS.md`, `SECURITY-PLAN.md`.
+- 다음 순서: 익명 통계 위조/재전송 방어, health/logout/image endpoint 정보 노출 정리, dependency advisory 영향 검토. Access 설정 제거만으로는 Worker의 JWT 요구가 해제되지 않으므로 롤백 시 Access 설정과 Worker 설정을 함께 조정해야 합니다.
+- 메타데이터 제외 후속: 첫 검증 빌드가 시작된 뒤 ignore 파일을 추가해 당시 산출물에는 규칙이 없었습니다. Cloudflare Vite plugin 소스를 확인한 결과 public `.assetsignore` 규칙을 읽고 기본 `wrangler.json`/`.dev.vars` 제외를 추가하므로 별도 integration은 필요하지 않습니다. 새 빌드 산출물에서 메타데이터 제외와 기본 secret/config 제외를 함께 확인했습니다.
+- 최종 운영 배포 version: `8ca3f2af-939b-47bc-94ff-9ec7db98c031`. 홈/작업물/health 200, 관리자 화면과 API Access redirect 302, `/.DS_Store`와 `/assets/.DS_Store` 404 확인. 임시 hook 제거 후 최종 build도 0 errors/0 warnings로 성공했습니다. 코드·설정 변경은 미커밋 상태이며 후속 작업 목록은 `SECURITY-PLAN.md`에 유지합니다.
+
+## 2026-09-18 Production Analytics D1 Migration
+
+- 요청: 운영 Dashboard의 방문 통계 오류 확인 후 미적용 D1 migration을 직접 실행.
+- 운영 migration 목록에서 `0009_visit_analytics.sql`만 미적용임을 확인하고, 사용자 승인 후 `npm run db:migrate:remote`로 적용했습니다.
+- `analytics_views` 테이블과 인덱스 생성 성공. 원격 `SELECT COUNT(*) AS recorded_views FROM analytics_views` 조회 성공(검증 시점 0건). 기존 콘텐츠 테이블은 변경하지 않았습니다.
+- 관리자 화면은 새로고침 후 확인하면 됩니다. 과거 방문 기록은 복원되지 않으며 이후 수집부터 기록됩니다. 별도 코드 재배포나 커밋/푸시는 수행하지 않았습니다.
+
 ## 2026-09-17 Cloudflare Scanner Protection And Unused Pages Removal
 
 - 요청: Cloudflare의 해외 트래픽을 점검하고 안전한 보안 설정 적용. 사용하지 않는 기타 타브 서비스의 DNS, 자동 배포 및 공개 접속 중지는 사용자에게 범위를 확인한 후 진행했습니다.

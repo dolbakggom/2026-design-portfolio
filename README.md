@@ -29,7 +29,13 @@ npm run dev
 - D1 binding: `DB`
 - R2 binding: `MEDIA_BUCKET`
 - KV binding: `SESSION`
-- Rate limiting binding: `ADMIN_LOGIN_RATE_LIMITER` (10 attempts per minute per Cloudflare location)
+- Rate limiting binding: `ADMIN_LOGIN_RATE_LIMITER` (10 attempts per client IP per minute per Cloudflare location; eventually consistent)
+- Production administrator access: Cloudflare Access email verification, then the existing CMS login. The Access session lasts 8 hours; the CMS session is separate.
+- Protect `/admin`, `/admin/*`, `/api/admin`, and `/api/admin/*` only. Never apply the administrator policy to the entire public Worker.
+- Access configuration: `CLOUDFLARE_ACCESS_ENABLED`, `CLOUDFLARE_ACCESS_TEAM_DOMAIN`, `CLOUDFLARE_ACCESS_AUD`. These are not credentials. Production middleware verifies the signed assertion, issuer, audience, and expiry; missing or invalid assertions are rejected.
+- Local `astro dev` does not require Access. Isolated integration fixtures explicitly disable Access except the dedicated perimeter test. Do not disable it on production to make tests pass.
+- Keep `workers_dev = false` and `preview_urls = false` so deployment does not expose alternative administrator hostnames.
+- Login security events use `portfolio.admin.login_security` without request bodies, passwords, cookies, usernames, or raw client IPs. These logs are not automatic email alerts.
 - Required secrets: `ADMIN_PASSWORD_HASH`, `SESSION_SECRET`
 - Deploy with Cloudflare Workers, not Cloudflare Pages. Astro 7 + `@astrojs/cloudflare` v14 targets Workers.
 - Build command: `npm run build`

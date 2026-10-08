@@ -46,3 +46,6 @@
 - `SESSION_SECRET` must contain at least 32 random bytes. Prefer salted PBKDF2 password hashes; legacy `sha256:` hashes remain temporarily supported for existing deployments.
 - Optional cache purge vars/secrets: `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_CACHE_PURGE_TOKEN`. When present, admin saves purge public HTML through Cloudflare's global purge API in addition to the Worker Cache API.
 - Non-secret admin username may live in Wrangler vars as `ADMIN_USERNAME`.
+- Production `/admin` and `/api/admin` paths are protected by Cloudflare Access and signed JWT verification. Keep public routes unrestricted and preserve existing CMS session checks behind Access.
+- Preserve Access configuration and disabled `workers.dev`/preview URLs on deploy. Local dev bypasses Access; production must never use a test bypass.
+- Login rate limiting uses Cloudflare-supplied client IPs, not client forwarding headers or a shared key. Security logs must not include passwords, cookies, raw IPs, or request bodies.

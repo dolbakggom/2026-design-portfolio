@@ -2,6 +2,8 @@ name = "2026-design-portfolio"
 main = "@astrojs/cloudflare/entrypoints/server"
 compatibility_date = "2026-05-04"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
 routes = [
   { pattern = "dolbakggom.com", custom_domain = true }
 ]
@@ -38,6 +40,9 @@ namespace_id = "71014"
 
 [vars]
 ADMIN_USERNAME = "dolbakggom"
+CLOUDFLARE_ACCESS_ENABLED = "true"
+CLOUDFLARE_ACCESS_TEAM_DOMAIN = "dolbakggom.cloudflareaccess.com"
+CLOUDFLARE_ACCESS_AUD = "f3a21bdc5434ddd3f80622afaba79aed87cd1a4245e5e3aef1eacae0b814bee2"
 
 [[ratelimits]]
 name = "ANALYTICS_RATE_LIMITER"

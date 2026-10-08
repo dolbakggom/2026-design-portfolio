@@ -1,4 +1,6 @@
 import { defineMiddleware } from "astro:middleware";
+import { env } from "cloudflare:workers";
+import { isAdminPath, verifyCloudflareAccess } from "./lib/cloudflare-access";
 import { isFallbackContentResponse } from "./lib/content-response";
 import { forbidden } from "./lib/http";
 import { isAllowedAdminMutation } from "./lib/request-security";
@@ -50,6 +52,12 @@ const withPublicCacheHeaders = (response: Response, cacheState: "MISS" | "BYPASS
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const requestUrl = new URL(context.request.url);
+  if (import.meta.env.PROD && isAdminPath(requestUrl.pathname) && env.CLOUDFLARE_ACCESS_ENABLED === "true") {
+    if (!(await verifyCloudflareAccess(context.request, {
+      teamDomain: env.CLOUDFLARE_ACCESS_TEAM_DOMAIN,
+      audience: env.CLOUDFLARE_ACCESS_AUD
+    }))) return forbidden();
+  }
   if (requestUrl.pathname.startsWith("/api/admin/") && !isAllowedAdminMutation(context.request)) {
     return forbidden();
   }

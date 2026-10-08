@@ -77,7 +77,7 @@ before(async () => {
     workers: [
       {
         configPath: "dist/server/wrangler.json",
-        vars: { ADMIN_USERNAME },
+        vars: { ADMIN_USERNAME, CLOUDFLARE_ACCESS_ENABLED: "false" },
         secrets: {
           ADMIN_PASSWORD_HASH: `sha256:${createHash("sha256").update(ADMIN_PASSWORD).digest("hex")}`,
           SESSION_SECRET
@@ -880,6 +880,53 @@ test("admin CSS imports render the shell and work editor layout", async () => {
     assert.ok(Math.abs(editorState.stickyOffset) <= 1, `sticky toolbar offset: ${editorState.stickyOffset}`);
   } finally {
     await browser.close();
+  }
+});
+
+test("login rate limiting returns 429 and leaves other client IPs able to authenticate", async () => {
+  const login = (ip: string, password: string) => app.fetch(`${APP_ORIGIN}/api/admin/login`, {
+    method: "POST",
+    headers: { origin: APP_ORIGIN, "content-type": "application/json", "cf-connecting-ip": ip },
+    body: JSON.stringify({ username: ADMIN_USERNAME, password })
+  });
+  let limited: Response | undefined;
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const response = await login("192.0.2.101", "wrong-password");
+    if (response.status === 429) {
+      limited = response;
+      break;
+    }
+    assert.equal(response.status, 401);
+    await new Promise(resolve => setTimeout(resolve, 30));
+  }
+  assert.ok(limited, "repeated invalid credentials must eventually be rate limited");
+  assert.equal(limited.headers.get("retry-after"), "60");
+  assert.equal(limited.headers.get("cache-control"), "no-store");
+  assert.equal(limited.headers.get("set-cookie"), null);
+  const otherClient = await login("192.0.2.102", ADMIN_PASSWORD);
+  assert.equal(otherClient.status, 200);
+  assert.match(otherClient.headers.get("set-cookie") ?? "", /portfolio_admin=/);
+});
+
+test("production Access middleware rejects missing and forged assertions on every admin route", async () => {
+  const protectedServer = createTestHarness({
+    root: process.cwd(),
+    workers: [{ configPath: "dist/server/wrangler.json", vars: { CLOUDFLARE_ACCESS_ENABLED: "true" } }]
+  });
+  try {
+    await protectedServer.listen();
+    const protectedWorker = protectedServer.getWorker(APP_WORKER);
+    for (const path of ["/admin", "/admin/", "/api/admin", "/api/admin/profile", "/api/admin/login"]) {
+      for (const headers of [{}, { "cf-access-jwt-assertion": "forged-token" }]) {
+        const response = await protectedWorker.fetch(`${APP_ORIGIN}${path}`, { headers });
+        assert.equal(response.status, 403, path);
+        assert.equal(response.headers.get("cache-control"), "no-store");
+      }
+    }
+    const publicProbe = await protectedWorker.fetch(`${APP_ORIGIN}/api/health`);
+    assert.notEqual(publicProbe.status, 403, "public probes must not require Access");
+  } finally {
+    await protectedServer.close();
   }
 });
 
