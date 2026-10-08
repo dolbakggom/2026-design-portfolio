@@ -36,6 +36,19 @@
 
 ---
 
+## 2026-10-08 Analytics Integrity
+
+- 요청: 기존 관리자 보안 변경을 커밋/푸시하고 다음 개선 단계 진행. `c7d1edc`를 main에 푸시했습니다.
+- 익명 통계의 클라이언트 UUID를 신뢰하던 구조를 서버 발급 식별자와 서명된 page ticket으로 교체했습니다. HttpOnly/SameSite/HTTPS Secure 쿠키는 `/api/analytics`에만 적용되고 30분 동안 갱신되지 않으면 만료됩니다. 기존 공개 HTML 캐시와 CMS 인증 쿠키는 변경하지 않았습니다.
+- `/api/analytics/session`은 공개 페이지 경로와 메타데이터를 검증하고 IP당 10회/60초의 별도 Cloudflare limiter를 적용합니다. ticket은 24시간 만료, session cookie는 30분 만료이며 기존 SESSION_SECRET에서 도메인 분리된 서명 키를 파생합니다. 새 secret이나 D1 migration은 필요하지 않습니다.
+- 수집 API는 서명, origin, session cookie, 서버 발급 ID, 페이지/유입 도메인/기기 일치를 확인합니다. 보고된 시간은 서버에서 실제 지난 시간으로 제한합니다. 동일/과거 체류시간 전송은 조회수와 체류시간 및 last_seen을 변경하지 않습니다.
+- 클라이언트는 페이지 전환 시 발급 요청을 순서대로 처리하고 이전 페이지 응답이 새 상태를 덮어쓰지 못하게 합니다. 5초 활성 체류 후 기록, DNT/GPC/기존 opt-out/관리자/로컬 제외는 유지했습니다. IP와 원본 UA는 통계 테이블에 저장하지 않습니다.
+- 한계: 공개 발급 API를 사용하는 자동화까지 실제 사람과 구별하지는 못합니다. Cloudflare limiter는 location별로 동작합니다. 이미 열려 있는 구버전 탭은 ticket이 없어 기록이 거부되며 새로고침하면 정상 수집됩니다. 공개 페이지 감상에는 영향이 없습니다.
+- 중요 파일: `src/lib/analytics-security.ts`, `src/lib/analytics.ts`, `src/pages/api/analytics/session.ts`, `src/pages/api/analytics.ts`, `src/scripts/visit-analytics.ts`, `wrangler.toml`, `worker-configuration.d.ts`, analytics 단위/Worker 통합 테스트, `README.md`, `SECURITY-PLAN.md`.
+- 검증: 단위 95개 통과. build/check 78 files, 0 errors/0 warnings, Worker/Chrome 통합 15개 통과. 최종 회귀 검증과 배포 결과는 아래에 이어 기록합니다. 최초 check의 응답 JSON unknown 타입 오류는 런타임 구조 검증으로 수정했습니다. cf:types는 로그 경로 sandbox EPERM 경고가 있었으나 타입 생성은 exit 0으로 완료했습니다.
+- 다음 단계: health/logout/image 노출 범위 정리 및 관리자 API 인증 회귀, 이후 dependency advisory 영향 평가. Access의 실제 이메일 PIN/CMS 로그인은 사용자 확인이 남아 있습니다.
+- 최종 재검증: `npm run test:unit` 95/95, `npm run test:integration` build/check 0 errors/0 warnings 및 15/15 통과, `git diff --check` 통과. 이번 요청은 커밋/푸시까지 수행하며 수동 Worker 배포나 운영 통계 데이터 쓰기는 수행하지 않았습니다. 운영 반영은 연결된 배포의 성공 여부를 별도로 확인해야 합니다.
+
 ## 2026-10-08 Security Remediation: Login And Access
 
 - 요청: 외부 취약점 보고서 개선 계획을 순서대로 실행하고 설치한 Cloudflare 플러그인으로 운영 설정 적용.

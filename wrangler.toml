@@ -51,3 +51,11 @@ namespace_id = "71015"
   [ratelimits.simple]
   limit = 120
   period = 60
+
+[[ratelimits]]
+name = "ANALYTICS_SESSION_RATE_LIMITER"
+namespace_id = "71016"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60

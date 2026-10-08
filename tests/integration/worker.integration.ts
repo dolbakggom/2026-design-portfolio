@@ -4,6 +4,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { chromium } from "playwright-core";
 import { createTestHarness, type TestHarness, type WorkerHandle } from "wrangler";
+import { issueAnalyticsView } from '../../src/lib/analytics-security.ts';
 
 const APP_ORIGIN = "http://portfolio.test";
 const ADMIN_USERNAME = "integration-admin";
@@ -218,14 +219,39 @@ test("saved work blocks are read from D1 and rendered on the public detail page"
 });
 
 test("analytics excludes admins and private data, deduplicates visits, and restricts reports", async () => {
-  const payload = { id: crypto.randomUUID(), sessionId: crypto.randomUUID(), path: '/work/integration-work', referrer: 'google.com', device: 'desktop', activeSeconds: 5 };
+  const metadata = { path: '/work/integration-work', referrer: 'google.com', device: 'desktop' as const };
+  const bootstrap = await app.fetch(`${APP_ORIGIN}/api/analytics/session`, {
+    method: 'POST', headers: { origin: APP_ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify(metadata)
+  });
+  assert.equal(bootstrap.status, 200);
+  assert.match(bootstrap.headers.get('set-cookie')!, /HttpOnly/);
+  const freshTicket = await bootstrap.json() as { id: string; sessionId: string; viewToken: string };
+  const immediate = await app.fetch(`${APP_ORIGIN}/api/analytics`, {
+    method: 'POST', headers: { origin: APP_ORIGIN, 'content-type': 'application/json', cookie: bootstrap.headers.get('set-cookie')!.split(';')[0] },
+    body: JSON.stringify({ ...freshTicket, ...metadata, activeSeconds: 86400 })
+  });
+  assert.equal(immediate.status, 204);
+  const invalidBootstrap = await app.fetch(`${APP_ORIGIN}/api/analytics/session`, {
+    method: 'POST', headers: { origin: APP_ORIGIN, 'content-type': 'application/json' },
+    body: JSON.stringify({ ...metadata, sessionId: crypto.randomUUID() })
+  });
+  assert.equal(invalidBootstrap.status, 400);
+  const issued = await issueAnalyticsView(new Request(`${APP_ORIGIN}/api/analytics`), metadata, SESSION_SECRET, false, Date.now() - 10000);
+  const cookie = issued.cookie.split(';')[0];
+  const payload = { id: issued.view.id, sessionId: issued.view.sessionId, viewToken: issued.viewToken, ...metadata, activeSeconds: 5 };
   const send = (body: object, headers: Record<string, string> = {}) => app.fetch(`${APP_ORIGIN}/api/analytics`, {
-    method: 'POST', headers: { origin: APP_ORIGIN, 'content-type': 'application/json', ...headers }, body: JSON.stringify(body)
+    method: 'POST', headers: { origin: APP_ORIGIN, cookie, 'content-type': 'application/json', ...headers }, body: JSON.stringify(body)
   });
   assert.equal((await app.fetch(`${APP_ORIGIN}/api/admin/analytics`)).status, 401);
   assert.equal((await send(payload, { origin: 'https://other.test' })).status, 403);
   assert.equal((await send({ ...payload, referrer: 'google.com/?q=secret' })).status, 400);
-  assert.equal((await send({ ...payload, path: '/work/not-a-public-project' })).status, 400);
+  assert.equal((await send({ ...payload, path: '/work/not-a-public-project' })).status, 403);
+  assert.equal((await send({ ...payload, id: crypto.randomUUID() })).status, 403);
+  assert.equal((await send({ ...payload, sessionId: crypto.randomUUID() })).status, 403);
+  assert.equal((await send({ ...payload, referrer: 'other.test' })).status, 403);
+  assert.equal((await send({ ...payload, device: 'mobile' })).status, 403);
+  assert.equal((await send(payload, { cookie: '' })).status, 403);
+  assert.equal((await send({ ...payload, viewToken: 'forged' })).status, 403);
   assert.equal((await send(payload, { cookie: adminCookie })).status, 204);
   assert.equal((await send(payload, { dnt: '1' })).status, 204);
   assert.equal((await send(payload, { 'user-agent': 'PreviewBot' })).status, 204);
@@ -233,16 +259,19 @@ test("analytics excludes admins and private data, deduplicates visits, and restr
     const response = await app.fetch(`${APP_ORIGIN}/api/admin/analytics?days=7`, { headers: adminHeaders() });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'no-store');
-    return await response.json() as { summary: { sessions: number; views: number; seconds: number }; daily: unknown[]; recent: { paths: string }[] };
+    return await response.json() as { summary: { sessions: number; views: number; seconds: number }; daily: unknown[]; recent: { paths: string; lastSeen: number }[] };
   };
   assert.equal((await report()).summary.views, 0);
   assert.equal((await send(payload)).status, 204);
+  const lastSeen = (await report()).recent[0].lastSeen;
   assert.equal((await send(payload)).status, 204);
+  assert.equal((await report()).recent[0].lastSeen, lastSeen);
   assert.deepEqual((await report()).summary, { sessions: 1, views: 1, seconds: 5 });
   await send({ ...payload, activeSeconds: 6 });
   await send({ ...payload, activeSeconds: 5 });
   assert.equal((await report()).summary.seconds, 6);
-  await send({ ...payload, id: crypto.randomUUID(), path: '/about' });
+  const about = await issueAnalyticsView(new Request(`${APP_ORIGIN}/api/analytics`, { headers: { cookie } }), { ...metadata, path: '/about' }, SESSION_SECRET, false, Date.now() - 10000);
+  await send({ ...payload, id: about.view.id, viewToken: about.viewToken, path: '/about' });
   const twoPages = await report();
   assert.equal(twoPages.summary.sessions, 1);
   assert.equal(twoPages.summary.views, 2);
@@ -263,6 +292,11 @@ test('browser analytics waits for engagement, keeps a session across pages, and 
       if (url.pathname === '/api/analytics') {
         events.push(route.request().postDataJSON());
         await route.fulfill({ status: 204 });
+      } else if (url.pathname === '/api/analytics/session') {
+        const response = await app.fetch(url.href, { method: 'POST', headers: {
+          origin: url.origin, 'content-type': 'application/json', cookie: route.request().headers()['cookie'] ?? ''
+        }, body: route.request().postData() });
+        await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: await response.text() });
       } else {
         const response = await route.fetch({ url: `${harnessOrigin}${url.pathname}${url.search}` });
         await route.fulfill({ response });
@@ -282,11 +316,7 @@ test('browser analytics waits for engagement, keeps a session across pages, and 
     assert.equal(home.path, new URL(page.url()).pathname);
     assert.equal(home.sessionId, events[0].sessionId);
     assert.notEqual(home.id, events[0].id);
-    await page.evaluate(() => {
-      const session = JSON.parse(localStorage.getItem('portfolio-visit-session')!);
-      session.last = Date.now() - 31 * 60 * 1000;
-      localStorage.setItem('portfolio-visit-session', JSON.stringify(session));
-    });
+    await page.context().clearCookies();
     const renewed = page.waitForResponse(response => response.url().endsWith('/api/analytics') && response.request().postDataJSON().sessionId !== home.sessionId);
     await page.goto('https://dolbakggom.com/work/integration-work', { waitUntil: 'domcontentloaded' });
     await renewed;
@@ -745,9 +775,11 @@ test("admin CSS imports render the shell and work editor layout", async () => {
     await page.getByRole('button', { name: '최근 30일', exact: true }).click();
     await page.getByText('아직 기록된 방문이 없습니다.', { exact: true }).waitFor();
 
+    const metadata = { path: '/work/integration-work', referrer: 'google.com', device: 'mobile' as const };
+    const issued = await issueAnalyticsView(new Request(`${APP_ORIGIN}/api/analytics`), metadata, SESSION_SECRET, false, Date.now() - 15000);
     await app.fetch(`${APP_ORIGIN}/api/analytics`, {
-      method: 'POST', headers: { origin: APP_ORIGIN, 'content-type': 'application/json' },
-      body: JSON.stringify({ id: crypto.randomUUID(), sessionId: crypto.randomUUID(), path: '/work/integration-work', referrer: 'google.com', device: 'mobile', activeSeconds: 10 })
+      method: 'POST', headers: { origin: APP_ORIGIN, cookie: issued.cookie.split(';')[0], 'content-type': 'application/json' },
+      body: JSON.stringify({ id: issued.view.id, sessionId: issued.view.sessionId, viewToken: issued.viewToken, ...metadata, activeSeconds: 10 })
     });
     await page.getByRole('button', { name: '새로고침', exact: true }).click();
     await page.getByRole('heading', { name: '많이 본 프로젝트', exact: true }).waitFor();

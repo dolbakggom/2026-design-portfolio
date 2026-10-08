@@ -25,7 +25,7 @@ not successful administrator access or private file contents being read.
    - Verify Access signatures in the Worker for path-based protection.
    - Production workers.dev and preview URLs are already disabled.
    - Preserve the existing application session authentication and local editing.
-3. Analytics integrity: pending.
+3. Analytics integrity: implemented; verification and rollout recorded in HISTORY.md.
    - Use server-issued expiring anonymous identifiers/tokens with replay controls.
    - Retain request limits and privacy exclusions; do not persist visitor IPs.
    - Anonymous tokens reduce forgery but do not prove a visitor is human.
