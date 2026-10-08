@@ -36,6 +36,29 @@
 
 ---
 
+## 2026-10-08 Security Changes Commit And Remaining Checks
+
+- 요청: 의존성 보안 업데이트 및 초기 gallery 진입 수정까지 커밋하고 남은 작업 확인.
+- `package.json`/lock, editor 보안 회귀, 초기 `/work` pin-refresh 정렬, 관련 통합 테스트와 문서/히스토리를 함께 커밋합니다. push/운영 배포는 이번 요청에 포함하지 않습니다.
+- 직전 최종 검증 결과: 전체 npm audit 0건, 단위 97/97, build/check 0 errors/0 warnings, 전체 통합 17/17 및 canonical assertion 포함 독립 통합 6/6. 이번 커밋 준비에서는 `git diff --check`를 재확인했으며 코드 변경 없이 테스트 전체를 재실행하지는 않았습니다.
+- 계획의 코드 개선 1~5단계는 구현 완료입니다. 남은 완료 조건은 미푸시 커밋의 릴리스/운영 배포 확인, 실제 소유자 이메일 PIN→CMS 로그인 확인, 운영 저장/이미지 업로드/공개 화면/통계 회귀 검증입니다. 통계 변경은 이미 push했지만 실제 운영 배포 성공을 확인한 기록은 없습니다.
+- 장기 유지보수: upstream Miniflare Sharp pin이 patched version으로 갱신되면 temporary override 검토/제거, 정기 audit 및 회귀 테스트. 감사 0건은 무취약 보증이 아닙니다. 추가 D1 migration/새 secret은 필요하지 않습니다.
+
+## 2026-10-08 Dependency Security Updates
+
+- 요청: 이전 API 보안 변경은 커밋만 하고 다음 단계 진행. `b935692`(Harden health logout and unused image endpoints)를 생성했으며 push/운영 배포는 하지 않았습니다.
+- npm/공식 maintainer 공지와 실제 소스 사용 범위를 분석했습니다. 시작 보고는 46 package entries(30 moderate/15 high/1 critical)이며 취약점이 실제 46곳에서 악용된다는 의미는 아닙니다. Astro AVIF 최적화는 passthrough/R2/미사용 _image 차단으로 현재 사용되지 않지만 패치를 적용했습니다. configured base/ClientRouter와 Tiptap Markdown extension도 현재 사용되지 않습니다. Tiptap은 관리자 브라우저 붙여넣기, sanitize-html은 저장/렌더링 경계라 우선 업데이트했습니다.
+- Astro 7.3.7, Cloudflare 14.3.4, React adapter 6.0.6, Tiptap 계열 3.31.4, sanitize-html 2.18.0, Sharp 0.35.5, Wrangler 4.148.0으로 업데이트했습니다. root의 기존 major 범위를 유지하고 force/legacy-peer-deps는 사용하지 않았습니다. lock 재생성으로 나머지 허용 범위 내 전이/직접 의존성도 갱신됐습니다.
+- 기존 installed/locked Tiptap 3.22.5 graph는 새 정확 peer 3.31.4와 ERESOLVE가 발생해 기존 폴더/lock을 /tmp에 보존하고 새 graph를 설치했습니다. 임시 중간 설치의 파일 이동/lock 재해석 문제도 clean install로 정리했습니다. 최종 `node_modules -> node_modules.nosync`를 복구했습니다. 원본 보존 위치는 `/tmp/portfolio-dependencies-step5-20261008`, `/tmp/portfolio-package-lock-step5-20261008.json`입니다.
+- 상위 최신 Miniflare도 sharp 0.35.4를 고정하여 보고 5건이 남았습니다. miniflare에만 sharp 0.35.5를 지정한 temporary override를 적용했고 새 lock/설치를 검증했습니다. root Sharp도 같은 patched minor입니다. upstream pin 수정 시 override 검토/제거가 필요합니다. npm이 제안한 Wrangler 4.15.2 downgrade는 적용하지 않았습니다.
+- 최종 `npm audit` 전체 의존성 보고 0건. 단위 97/97 통과, check/build 78 files / 0 errors / 0 warnings. Tiptap JSON-origin prototype key가 실행속성을 상속하지 않는 테스트, SVG animation/foreignObject 제거 및 code 유지 테스트를 추가했습니다.
+- 첫 전체 통합은 16/17 통과하며 앞 단계에서도 발생한 기존 gallery 위치 대기(line 632)가 timeout했습니다. 동일 명령 재실행의 최종 결과는 아래에 기록합니다. 관리자 브라우저 inline-code 입력/preview, D1 저장→공개 렌더링, R2 업로드, 인증/통계 테스트는 통과했습니다.
+- `npm ls --all`은 node_modules symlink를 workspace links로 오인하여 upstream devDependencies/정확 dev-version 오류를 광범위하게 표시합니다. 실디렉터리에서 별도 확인한 결과 peer invalid 오류는 없고 optional `@img/sharp-wasm32`만 extraneous로 표시됩니다(0.35.5가 lock에 optional로 존재). 실제 build와 audit 결과로 검증합니다.
+- 중요 파일: `package.json`, `package-lock.json`, `tests/editor-dependency-security.test.ts`, `SECURITY-PLAN.md`, `README.md`. 새 D1 migration/secret/콘텐츠 변경은 없습니다. 이번 의존성 변경은 미커밋이며 push/배포하지 않습니다.
+- 추가 검증에서 같은 gallery timeout이 반복돼 위치를 계측했습니다. 초기 jump 뒤 pin spacer 재계산으로 scrollY 5398 / gallery offset 10160 / 화면 top 4762가 됐고 route도 `/`로 되돌아갔습니다. security와 무관한 Lenis는 기존 1.3.23으로 유지했으나 문제는 재현됐습니다. `src/scripts/home-page.ts`에서 첫 `/work` jump 후 최종 ScrollTrigger refresh 기준으로 한 번만 재정렬합니다. wheel/touch/pointer/key 입력이 있거나 back-forward 복원일 때는 보정하지 않아 사용자 위치를 덮어쓰지 않습니다.
+- 해당 테스트의 timeout 인수를 올바른 Playwright options 위치에 전달하고 실패 시 geometry 진단을 남기며 `/work` canonical 유지도 검증하도록 강화했습니다. 단순 timeout 증가나 assertion 완화로 우회하지 않았습니다. 최종 검증 결과는 아래 후속 기록에 남깁니다.
+- 최종 검증: `npm audit` 전체 및 `--omit=dev` 모두 보고 0건 / exit 0. 단위 97/97, build/check 0 errors/0 warnings 및 전체 통합 17/17 통과. 마지막 canonical assertion 추가 후 관련 fixture 포함 독립 통합 6/6도 통과했고 gallery 항목은 약 4.4초에 완료됐습니다. `git diff --check` 통과, iCloud symlink 확인 완료. 의존성 및 초기 갤러리 진입 수정은 미커밋 상태로 유지하며 push/운영 배포하지 않았습니다.
+
 ## 2026-10-08 Endpoint Hardening
 
 - 요청: 다음 보안 개선 단계 진행 및 작업 요약.

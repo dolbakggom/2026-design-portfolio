@@ -632,7 +632,18 @@ test("home loading, career endpoints, and gallery height stay visually aligned",
     await page.waitForFunction(() => {
       const section = document.querySelector<HTMLElement>(".gallery-section");
       return Boolean(section && Math.abs(section.getBoundingClientRect().top) <= 1);
-    }, { timeout: 8000 });
+    }, undefined, { timeout: 8000 }).catch(async error => {
+      console.error('gallery position diagnostics', await page.evaluate(() => ({
+        scroll: window.scrollY,
+        maximum: document.documentElement.scrollHeight - window.innerHeight,
+        offset: document.querySelector<HTMLElement>('.gallery-section')?.offsetTop,
+        top: document.querySelector('.gallery-section')?.getBoundingClientRect().top,
+        height: document.querySelector<HTMLElement>('.gallery-section')?.offsetHeight,
+        route: location.pathname
+      })));
+      throw error;
+    });
+    assert.equal(new URL(page.url()).pathname, '/work', 'gallery entry must retain its canonical route after pin refresh');
     const galleryHeights = await page.evaluate(() => {
       const section = document.querySelector<HTMLElement>(".gallery-section");
       const canvas = document.querySelector<HTMLElement>(".gallery-canvas");

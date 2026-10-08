@@ -318,6 +318,14 @@ const scrollToIntroFromFloatingButton = () => {
 scrollToTopHandler = scrollToIntroFromFloatingButton;
 portfolioWindow.__portfolioScrollToTop = scrollToIntroFromFloatingButton;
 
+let initialWorkAlignmentPending = initialSection === "work" && !shouldPreserveRestoredWorkScroll;
+let initialWorkJumped = false;
+for (const event of ["wheel", "touchstart", "pointerdown", "keydown"]) {
+  window.addEventListener(event, () => { initialWorkAlignmentPending = false; }, {
+    passive: true, once: true, signal: pageSignal
+  });
+}
+
 const refreshHomeScrollLayout = (force = false) => {
   const viewportChanged = syncHomeViewportHeight();
   updateScrollGeometryCache();
@@ -339,6 +347,13 @@ const refreshHomeScrollLayout = (force = false) => {
     identityController.queueTimelineFromScroll();
     portfolioWindow.__portfolioLenis?.resize?.();
     ScrollTrigger.refresh();
+    // Pin spacers can shift the gallery after the initial route jump.
+    if (initialWorkAlignmentPending && initialWorkJumped && gallerySection) {
+      initialWorkAlignmentPending = false;
+      portfolioWindow.__portfolioLenis?.resize?.();
+      scrollToPosition(gallerySection.offsetTop, "auto");
+      replaceRoute("/work", { immediate: true });
+    }
   }, 180);
 };
 
@@ -402,6 +417,7 @@ const scrollToInitialSection = () => {
         : 0;
 
   scrollToPosition(targetTop ?? 0, "auto");
+  if (initialSection === "work") initialWorkJumped = true;
   if (initialSection === "about") {
     identityController.playAboutIntro();
   }

@@ -67,6 +67,12 @@ npm run cf:types
 - Public health reports only the overall status and never caches it; the real D1 schema probe and sanitized failure logs remain active. HTTP 200/503 intentionally remains observable by uptime monitors.
 - The unused Astro `/_image` endpoint always returns the same non-cacheable 404, including encoded/trailing-slash variants, without inspecting the supplied image path. The site uses R2 media and stored responsive variants, not this optimizer. Review this guard before introducing `astro:assets` runtime image transformations.
 
+### Dependency Security
+
+- Keep the package lock with the security-reviewed versions and run `npm audit` plus `npm test` before releases. Zero audit findings means no currently reported package advisories, not that the application is vulnerability-free.
+- `overrides.miniflare.sharp` temporarily pins the patched 0.35.5 release because Miniflare's own dependency is still 0.35.4. Review/remove this targeted override when Cloudflare updates its pin; do not downgrade Wrangler or use `npm audit fix --force` to hide the advisory.
+- Preserve `node_modules -> node_modules.nosync` after installation. npm can replace this symlink or misinterpret linked dependency packages during deep `npm ls` checks; inspect actual peer versions before treating that output as a build failure.
+
 Public routes keep rendering starter content when D1 is unavailable. These fallback events are recorded as `portfolio.content.read_failed` with `home` or `work` scope. Inspect production failures in Workers Logs or stream only matching entries:
 
 ```bash
